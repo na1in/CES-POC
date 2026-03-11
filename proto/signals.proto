@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+import "google/protobuf/timestamp.proto";
+import "proto/customer.proto";
+import "proto/policy.proto";
+
+// Quality of payment timing relative to due date.
+enum PaymentTimingQuality {
+  PAYMENT_TIMING_QUALITY_UNSPECIFIED = 0;
+  PAYMENT_TIMING_QUALITY_EXCELLENT = 1;
+  PAYMENT_TIMING_QUALITY_GOOD = 2;
+  PAYMENT_TIMING_QUALITY_ACCEPTABLE = 3;
+  PAYMENT_TIMING_QUALITY_POOR = 4;
+}
+
+// Account status used in risk signal evaluation.
+enum AccountStatus {
+  ACCOUNT_STATUS_UNSPECIFIED = 0;
+  ACCOUNT_STATUS_ACTIVE = 1;
+  ACCOUNT_STATUS_INACTIVE = 2;
+  ACCOUNT_STATUS_CLOSED = 3;
+}
+
+// All computed feature signals for a payment (1-to-1 with Payment).
+message PaymentSignals {
+  // References Payment.payment_id.
+  string payment_id = 1;
+
+  google.protobuf.Timestamp computed_at = 2;
+
+  // --- Matching signals ---
+  MatchingSignals matching = 3;
+
+  // --- Amount signals ---
+  AmountSignals amount = 4;
+
+  // --- Temporal signals ---
+  TemporalSignals temporal = 5;
+
+  // --- Risk signals ---
+  RiskSignals risk = 6;
+
+  // --- Duplicate signals ---
+  DuplicateSignals duplicate = 7;
+}
+
+// Signals related to identity and policy matching.
+message MatchingSignals {
+  // 0-100 score for sender name vs. customer name.
+  double name_similarity_score = 1;
+
+  // 0-100 confidence that the correct policy was identified.
+  double policy_match_confidence = 2;
+
+  // 0-100 confidence that the correct customer was identified.
+  double customer_match_confidence = 3;
+
+  // Account number matches a historically used account.
+  bool account_match = 4;
+
+  // Amount matches expected premium.
+  bool amount_match = 5;
+
+  // Payment pattern matches historical behavior.
+  bool historical_match = 6;
+}
+
+// Signals related to payment amount analysis.
+message AmountSignals {
+  // Percentage variance from expected premium.
+  double amount_variance_pct = 1;
+
+  bool is_overpayment = 2;
+
+  bool is_underpayment = 3;
+
+  // Dollar difference from expected (in cents).
+  int64 difference_amount = 4;
+
+  // Payment equals N x premium.
+  bool is_multi_period = 5;
+
+  // Number of periods covered (0 if not applicable).
+  int32 estimated_periods = 6;
+
+  // 0-100 consistency with historical payment amounts.
+  double historical_consistency_score = 7;
+}
+
+// Signals related to payment timing.
+message TemporalSignals {
+  PaymentTimingQuality payment_timing_quality = 1;
+
+  // Positive = after due date, negative = before.
+  int32 days_from_due_date = 2;
+
+  int32 days_since_last_payment = 3;
+}
+
+// Signals related to risk evaluation.
+message RiskSignals {
+  bool has_risk_flags = 1;
+
+  // List of specific risk flag types present.
+  repeated RiskFlagType risk_flag_types = 2;
+
+  AccountStatus account_status = 3;
+}
+
+// Signals related to duplicate payment detection.
+message DuplicateSignals {
+  // 100% exact match found.
+  bool is_duplicate_match = 1;
+
+  // Reference to the original payment (empty if no duplicate).
+  string duplicate_payment_id = 2;
+
+  // Hours between this payment and the suspected duplicate.
+  double hours_since_duplicate = 3;
+
+  // Outstanding balance exists to justify a second payment.
+  bool outstanding_balance_justifies = 4;
+}

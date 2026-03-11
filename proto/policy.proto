@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+import "google/protobuf/timestamp.proto";
+
+// How frequently a premium is billed.
+enum PremiumFrequency {
+  PREMIUM_FREQUENCY_UNSPECIFIED = 0;
+  PREMIUM_FREQUENCY_MONTHLY = 1;
+  PREMIUM_FREQUENCY_QUARTERLY = 2;
+  PREMIUM_FREQUENCY_SEMI_ANNUAL = 3;
+  PREMIUM_FREQUENCY_ANNUAL = 4;
+}
+
+// Status of a policy.
+enum PolicyStatus {
+  POLICY_STATUS_UNSPECIFIED = 0;
+  POLICY_STATUS_ACTIVE = 1;
+  POLICY_STATUS_INACTIVE = 2;
+  POLICY_STATUS_CLOSED = 3;
+}
+
+// An insurance policy tied to a customer.
+message Policy {
+  // Unique identifier (e.g., POL-XXXXX).
+  string policy_number = 1;
+
+  // References Customer.customer_id.
+  string customer_id = 2;
+
+  // e.g., Auto, Home, Life, Health.
+  string policy_type = 3;
+
+  // Expected premium amount in cents (or smallest currency unit).
+  int64 premium_amount = 4;
+
+  PremiumFrequency premium_frequency = 5;
+
+  PolicyStatus status = 6;
+
+  // Current amount owed in cents.
+  int64 outstanding_balance = 7;
+
+  // When next payment is due (date only, stored as timestamp at midnight UTC).
+  google.protobuf.Timestamp next_due_date = 8;
+
+  google.protobuf.Timestamp created_date = 9;
+  google.protobuf.Timestamp modified_date = 10;
+}
+
+// Status of a historical payment.
+enum PaymentHistoryStatus {
+  PAYMENT_HISTORY_STATUS_UNSPECIFIED = 0;
+  PAYMENT_HISTORY_STATUS_APPLIED = 1;
+  PAYMENT_HISTORY_STATUS_BOUNCED = 2;
+  PAYMENT_HISTORY_STATUS_REVERSED = 3;
+}
+
+// A historical payment record for pattern analysis (used by Scenarios 2, 3, 5).
+message PaymentHistory {
+  int64 history_id = 1;
+
+  // References Policy.policy_number.
+  string policy_id = 2;
+
+  google.protobuf.Timestamp payment_date = 3;
+
+  // Amount in cents.
+  int64 amount = 4;
+
+  // e.g., ACH, Check, Credit Card, Wire.
+  string payment_method = 5;
+
+  string sender_account = 6;
+
+  PaymentHistoryStatus status = 7;
+}

@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+import "google/protobuf/timestamp.proto";
+
+// Lifecycle status of an incoming payment.
+enum PaymentStatus {
+  PAYMENT_STATUS_UNSPECIFIED = 0;
+  PAYMENT_STATUS_RECEIVED = 1;
+  PAYMENT_STATUS_PROCESSING = 2;
+  PAYMENT_STATUS_APPLIED = 3;
+  PAYMENT_STATUS_HELD = 4;
+  PAYMENT_STATUS_ESCALATED = 5;
+}
+
+// An incoming payment to be resolved by the AI agent.
+message Payment {
+  // Unique identifier (e.g., PMT-XXX).
+  string payment_id = 1;
+
+  // Payment amount in cents.
+  int64 amount = 2;
+
+  // Name from payment source.
+  string sender_name = 3;
+
+  // Account identifier (may be masked).
+  string sender_account = 4;
+
+  // Intended beneficiary (optional).
+  string beneficiary_name = 5;
+
+  // e.g., ACH, Check, Credit Card, Wire.
+  string payment_method = 6;
+
+  // Date/time received (with time precision for duplicate detection).
+  google.protobuf.Timestamp payment_date = 7;
+
+  // Primary reference (policy number, etc.).
+  string reference_field_1 = 8;
+
+  // Secondary reference (optional).
+  string reference_field_2 = 9;
+
+  // If the payment went through
+  PaymentStatus status = 10;
+
+  // Resolved customer (optional — may not be matched).
+  string matched_customer_id = 11;
+
+  // Resolved policy (optional — may not be matched).
+  string matched_policy_id = 12;
+
+  // When payment was ingested.
+  google.protobuf.Timestamp created_timestamp = 13;
+}

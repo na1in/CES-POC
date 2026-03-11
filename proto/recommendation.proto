@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+import "google/protobuf/timestamp.proto";
+
+// Final AI agent recommendation for a payment.
+enum Recommendation {
+  RECOMMENDATION_UNSPECIFIED = 0;
+  RECOMMENDATION_APPLY = 1;
+  RECOMMENDATION_HOLD = 2;
+  RECOMMENDATION_ESCALATE = 3;
+}
+
+// Which scenario the payment was routed through.
+enum ScenarioRoute {
+  SCENARIO_ROUTE_UNSPECIFIED = 0;
+  SCENARIO_ROUTE_1 = 1;  // Strong Policy Match
+  SCENARIO_ROUTE_2 = 2;  // Customer Match, No Policy
+  SCENARIO_ROUTE_3 = 3;  // High Amount Variance
+  SCENARIO_ROUTE_4 = 4;  // No Matching Customer
+  SCENARIO_ROUTE_5 = 5;  // Duplicate Payment
+}
+
+// Final AI agent decision output (1-to-1 with Payment).
+message PaymentRecommendation {
+  // References Payment.payment_id.
+  string payment_id = 1;
+
+  Recommendation recommendation = 2;
+
+  // 0-100 overall confidence in the recommendation.
+  double confidence_score = 3;
+
+  ScenarioRoute scenario_route = 4;
+
+  // Specific decision path (e.g., "scenario_1_auto_apply").
+  string decision_path = 5;
+
+  bool requires_human_approval = 6;
+
+  // Why human approval is needed (empty if not required).
+  string approval_reason = 7;
+
+  // Ordered list of reasoning points that led to this decision.
+  repeated string reasoning = 8;
+
+  // Specific next action to take.
+  string suggested_action = 9;
+
+  // Time taken to compute recommendation in milliseconds.
+  int32 processing_time_ms = 10;
+
+  google.protobuf.Timestamp created_at = 11;
+}

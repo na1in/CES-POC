@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+import "google/protobuf/timestamp.proto";
+
+// Status of a customer account.
+enum CustomerStatus {
+  CUSTOMER_STATUS_UNSPECIFIED = 0;
+  CUSTOMER_STATUS_ACTIVE = 1;
+  CUSTOMER_STATUS_INACTIVE = 2;
+  CUSTOMER_STATUS_PENDING = 3;
+  CUSTOMER_STATUS_CLOSED = 4;
+}
+
+// A customer in the system.
+message Customer {
+  // Unique identifier (e.g., CUST-XXXX).
+  string customer_id = 1;
+
+  string name = 2;
+
+  // Primary account identifier.
+  string account_number = 3;
+
+  CustomerStatus status = 4;
+
+  google.protobuf.Timestamp created_date = 5;
+  google.protobuf.Timestamp modified_date = 6;
+}
+
+// Type of risk flag on a customer account.
+enum RiskFlagType {
+  RISK_FLAG_TYPE_UNSPECIFIED = 0;
+  RISK_FLAG_TYPE_FRAUD_HISTORY = 1;
+  RISK_FLAG_TYPE_SUSPENDED_ACCOUNT = 2;
+  RISK_FLAG_TYPE_CHRONIC_LATE_PAYMENTS = 3;
+}
+
+// A risk flag associated with a customer (used by Scenario 1 hold path).
+message RiskFlag {
+  int64 flag_id = 1;
+
+  // References Customer.customer_id.
+  string customer_id = 2;
+
+  RiskFlagType flag_type = 3;
+
+  bool is_active = 4;
+
+  google.protobuf.Timestamp flagged_date = 5;
+
+  // Additional context.
+  string notes = 6;
+}

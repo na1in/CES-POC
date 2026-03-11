@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// Type of action recorded in the audit trail.
+enum AuditActionType {
+  AUDIT_ACTION_TYPE_UNSPECIFIED = 0;
+  AUDIT_ACTION_TYPE_RECEIVED = 1;
+  AUDIT_ACTION_TYPE_SIGNALS_COMPUTED = 2;
+  AUDIT_ACTION_TYPE_RECOMMENDATION_MADE = 3;
+  AUDIT_ACTION_TYPE_APPROVED = 4;
+  AUDIT_ACTION_TYPE_APPLIED = 5;
+  AUDIT_ACTION_TYPE_ESCALATED = 6;
+}
+
+// A single audit log entry for compliance tracking.
+message AuditLogEntry {
+  int64 log_id = 1;
+
+  // References Payment.payment_id.
+  string payment_id = 2;
+
+  AuditActionType action_type = 3;
+
+  // System or user identifier that performed the action.
+  string actor = 4;
+
+  // Full action details as a structured object.
+  google.protobuf.Struct details = 5;
+
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+// Externalized configuration threshold (tunable without code changes).
+message ConfigurationThreshold {
+  // e.g., NAME_MATCH_AUTO_APPLY.
+  string parameter_name = 1;
+
+  // The threshold value (stored as string for flexibility).
+  string parameter_value = 2;
+
+  // What this parameter controls.
+  string description = 3;
+
+  // When this configuration became active.
+  google.protobuf.Timestamp effective_date = 4;
+}
