@@ -15,12 +15,13 @@ All thresholds defined in this document are configurable:
 ```json
 {
   "scenario_1_thresholds": {
-    "name_similarity_apply": 95,
+    "name_similarity_apply": 90,
     "name_similarity_hold_min": 75,
-    "amount_tolerance_percentage": 2
+    "amount_tolerance_percentage": 2,
+    "payment_method_risk_auto_apply": "low"
   },
   "scenario_2_thresholds": {
-    "customer_exact_match": 100,
+    "customer_match_min": 90,
     "amount_variance_threshold": 15,
     "supporting_signals_required": 2
   },
@@ -35,7 +36,9 @@ All thresholds defined in this document are configurable:
   },
   "scenario_5_thresholds": {
     "duplicate_time_window_hours": 72,
-    "exact_match_required": true
+    "duplicate_amount_tolerance_cents": 200,
+    "exact_match_fields": ["sender_name", "payment_method", "policy_reference"],
+    "amount_match": "within_tolerance"
   }
 }
 ```
@@ -127,20 +130,26 @@ Payment with high confidence match to known policyholder and expected premium am
    - Output: Days difference + quality rating
    - Example: 0 days difference = EXCELLENT
 
+6. **Payment_Method_Risk_Level**
+   - Classification: Low (ACH, Card), Medium (Check, Wire), High (Unknown)
+   - Output: Enum (LOW / MEDIUM / HIGH)
+   - Example: "Bank Transfer" = LOW
+
 ### Decision Logic
 
 **APPLY Conditions:**
 ```
-IF Name_Similarity_Score > 95%
+IF Name_Similarity_Score > 90%
 AND Amount_Variance_Percentage <= 2%
 AND Risk_Flag_Present == False
 AND Policy_Status == "Active"
+AND Payment_Method_Risk_Level == "Low"
 THEN APPLY (auto-apply without approval)
 ```
 
 **HOLD Conditions:**
 ```
-IF Name_Similarity_Score >= 75% AND < 95%
+IF Name_Similarity_Score >= 75% AND <= 90%
 AND Amount_Variance_Percentage <= 2%
 AND Risk_Flag_Present == False
 THEN HOLD (apply with approval required)
@@ -149,6 +158,11 @@ OR
 
 IF Risk_Flag_Present == True (high risk)
 THEN HOLD (regardless of other scores)
+
+OR
+
+IF Payment_Method_Risk_Level == "High"
+THEN HOLD (unknown payment method requires review)
 ```
 
 **ESCALATE Conditions:**
@@ -263,11 +277,11 @@ Payment missing explicit policy reference but sender matches known customer. Req
 ### Signals to Compute
 
 1. **Sender_Customer_Match_Confidence**
-   - Exact name match: 100%
-   - Fuzzy match: <100%
+   - Name match ≥90%: Strong match (proceed directly)
+   - Name match <90% with 2+ supporting signals: Acceptable match
    - Output: Percentage + match type
 
-2. **Supporting_Signals** (when exact match not available)
+2. **Supporting_Signals** (when name match <90%)
    - Account number match: +1 signal
    - Amount matches expected premium: +1 signal
    - Historical payment pattern match: +1 signal
@@ -291,10 +305,10 @@ Payment missing explicit policy reference but sender matches known customer. Req
 
 ### Decision Logic
 
-**Case 1: 100% Exact Customer Match**
+**Case 1: Strong Customer Match (≥90%)**
 
 ```
-IF Customer_Match_Confidence == 100%:
+IF Customer_Match_Confidence >= 90%:
 
   IF Policy_Reference is NULL or EMPTY:
     # Missing reference case
@@ -327,10 +341,10 @@ IF Customer_Match_Confidence == 100%:
       HOLD (partial reference matches multiple policies)
 ```
 
-**Case 2: Multiple Supporting Signals (No 100% Exact Match)**
+**Case 2: Multiple Supporting Signals (Name Match <90%)**
 
 ```
-IF Customer_Match_Confidence < 100%:
+IF Customer_Match_Confidence < 90%:
   Supporting_Signal_Count = 0
 
   IF Account_Number_Matches_Historical: Supporting_Signal_Count += 1
@@ -460,7 +474,7 @@ Tier 5: >100%     → ESCALATE (extreme variance - potential fraud/major error)
 ### Signals to Compute
 
 1. **Name_Similarity_Score**
-   - Must be 100% for Scenario 3 (otherwise escalate to Scenario 4)
+   - Must be ≥90% for Scenario 3 (otherwise escalate to Scenario 4)
    - Output: Percentage
 
 2. **Amount_Variance_Percentage**
@@ -486,11 +500,21 @@ Tier 5: >100%     → ESCALATE (extreme variance - potential fraud/major error)
    - Check for recent policy changes that might explain variance
    - Output: Boolean + modification details
 
+7. **Multi_Method_Payment_Indicator**
+   - Check if payment ≈ premium / N (split across methods/banks)
+   - Common: $7,500 premium paid as $2,500 × 3 from different banks
+   - Output: Boolean + fraction
+
+8. **Third_Party_Payment_Indicator**
+   - Check if sender differs from policyholder
+   - Patterns: corporate names (Corp/LLC/Payroll), shared last name, mortgage escrow
+   - Output: Boolean + relationship type
+
 ### Decision Logic
 
 ```python
 # First verify name/policy match
-IF Name_Similarity_Score < 100%:
+IF Name_Similarity_Score < 90%:
   ESCALATE to Scenario 4 (customer match issue)
 
 # Calculate variance
@@ -509,19 +533,34 @@ ELIF Absolute_Variance > 2% AND Absolute_Variance <= 15%:
 
 ELIF Absolute_Variance > 15% AND Absolute_Variance <= 50%:
   # Tier 3: Moderate variance - PRIMARY SCENARIO 3 FOCUS
-  HOLD for manual review
-  Reason = "Moderate variance - verify customer intent and policy status"
+  # Before holding/escalating, check special cases:
 
-  # Check if multi-period payment
+  # Check 1: Multi-period payment
   Period_Multiplier = round(Payment_Amount / Expected_Premium)
   IF abs(Payment_Amount - (Expected_Premium * Period_Multiplier)) < (Expected_Premium * 0.05):
-    Note = "May be multi-period payment (approximately {Period_Multiplier}x premium)"
+    HOLD with note "May be multi-period payment (approximately {Period_Multiplier}x premium)"
+
+  # Check 2: Multi-method payment (split premium)
+  ELIF is_multi_method:
+    HOLD with note "Appears to be split payment ({multi_method_fraction}x of premium)"
+
+  # Check 3: Third-party payment
+  ELIF is_third_party_payment:
+    HOLD with note "Third-party payment detected ({third_party_relationship})"
+
+  ELSE:
+    HOLD for manual review
+    Reason = "Moderate variance - verify customer intent and policy status"
 
 ELIF Absolute_Variance > 50% AND Absolute_Variance <= 100%:
   # Tier 4: High variance
-  HOLD for investigation
-  Reason = "High variance - verify policy modifications and customer intent"
-  Risk_Flag = "HIGH_AMOUNT_VARIANCE"
+  # Still check special cases — if detected AND variance ≤ 50%, HOLD instead of ESCALATE
+  IF is_multi_period OR is_multi_method OR is_third_party_payment:
+    HOLD with note "Special case detected despite high variance"
+  ELSE:
+    HOLD for investigation
+    Reason = "High variance - verify policy modifications and customer intent"
+    Risk_Flag = "HIGH_AMOUNT_VARIANCE"
 
 ELIF Absolute_Variance > 100%:
   # Tier 5: Extreme variance
@@ -701,7 +740,18 @@ Payment sender and beneficiary do not match any known policyholder in the system
 ### Decision Logic
 
 ```python
-# Search entire database for best match
+# Step 1: Check for third-party payment before escalating
+IF Policy_Reference is valid AND Policy exists:
+  IF is_third_party_payment:
+    # Sender doesn't match but may be legitimate (employer, family, escrow)
+    IF Amount_Variance <= 15%:
+      HOLD with note "Third-party payment detected ({third_party_relationship})"
+      Confidence = 40-60%
+    ELSE:
+      ESCALATE
+      Reason = "Third-party detected but amount doesn't match"
+
+# Step 2: Search entire database for best match
 Max_Similarity_Score = max([
     calculate_similarity(Payment.Sender_Name, Customer.Name)
     for Customer in All_Customers
@@ -712,16 +762,25 @@ IF Max_Similarity_Score < 75%:
   ESCALATE to investigation queue
   Reason = "No matching customer found in database (Max similarity: {Max_Similarity_Score}%)"
 
-ELIF Max_Similarity_Score >= 75% AND Max_Similarity_Score < 100%:
-  # Potential match exists but not exact
+ELIF Max_Similarity_Score >= 75% AND Max_Similarity_Score < 90%:
+  # Potential match exists but not strong enough
   HOLD for manual review
   Reason = "Potential customer match found but not exact (Similarity: {Max_Similarity_Score}%)"
   # Provide potential matches for manual verification
 
-ELSE:  # Max_Similarity_Score == 100%
+ELSE:  # Max_Similarity_Score >= 90%
   # This would route to Scenario 1 or 2
   # Should not reach this point in Scenario 4
 ```
+
+**Third-party payment patterns detected:**
+
+| Pattern | Examples |
+|---------|----------|
+| Corporate/Payroll | "ABC Corp", "XYZ LLC", "ADP Payroll" |
+| Mortgage Escrow | "Wells Fargo Escrow", "Chase Mortgage Services" |
+| Family Member | Shared last name with policyholder |
+| Trust/POA | "Smith Family Trust", "POA for John Smith" |
 
 ### Expected Agent Output
 
@@ -796,7 +855,7 @@ ELSE:  # Max_Similarity_Score == 100%
 ## Scenario 5: Duplicate Payment Suspicion
 
 ### Description
-Payment precisely matches a recent transaction within 72-hour window, with 100% exact match on critical fields. Indicates potential accidental duplicate submission.
+Payment closely matches a recent transaction within 72-hour window on all critical fields. Amount matching allows a **$2 tolerance** to account for fees, charges, and rounding differences. Indicates potential accidental duplicate submission.
 
 ### Payment Input Data
 ```json
@@ -866,13 +925,13 @@ Payment precisely matches a recent transaction within 72-hour window, with 100% 
 ### Signals to Compute
 
 1. **Duplicate_Probability_Score**
-   - Check 100% exact match on critical fields
+   - Check match on critical fields: 3 exact + amount within $2
    - Fields to match:
-     - Amount (exact)
      - Sender name (exact)
      - Payment type/method (exact)
      - Policy reference (exact)
-   - Output: Percentage (0 or 100 for exact match)
+     - Amount (within $2 tolerance — covers fees, rounding, surcharges)
+   - Output: Percentage (0 or 100 — binary check)
 
 2. **Time_Between_Payments**
    - Calculate hours/days between current and previous payment
@@ -897,10 +956,10 @@ Payment precisely matches a recent transaction within 72-hour window, with 100% 
 Recent_Matching_Payments = search_payments(
     time_window_hours=72,
     filters={
-        "sender_name": Payment.Sender_Name,
-        "amount": Payment.Amount,
-        "policy_reference": Payment.Policy_Reference,
-        "payment_method": Payment.Payment_Method
+        "sender_name": Payment.Sender_Name,          # exact
+        "policy_reference": Payment.Policy_Reference,  # exact
+        "payment_method": Payment.Payment_Method,      # exact
+        "amount_tolerance_cents": 200                  # $2 tolerance
     }
 )
 
@@ -912,15 +971,13 @@ IF len(Recent_Matching_Payments) > 0:
   Exact_Match_Fields = 0
   Total_Fields = 4
 
-  IF Payment.Amount == Original_Payment.Amount: Exact_Match_Fields += 1
   IF Payment.Sender_Name == Original_Payment.Sender_Name: Exact_Match_Fields += 1
   IF Payment.Payment_Method == Original_Payment.Payment_Method: Exact_Match_Fields += 1
   IF Payment.Policy_Reference == Original_Payment.Policy_Reference: Exact_Match_Fields += 1
+  Amount_Diff = abs(Payment.Amount - Original_Payment.Amount)
 
-  Match_Percentage = (Exact_Match_Fields / Total_Fields) * 100
-
-  IF Match_Percentage == 100:
-    # 100% exact duplicate
+  IF Exact_Match_Fields == 3 AND Amount_Diff <= 200:  # 200 cents = $2 tolerance
+    # Duplicate detected (3 exact fields + amount within $2)
     Hours_Between = (Payment.Timestamp - Original_Payment.Timestamp).total_hours()
 
     IF Hours_Between <= 72:
@@ -931,10 +988,12 @@ IF len(Recent_Matching_Payments) > 0:
       ELSE:
         # No outstanding balance, likely duplicate
         ESCALATE
-        Reason = "Potential duplicate detected - 100% match within 72 hours"
+        Reason = "Potential duplicate detected within 72 hours"
         Risk_Flag = "POTENTIAL_DUPLICATE"
+        IF Amount_Diff > 0:
+          Note = "Amount differs by ${Amount_Diff/100}, likely due to fees/rounding"
   ELSE:
-    # Not exact match, continue normal processing
+    # Fields don't match or amount diff > $2, continue normal processing
     Route to appropriate scenario (1, 2, or 3)
 ```
 
@@ -954,11 +1013,11 @@ IF len(Recent_Matching_Payments) > 0:
     "Original payment: PMT-2024-004A for $750 on 2024-02-23 10:15 AM",
     "Current payment: PMT-2024-005 for $750 on 2024-02-25 02:30 PM",
     "Time between payments: 52 hours (within 72-hour duplicate window)",
-    "100% exact match on all critical fields:",
-    "  - Amount: $750 (exact match)",
+    "Match on all critical fields (3 exact + amount within $2 tolerance):",
     "  - Sender: Emily Watson (exact match)",
     "  - Payment method: ACH (exact match)",
     "  - Policy reference: POL-99887 (exact match)",
+    "  - Amount: $750 (exact match, $0 difference)",
     "  - Account: ****4455 (exact match)",
     "Policy POL-99887 has $0 outstanding balance",
     "Next payment not due until 2024-03-20 (23 days away)",
@@ -1061,16 +1120,18 @@ Payment Received
 
 | Scenario | Primary Condition | Confidence | Action | Approval Required |
 |----------|------------------|------------|--------|-------------------|
-| 1 | Name ≥95%, Amount ≤2% variance, Policy# provided | 90-100% | APPLY | No |
-| 1 (Hold) | Name 75-95%, Amount ≤2% variance | 75-89% | HOLD/APPLY | Yes |
-| 2 | 100% customer match, No policy# OR supporting signals | 75-89% | APPLY | Yes |
-| 2 (Hold) | 100% customer match, Multiple policies | 70-85% | HOLD | Yes |
-| 3 (Tier 2) | Perfect match, 2-15% variance | 85-90% | APPLY | Yes |
-| 3 (Tier 3) | Perfect match, 15-50% variance | 60-75% | HOLD | Yes |
-| 3 (Tier 4) | Perfect match, 50-100% variance | 40-60% | HOLD | Yes |
-| 3 (Tier 5) | Perfect match, >100% variance | 0-40% | ESCALATE | Yes |
-| 4 | Name similarity <75% | 0% | ESCALATE | Yes |
-| 5 | 100% duplicate match, <72 hours | 0% | ESCALATE | Yes |
+| 1 | Name >90%, Amount ≤2%, No risk flags, Low risk method | 90-100% | APPLY | No |
+| 1 (Hold) | Name 75-90%, Amount ≤2% variance | 60-85% | HOLD/APPLY | Yes |
+| 1 (Hold) | Risk flags present OR High risk method | 50-70% | HOLD | Yes |
+| 2 | ≥90% customer match, No policy# OR supporting signals | 75-90% | APPLY | Yes (always) |
+| 2 (Hold) | Customer matched, Multiple policies, cannot disambiguate | 70-80% | HOLD | Yes |
+| 3 (Tier 2) | Name ≥90%, 2-15% variance | 85-90% | APPLY | Yes |
+| 3 (Tier 3) | Name ≥90%, 15-50% variance (or special case detected) | 60-75% | HOLD | Yes |
+| 3 (Tier 4) | Name ≥90%, 50-100% variance | 40-60% | HOLD | Yes |
+| 3 (Tier 5) | Name ≥90%, >100% variance | 0-40% | ESCALATE | Yes |
+| 4 | No customer match (check third-party first) | 0-60% | ESCALATE or HOLD | Yes |
+| 5 | 3 exact fields + amount within $2, <72 hours, no balance | 0% | ESCALATE | Yes |
+| 5 (Hold) | 3 exact fields + amount within $2, <72 hours, balance >0 | 60% | HOLD | Yes |
 
 ---
 

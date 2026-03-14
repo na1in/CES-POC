@@ -15,7 +15,7 @@ This is a **design document only**, database-agnostic. All message and enum defi
 | `proto/customer.proto` | `Customer`, `RiskFlag` | Customer accounts and risk flags |
 | `proto/policy.proto` | `Policy`, `PaymentHistory` | Insurance policies and historical payment records |
 | `proto/payment.proto` | `Payment` | Incoming payments to be resolved |
-| `proto/signals.proto` | `PaymentSignals`, `MatchingSignals`, `AmountSignals`, `TemporalSignals`, `RiskSignals`, `DuplicateSignals` | All computed feature signals (1-to-1 with Payment) |
+| `proto/signals.proto` | `PaymentSignals`, `MatchingSignals`, `AmountSignals`, `TemporalSignals`, `RiskSignals`, `DuplicateSignals`, `PaymentMethodRiskLevel` | All computed feature signals (1-to-1 with Payment) |
 | `proto/recommendation.proto` | `PaymentRecommendation` | Final AI agent decision output (1-to-1 with Payment) |
 | `proto/audit.proto` | `AuditLogEntry`, `ConfigurationThreshold` | Audit trail and tunable thresholds |
 
@@ -68,3 +68,6 @@ When backed by a datastore that supports indexing:
 - **JSON fields** from the original design map to `google.protobuf.Struct` (audit details) or `repeated string` (reasoning points).
 - **Nullable fields** are represented by proto3 default values (empty string = not set). Where the distinction between "unset" and "default" matters, use wrapper types or optional fields.
 - **PaymentSignals** uses nested sub-messages (`MatchingSignals`, `AmountSignals`, etc.) rather than a flat structure to group related signals cleanly.
+- **AmountSignals** includes `is_multi_method` (bool), `multi_method_fraction` (double), `is_third_party_payment` (bool), and `third_party_relationship` (string) for detecting split and third-party payments.
+- **RiskSignals** includes `payment_method_risk_level` (enum: LOW, MEDIUM, HIGH) derived from payment method.
+- **DuplicateSignals** includes `duplicate_amount_difference` (int64, cents) to capture amount differences within the $2 tolerance.

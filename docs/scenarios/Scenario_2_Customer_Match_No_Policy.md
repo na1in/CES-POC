@@ -21,9 +21,19 @@ Payment is missing explicit policy reference, but sender matches a known custome
 
 | Parameter | Value | Description |
 |-----------|-------|-------------|
-| **Customer Exact Match** | 100% | Exact name match required |
-| **Supporting Signals Required** | 2+ | When exact match not available |
+| **Customer Name Match** | ≥90% | Name similarity threshold to proceed |
+| **Supporting Signals Required** | 2+ | When name match is below 90% |
 | **Amount Variance Threshold** | 15% | If exceeded, routes to Scenario 3 |
+
+> **Design Note (from sponsor feedback):** The original threshold of 100% exact match is
+> unrealistic for existing policies. Name variations are extremely common in insurance:
+> - Wedding name changes: "Sarah Miller" → "Sarah Johnson"
+> - Middle name/initial: "Sarah Johnson" vs "Sarah M Johnson"
+> - Name format: "Johnson Sarah" vs "Sarah Johnson"
+> - Typos in historical records
+>
+> For this reason, the threshold is set to **≥90%** using the hybrid name matching
+> approach (traditional algorithms + LLM fallback for gray-zone cases).
 
 ---
 
@@ -32,15 +42,17 @@ Payment is missing explicit policy reference, but sender matches a known custome
 ### **Prerequisite Check: Customer Match**
 
 ```
-Option A: 100% Exact Customer Match
-  IF Customer_Name matches exactly
+Option A: Strong Customer Name Match
+  IF Customer_Name_Similarity ≥ 90%
   THEN proceed with scenario
 
-Option B: Multiple Supporting Signals
-  IF Customer_Match < 100%
-     BUT Account_Number_Match = True
-     AND Amount_Matches_Expected = True
-  THEN proceed (requires ≥2 supporting signals)
+Option B: Weaker Name Match + Supporting Signals
+  IF Customer_Name_Similarity < 90%
+     BUT ≥2 supporting signals are true:
+       - Account_Number_Match = True
+       - Amount_Matches_Expected = True
+       - Historical_Pattern_Match = True
+  THEN proceed with scenario
 
   ELSE → ESCALATE to Scenario 4
 ```
@@ -115,8 +127,11 @@ IF Policy_Reference is PARTIAL (e.g., last 5 digits):
 
 ### 1. Customer Match Confidence (0-100%)
 - Exact name match = 100%
-- Fuzzy match with variations < 100%
+- Strong match (format/initial variations) = 90-99%
+- Fuzzy match with larger variations < 90%
 - No match = 0%
+- **Threshold to proceed: ≥90%** (or <90% with 2+ supporting signals)
+- Uses hybrid name matching (traditional + Haiku LLM for gray zone)
 
 ### 2. Supporting Signals (Boolean, each)
 - **Account Number Match**: Sender account matches historical account
@@ -211,7 +226,7 @@ IF Policy_Reference is PARTIAL (e.g., last 5 digits):
 - **Recommendation**: APPLY with approval
 - **Confidence**: 82%
 - **Matched Policy**: POL-67890
-- **Reasoning**: "Customer matched exactly (100%). Customer has 2 active policies. Amount $1,250 matches exactly ONE policy (POL-67890 - Auto). Requires approval for policy verification."
+- **Reasoning**: "Customer 'Sarah M Johnson' matched to 'Sarah Johnson' with 95% similarity (middle initial variation). Customer has 2 active policies. Amount $1,250 matches exactly ONE policy (POL-67890 - Auto). Requires approval for policy verification."
 
 ---
 
@@ -264,7 +279,7 @@ IF Policy_Reference is PARTIAL (e.g., last 5 digits):
                            │
                 ┌──────────▼──────────┐
                 │ Customer Name       │
-                │ Match = 100%?       │
+                │ Match ≥ 90%?        │
                 └──────────┬──────────┘
                            │
                  ┌───YES───┴───NO────┐

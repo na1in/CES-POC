@@ -26,8 +26,12 @@ This document defines the decision logic for the AI Agent to handle unidentified
 | **Name Match - Escalate** | <75% | Below this = no match found |
 | **Amount Tolerance** | ±2% | Acceptable variance - auto-approve |
 | **Amount Variance - Hold** | 2-15% | Requires manual review |
-| **Amount Variance - Escalate** | >15% | Route to investigation |
+| **Amount Variance - Escalate** | >15% | Route to investigation (unless special case) |
 | **Duplicate Detection Window** | 72 hours | Time window for duplicate checking |
+| **Duplicate Amount Tolerance** | $2.00 (200 cents) | Covers bank fees, rounding, surcharges |
+| **Payment Method Risk - Low** | ACH, Card | Required for auto-apply |
+| **Payment Method Risk - Medium** | Check, Wire | Proceeds normally but noted |
+| **Payment Method Risk - High** | Unknown | Forces HOLD in Scenario 1 |
 
 ---
 
@@ -41,6 +45,7 @@ IF Name_Similarity > 90%
    AND Amount_Variance ≤ 2%
    AND Risk_Flags = None
    AND Policy_Status = Active
+   AND Payment_Method_Risk = Low
 THEN → APPLY (no approval needed)
 
 IF Name_Similarity 75-90%
@@ -51,11 +56,14 @@ THEN → HOLD (apply with approval)
 IF Risk_Flags = Present
 THEN → HOLD regardless of scores
 
+IF Payment_Method_Risk = High
+THEN → HOLD (unknown payment method)
+
 IF Name_Similarity < 75%
 THEN → ESCALATE
 ```
 
-**Key Signals**: Name similarity, Amount variance, Policy match, Risk flags
+**Key Signals**: Name similarity, Amount variance, Policy match, Risk flags, Payment method risk level
 
 **Output**: APPLY with 90-100% confidence or HOLD with 75-89% confidence
 
@@ -68,8 +76,8 @@ THEN → ESCALATE
 ### Decision Logic
 ```
 Step 1: Verify Customer Match
-  IF Customer_Match = 100% exact
-  OR (Customer_Match ≥ 80% AND 2+ supporting signals*)
+  IF Customer_Match ≥ 90%
+  OR (Customer_Match < 90% AND 2+ supporting signals*)
   THEN continue
   ELSE → ESCALATE
 
@@ -110,8 +118,8 @@ Step 3: Identify Policy
 
 ### Decision Logic
 ```
-Prerequisite: Name_Similarity = 100%
-(If name doesn't match, route to Scenario 4)
+Prerequisite: Name_Similarity ≥ 90%
+(If name < 90%, route to Scenario 4)
 
 Calculate: Variance = |Payment_Amount - Expected_Premium| / Expected_Premium × 100
 
@@ -121,11 +129,22 @@ THEN → AUTO-APPROVE (same as Scenario 1)
 IF Variance 2-15%
 THEN → HOLD (requires manual review)
 
-IF Variance > 15%
-THEN → ESCALATE (route to investigation)
+IF Variance 15-50%
+THEN → Check special cases first:
+  - Multi-period payment (amount ≈ N × premium)
+  - Multi-method payment (amount ≈ premium / N, split across banks)
+  - Third-party payment (sender ≠ policyholder)
+  IF special case detected → HOLD
+  ELSE → HOLD for investigation
+
+IF Variance 50-100%
+THEN → HOLD (special cases still checked)
+
+IF Variance > 100%
+THEN → ESCALATE (potential fraud)
 ```
 
-**Key Signals**: Amount variance, Historical pattern consistency, Multi-period payment indicator
+**Key Signals**: Amount variance, Historical pattern consistency, Multi-period indicator, Multi-method indicator, Third-party indicator
 
 ---
 
@@ -135,14 +154,19 @@ THEN → ESCALATE (route to investigation)
 
 ### Decision Logic
 ```
-IF payment reaches Scenario 4:
-THEN → ESCALATE to investigation queue
+Step 1: Check for third-party payment
+  IF valid policy reference + third-party pattern detected
+     AND Amount_Variance ≤ 15%
+  THEN → HOLD (third-party payment, e.g., employer, family, escrow)
 
-All payments here are escalated. Partial match cases (75%+)
-are already handled by Scenarios 1 and 2 before reaching here.
+Step 2: If not third-party
+  THEN → ESCALATE to investigation queue
+  Provide best fuzzy match and amount correlation for investigator
 ```
 
-**Output**: ESCALATE with 0% confidence, provide best fuzzy match and amount correlation for investigator
+**Third-party patterns**: Corporate names (Corp/LLC/Payroll), shared last name with policyholder, mortgage escrow companies, trusts/POA
+
+**Output**: ESCALATE with 0% confidence (or HOLD at 40-60% if third-party detected)
 
 ---
 
@@ -153,23 +177,24 @@ are already handled by Scenarios 1 and 2 before reaching here.
 ### Decision Logic
 ```
 Step 1: Search last 72 hours for matching payments
-  Match on ALL fields:
-    - Amount (exact)
+  Match on:
     - Sender name (exact)
     - Payment method (exact)
     - Policy reference (exact)
+    - Amount (within $2 tolerance — covers fees, rounding, surcharges)
 
 Step 2: Evaluate match
-  IF 100% exact match found within 72 hours
+  IF match found (3 exact fields + amount within $2)
      AND Outstanding_Balance = 0
      AND Next_Payment_Not_Due
   THEN → ESCALATE (potential duplicate)
+  Note: If amounts differ, include fee/rounding explanation
 
-  IF 100% exact match found
+  IF match found
      AND Outstanding_Balance > 0
   THEN → HOLD (might be legitimate catch-up payment)
 
-  IF No exact match found
+  IF No match found (or amount diff > $2)
   THEN → Route to appropriate scenario (1, 2, or 3)
 ```
 
@@ -215,10 +240,11 @@ Step 2: Evaluate match
                            ▼                        ▼
                   ┌──────────────┐       ┌──────────────────┐
                   │ Name match   │       │ Customer match?  │
-                  │ ≥75%?        │       │ (exact or 2+     │
-                  └──────┬───────┘       │  supporting      │
-                         │               │  signals)        │
-                    YES  │  NO           └────────┬─────────┘
+                  │ ≥75%?        │       │ (≥90% or <90%    │
+                  └──────┬───────┘       │  with 2+         │
+                         │               │  supporting      │
+                    YES  │  NO           │  signals)        │
+                         │               └────────┬─────────┘
                     ┌────┴────┐                   │
                     │         │          ┌──YES───┴───NO──┐
                     ▼         │          │                │
@@ -245,18 +271,20 @@ Step 2: Evaluate match
 
 | Scenario | Key Condition | Action | Human Approval |
 |----------|--------------|--------|----------------|
-| **1 - Auto Apply** | Name >90%, Amount ±2%, No risk flags | **APPLY** | No |
+| **1 - Auto Apply** | Name >90%, Amount ±2%, No risk flags, Low risk method | **APPLY** | No |
 | **1 - Hold** | Name 75-90%, Amount ±2% | **HOLD** | Required |
-| **1 - Hold** | Risk flags present (any score) | **HOLD** | Required |
+| **1 - Hold** | Risk flags present OR High risk method | **HOLD** | Required |
 | **1 - Escalate** | Name <75% | **ESCALATE** | Required |
-| **2 - Apply** | Customer matched, 1 policy or amount identifies 1 | **APPLY** | Required |
+| **2 - Apply** | Customer ≥90%, 1 policy or amount identifies 1 | **APPLY** | Required (always) |
 | **2 - Hold** | Customer matched, cannot disambiguate policy | **HOLD** | Required |
 | **3 - Auto Approve** | Variance <2% | **APPLY** | No |
 | **3 - Hold** | Variance 2-15% | **HOLD** | Required |
-| **3 - Escalate** | Variance >15% | **ESCALATE** | Required |
-| **4 - No Match** | All matching attempts failed | **ESCALATE** | Required |
-| **5 - Duplicate** | 100% exact match within 72 hours, no balance | **ESCALATE** | Required |
-| **5 - Hold** | 100% exact match within 72 hours, balance exists | **HOLD** | Required |
+| **3 - Hold** | Variance 15-50%, special case detected | **HOLD** | Required |
+| **3 - Escalate** | Variance >100% | **ESCALATE** | Required |
+| **4 - Hold** | Third-party detected, amount ≤15% | **HOLD** | Required |
+| **4 - Escalate** | No match, no third-party | **ESCALATE** | Required |
+| **5 - Duplicate** | 3 exact + amount within $2, 72hrs, no balance | **ESCALATE** | Required |
+| **5 - Hold** | 3 exact + amount within $2, 72hrs, balance >0 | **HOLD** | Required |
 
 ---
 

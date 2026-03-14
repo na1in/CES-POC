@@ -20,15 +20,50 @@ Payment sender does not match any known policyholder in the system. This scenari
 
 ## Decision Logic
 
+### **Step 1: Third-Party Payment Check (NEW)**
+
+Before escalating, check if this could be a legitimate third-party payment:
+
 ```
-IF payment reaches Scenario 4:
+IF payment has a valid policy reference:
+  Look up the policy regardless of sender name
+
+  IF policy exists AND is active:
+    IF amount is close to expected premium (variance ≤ 15%):
+      → is_third_party_payment = true
+      → HOLD (not ESCALATE)
+      → Confidence: 40-60%
+      → Reason: "Sender does not match policyholder, but payment
+        references a valid active policy with matching amount.
+        Possible third-party payment."
+
+    IF amount does NOT match (variance > 15%):
+      → ESCALATE
+      → Note: "Valid policy found but amount does not match.
+        Possible third-party payment with incorrect amount."
+```
+
+**Common third-party patterns to detect:**
+
+| Sender Pattern | Likely Relationship |
+|---------------|-------------------|
+| Contains "Corp", "LLC", "Inc", "Payroll" | Employer payroll |
+| Contains "Escrow", "Mortgage", "Bank" | Mortgage escrow company |
+| Same last name as policyholder | Family member |
+| Contains "Trust", "Estate" | Legal entity / estate |
+| Contains "POA", "Attorney" | Power of attorney |
+
+### **Step 2: Default — Escalate All Remaining**
+
+```
+IF payment reaches Scenario 4 AND no third-party pattern detected:
   THEN → ESCALATE to investigation queue
   Confidence: 0%
   Human Approval: Required
   Reason: "No matching customer or policy identified"
 ```
 
-All payments in this scenario are escalated. Partial match cases (75%+) are already handled by Scenarios 1 and 2 before reaching here.
+Payments without a valid policy reference and no name match are always escalated. The system still provides best fuzzy match and amount correlation data to assist the investigator.
 
 ---
 
@@ -65,6 +100,13 @@ All payments in this scenario are escalated. Partial match cases (75%+) are alre
 - Search for active policies with matching premium amounts
 - May help investigator identify intended policy
 - **Output**: List of policies with similar amounts
+
+### 4. Third-Party Payment Detection (NEW)
+- Check if sender name contains corporate/institutional patterns
+- Check if a valid policy is referenced despite name mismatch
+- Check if sender shares last name with any policyholder
+- Check historical third-party payers for referenced policy
+- **Output**: Boolean + detected relationship type + referenced policy details
 
 ---
 
@@ -147,6 +189,91 @@ All payments in this scenario are escalated. Partial match cases (75%+) are alre
 
 ---
 
+### Example 3: Third-Party Payment Caught (NEW)
+
+**Input:**
+```json
+{
+  "payment_id": "PMT-405",
+  "amount": 2500.00,
+  "sender_name": "Pinnacle Mortgage Services",
+  "reference_field_1": "POL-11223",
+  "payment_method": "ACH"
+}
+```
+
+**Search Results:**
+```json
+{
+  "sender_customer_match": 0,
+  "policy_lookup": {
+    "policy_number": "POL-11223",
+    "policy_holder_name": "Robert Chen",
+    "premium_amount": 2500.00,
+    "status": "Active"
+  },
+  "third_party_detection": {
+    "is_third_party": true,
+    "relationship": "escrow",
+    "reason": "Sender contains 'Mortgage Services' pattern"
+  }
+}
+```
+
+**Agent Output:**
+- **Recommendation**: HOLD (not ESCALATE)
+- **Confidence**: 55%
+- **Reasoning**:
+  - "Sender 'Pinnacle Mortgage Services' does not match policyholder 'Robert Chen'"
+  - "However, payment references valid active policy POL-11223"
+  - "Amount $2,500 matches expected premium exactly (0% variance)"
+  - "Third-party payment detected — sender appears to be mortgage escrow company"
+  - "Holding for approval to verify authorized third-party payer"
+
+---
+
+### Example 4: Third-Party — Family Member (NEW)
+
+**Input:**
+```json
+{
+  "payment_id": "PMT-406",
+  "amount": 1250.00,
+  "sender_name": "David Chen",
+  "reference_field_1": "POL-11223"
+}
+```
+
+**Search Results:**
+```json
+{
+  "sender_customer_match": 0,
+  "policy_lookup": {
+    "policy_number": "POL-11223",
+    "policy_holder_name": "Robert Chen",
+    "premium_amount": 1250.00,
+    "status": "Active"
+  },
+  "third_party_detection": {
+    "is_third_party": true,
+    "relationship": "family",
+    "reason": "Sender shares last name 'Chen' with policyholder"
+  }
+}
+```
+
+**Agent Output:**
+- **Recommendation**: HOLD (not ESCALATE)
+- **Confidence**: 50%
+- **Reasoning**:
+  - "Sender 'David Chen' does not match policyholder 'Robert Chen'"
+  - "Payment references valid active policy POL-11223"
+  - "Amount matches expected premium exactly"
+  - "Sender shares last name with policyholder — possible family member payment"
+  - "Holding for approval to verify relationship"
+
+---
+
 ## Flow Diagram
 
 ```
@@ -155,35 +282,80 @@ All payments in this scenario are escalated. Partial match cases (75%+) are alre
         │ by Scenario 1 or 2           │
         └──────────────┬───────────────┘
                        │
-            ┌──────────▼──────────┐
-            │ Search entire       │
-            │ customer database   │
-            │ (active + inactive) │
-            └──────────┬──────────┘
+            ┌──────────▼──────────────┐
+            │ Does payment reference   │
+            │ a valid active policy?   │
+            └──────────┬──────────────┘
                        │
-                       ▼
-              ┌────────────────┐
-              │    ESCALATE    │
-              │                │
-              │ Provide best   │
-              │ fuzzy match +  │
-              │ amount         │
-              │ correlation    │
-              │ for investigator│
-              └────────────────┘
+             ┌───YES───┴───NO───┐
+             │                  │
+             ▼                  │
+    ┌────────────────────┐      │
+    │ Amount matches      │      │
+    │ expected premium    │      │
+    │ (variance ≤ 15%)?   │      │
+    └─────────┬──────────┘      │
+              │                 │
+     ┌──YES───┴───NO───┐       │
+     │                 │       │
+     ▼                 │       │
+┌──────────────┐       │       │
+│ Third-party  │       │       │
+│ detected?    │       │       │
+│              │       │       │
+│ Check:       │       │       │
+│ - Corporate  │       │       │
+│   patterns   │       │       │
+│ - Shared     │       │       │
+│   last name  │       │       │
+│ - Historical │       │       │
+│   3rd-party  │       │       │
+└──────┬───────┘       │       │
+       │               │       │
+  ┌─YES┴──NO──┐        │       │
+  │           │        │       │
+  ▼           │        │       │
+┌────────┐    │        │       │
+│  HOLD  │    │        │       │
+│"Third- │    │        │       │
+│ party  │    │        │       │
+│payment"│    │        │       │
+│Conf:   │    │        │       │
+│40-60%  │    │        │       │
+└────────┘    │        │       │
+              ▼        ▼       ▼
+         ┌─────────────────────────┐
+         │       ESCALATE          │
+         │                         │
+         │ Provide:                │
+         │ - Best fuzzy match      │
+         │ - Amount correlation    │
+         │ - Possible explanations │
+         │ Confidence: 0%          │
+         └─────────────────────────┘
 ```
 
 ---
 
 ## Edge Cases to Consider
 
-### Case 1: Third-Party Payment
+### Case 1: Third-Party Payment With Valid Policy Reference
 ```
 Payment from "XYZ Company Payroll"
-On behalf of employee who is policyholder
+Reference: "POL-12345"
+Policy exists, amount matches premium
 
-→ ESCALATE
-→ Investigation: Identify employee, verify authorized third-party payment
+→ HOLD (third-party detected via corporate name pattern)
+→ Approval: Verify authorized third-party payer
+```
+
+### Case 1b: Third-Party Payment Without Policy Reference
+```
+Payment from "XYZ Company Payroll"
+No policy reference, no amount match
+
+→ ESCALATE (cannot verify intent)
+→ Investigation: Identify employee, verify payment purpose
 ```
 
 ### Case 2: Name Change Not Updated

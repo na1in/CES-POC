@@ -26,6 +26,15 @@ enum AccountStatus {
   ACCOUNT_STATUS_CLOSED = 3;
 }
 
+// Risk level derived from payment method.
+// ACH/Card = Low, Check/Wire = Medium, Unknown = High.
+enum PaymentMethodRiskLevel {
+  PAYMENT_METHOD_RISK_LEVEL_UNSPECIFIED = 0;
+  PAYMENT_METHOD_RISK_LEVEL_LOW = 1;       // ACH, Card
+  PAYMENT_METHOD_RISK_LEVEL_MEDIUM = 2;    // Check, Wire
+  PAYMENT_METHOD_RISK_LEVEL_HIGH = 3;      // Unknown / unrecognized method
+}
+
 // All computed feature signals for a payment (1-to-1 with Payment).
 message PaymentSignals {
   // References Payment.payment_id.
@@ -82,7 +91,7 @@ message AmountSignals {
   // Dollar difference from expected (in cents).
   int64 difference_amount = 4;
 
-  // Payment equals N x premium.
+  // Payment equals N x premium (prepayment: e.g., $15,000 for $5,000/mo = 3 periods).
   bool is_multi_period = 5;
 
   // Number of periods covered (0 if not applicable).
@@ -90,6 +99,21 @@ message AmountSignals {
 
   // 0-100 consistency with historical payment amounts.
   double historical_consistency_score = 7;
+
+  // Payment is a fraction of expected premium, suggesting the customer is splitting
+  // the total across multiple payments/methods (e.g., $2,500 x 3 for $7,500 premium).
+  bool is_multi_method = 8;
+
+  // If multi-method detected, what fraction of the premium this payment represents.
+  // e.g., $2,500 of $7,500 = 0.333
+  double multi_method_fraction = 9;
+
+  // Whether the sender differs from the policyholder (third-party payment).
+  // Common: family member, employer payroll, mortgage escrow company.
+  bool is_third_party_payment = 10;
+
+  // Relationship of third-party sender if detected (e.g., "employer", "family", "escrow").
+  string third_party_relationship = 11;
 }
 
 // Signals related to payment timing.
@@ -110,11 +134,14 @@ message RiskSignals {
   repeated RiskFlagType risk_flag_types = 2;
 
   AccountStatus account_status = 3;
+
+  // Risk level derived from payment method (ACH/Card=Low, Check/Wire=Medium, Unknown=High).
+  PaymentMethodRiskLevel payment_method_risk_level = 4;
 }
 
 // Signals related to duplicate payment detection.
 message DuplicateSignals {
-  // 100% exact match found.
+  // Match found (3 exact fields + amount within $2 tolerance).
   bool is_duplicate_match = 1;
 
   // Reference to the original payment (empty if no duplicate).
@@ -125,4 +152,8 @@ message DuplicateSignals {
 
   // Outstanding balance exists to justify a second payment.
   bool outstanding_balance_justifies = 4;
+
+  // Absolute amount difference between this and suspected duplicate (in cents).
+  // 0 = exact match, up to 200 ($2.00) = within tolerance.
+  int64 duplicate_amount_difference = 5;
 }

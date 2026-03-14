@@ -77,7 +77,7 @@ The feature signals are organized into 5 main categories:
 - **Amount Match**: Payment amount matches expected premium for a policy
 - **Historical Pattern Match**: Amount and timing match historical payment pattern
 
-**Rule**: If name match < 100%, requires ≥2 supporting signals to proceed with Scenario 2. Otherwise escalates to Scenario 4.
+**Rule**: If name match < 90%, requires ≥2 supporting signals to proceed with Scenario 2. Otherwise escalates to Scenario 4.
 
 **Used In**: Scenario 2
 
@@ -135,7 +135,39 @@ is_multi_period = (abs(payment_amount - (expected_premium * period_multiplier)) 
 
 ---
 
-### 2.4 Historical Amount Consistency
+### 2.4 Multi-Method Payment Indicator
+**Description**: Detects if payment might be a split payment where the customer is paying one premium across multiple payment methods or banks.
+
+**Computation Method**:
+```
+fraction = payment_amount / expected_premium
+is_multi_method = (fraction ≈ 1/N for N in [2,3,4]) within 5% tolerance
+```
+
+**Common Pattern**: $7,500 premium paid as $2,500 × 3 from different banks.
+
+**Output**: Boolean + fraction of premium this payment covers
+
+**Used In**: Scenario 3 (prevents unnecessary escalation of split payments)
+
+---
+
+### 2.5 Third-Party Payment Indicator
+**Description**: Detects if the payment sender differs from the policyholder, indicating a third-party payment (family member, employer, mortgage escrow company, etc.).
+
+**Detection Patterns**:
+- Corporate names (Corp, LLC, Payroll, Inc.)
+- Shared last name with policyholder (family member)
+- Mortgage/escrow company names
+- Historical third-party payers for this policy
+
+**Output**: Boolean + relationship type (employer, family, escrow, trust, POA, unknown)
+
+**Used In**: Scenarios 3, 4 (prevents unnecessary escalation of legitimate third-party payments)
+
+---
+
+### 2.6 Historical Amount Consistency
 **Description**: How consistent the payment amount is with customer's historical payments.
 
 **Computation Method**:
@@ -216,7 +248,23 @@ days_since_last = current_payment_date - last_payment_date
 
 ---
 
-### 4.3 Outstanding Balance Check
+### 4.3 Payment Method Risk Level
+**Description**: Risk classification derived from the payment method used.
+
+**Classification**:
+- **Low**: ACH, Credit Card (established electronic channels)
+- **Medium**: Check, Wire Transfer (less traceable)
+- **High**: Unknown or unrecognized payment method
+
+**Output**: Enum (LOW / MEDIUM / HIGH)
+
+**Impact**: In Scenario 1, auto-apply (Path 1) requires `Payment_Method_Risk_Level = Low`. High-risk methods force a HOLD regardless of other scores.
+
+**Used In**: Scenario 1
+
+---
+
+### 4.4 Outstanding Balance Check
 **Description**: Current balance owed on the policy.
 
 **Computation Method**:
@@ -232,22 +280,22 @@ outstanding_balance = total_premium_due - total_payments_applied
 
 ## 5. Duplicate Detection Signals
 
-### 5.1 Duplicate Match (100% Exact)
-**Description**: Checks if payment is an exact duplicate of a recent transaction within 72 hours.
+### 5.1 Duplicate Match (3 Exact + $2 Amount Tolerance)
+**Description**: Checks if payment matches a recent transaction within 72 hours on 3 exact fields plus amount within $2 tolerance.
 
 **Computation Method**:
 ```
 Search last 72 hours for payments matching ALL of:
   - Sender_Name (exact)
-  - Amount (exact)
   - Policy_Reference (exact)
   - Payment_Method (exact)
+  - Amount (within $2 tolerance — covers fees, rounding, surcharges)
 
-IF all 4 fields match: Duplicate = TRUE (100%)
+IF 3 exact fields match AND |amount_diff| <= $2: Duplicate = TRUE (100%)
 ELSE: Duplicate = FALSE (0%)
 ```
 
-This is a binary check — either all fields match exactly or it's not a duplicate.
+This is a binary check — either all criteria are met or it's not a duplicate. The $2 amount tolerance accounts for bank processing fees (e.g., $7,500 → $7,499), rounding differences, and small surcharges.
 
 **Output**: Boolean (duplicate detected / not detected)
 
@@ -282,6 +330,22 @@ hours_between = current_payment_timestamp - previous_payment_timestamp
 
 ---
 
+### 5.4 Duplicate Amount Difference
+**Description**: The absolute difference in cents between the current payment and the suspected duplicate payment.
+
+**Computation Method**:
+```
+duplicate_amount_difference = abs(current_payment_amount - duplicate_payment_amount)
+```
+
+**Output**: Integer (cents). 0 = exact match, up to 200 cents ($2) within tolerance.
+
+**Purpose**: Captured for reporting/audit. If amounts differ slightly, reasoning includes: "Amount difference of $X.XX likely due to fees/rounding."
+
+**Used In**: Scenario 5
+
+---
+
 ## Signal Dependency Map
 
 ```
@@ -289,19 +353,24 @@ Level 1 (Independent - compute first):
 ├─ Name Similarity Score
 ├─ Amount Variance Percentage
 ├─ Payment Timing Match
-└─ Duplicate Match (100% Exact)
+└─ Duplicate Match (3 exact + $2 tolerance)
 
 Level 2 (Depends on Level 1):
 ├─ Customer Match Confidence (uses Name Similarity)
 ├─ Policy Match Confidence (uses reference fields)
 ├─ Overpayment/Underpayment Indicator (uses Amount Variance)
-└─ Historical Amount Consistency
+├─ Historical Amount Consistency
+└─ Duplicate Amount Difference (if duplicate detected in Level 1)
 
 Level 3 (Depends on Level 2):
 ├─ Risk Flags + Account Status
+├─ Payment Method Risk Level (derived from payment method)
 ├─ Outstanding Balance Check
 ├─ Supporting Signals (Scenario 2)
-└─ Time Between Payments (Scenario 5)
+├─ Multi-Period Indicator (needs confirmed premium amount)
+├─ Multi-Method Payment Indicator (needs confirmed premium amount)
+├─ Third-Party Payment Indicator (needs confirmed customer ID)
+└─ Time Between Payments (if duplicate detected in Level 1)
 
 Level 4 (Final Decision):
 └─ Recommendation Engine (uses all signals → routes to correct scenario)

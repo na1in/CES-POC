@@ -42,7 +42,8 @@ CREATE TYPE payment_status AS ENUM (
     'processing',
     'applied',
     'held',
-    'escalated'
+    'escalated',
+    'processing_failed'
 );
 
 CREATE TYPE payment_timing_quality AS ENUM (
@@ -56,6 +57,12 @@ CREATE TYPE account_status AS ENUM (
     'active',
     'inactive',
     'closed'
+);
+
+CREATE TYPE payment_method_risk_level AS ENUM (
+    'low',        -- ACH, Card
+    'medium',     -- Check, Wire
+    'high'        -- Unknown / unrecognized method
 );
 
 CREATE TYPE recommendation AS ENUM (
@@ -180,6 +187,10 @@ CREATE TABLE payment_signals (
     is_multi_period                 BOOLEAN NOT NULL DEFAULT false,
     estimated_periods               INT     NOT NULL DEFAULT 0,
     historical_consistency_score    DOUBLE PRECISION, -- 0-100
+    is_multi_method                 BOOLEAN NOT NULL DEFAULT false,  -- split payment across methods/banks
+    multi_method_fraction           DOUBLE PRECISION,                -- fraction of premium this payment covers
+    is_third_party_payment          BOOLEAN NOT NULL DEFAULT false,  -- sender differs from policyholder
+    third_party_relationship        TEXT                             -- e.g., 'employer', 'family', 'escrow'
 
     -- Temporal signals
     payment_timing_quality      payment_timing_quality,
@@ -190,12 +201,14 @@ CREATE TABLE payment_signals (
     has_risk_flags              BOOLEAN NOT NULL DEFAULT false,
     risk_flag_types             risk_flag_type[],    -- postgres array of enum
     account_status              account_status,
+    payment_method_risk_level   payment_method_risk_level,  -- derived from payment method
 
     -- Duplicate signals
     is_duplicate_match              BOOLEAN NOT NULL DEFAULT false,
     duplicate_payment_id            TEXT,
     hours_since_duplicate           DOUBLE PRECISION,
-    outstanding_balance_justifies   BOOLEAN NOT NULL DEFAULT false
+    outstanding_balance_justifies   BOOLEAN NOT NULL DEFAULT false,
+    duplicate_amount_difference     BIGINT  NOT NULL DEFAULT 0     -- cents; 0=exact, up to 200=$2 tolerance
 );
 
 -- AI agent recommendation (1-to-1 with Payment).

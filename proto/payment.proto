@@ -15,6 +15,7 @@ enum PaymentStatus {
   PAYMENT_STATUS_APPLIED = 3;
   PAYMENT_STATUS_HELD = 4;
   PAYMENT_STATUS_ESCALATED = 5;
+  PAYMENT_STATUS_PROCESSING_FAILED = 6;
 }
 
 // An incoming payment to be resolved by the AI agent.

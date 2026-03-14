@@ -26,6 +26,23 @@ Payment has a high confidence match with a known policyholder and expected premi
 | **Name Match - Escalate** | <75% | Insufficient match - escalate |
 | **Amount Tolerance** | ±2% | Acceptable variance from expected premium |
 
+## Payment Method Risk Level
+
+An additional filter applied to every Scenario 1 payment. The risk level is derived from the payment method and is captured/reported alongside the recommendation.
+
+| Payment Method | Risk Level | Impact on Decision |
+|---------------|------------|-------------------|
+| ACH | Low | No impact — normal processing |
+| Card | Low | No impact — normal processing |
+| Check | Medium | Logged as risk factor; may reduce confidence score |
+| Wire | Medium | Logged as risk factor; may reduce confidence score |
+| Unknown | High | Forces HOLD regardless of other scores |
+
+**Rules:**
+- **Low risk**: No impact on decision. Proceed with normal thresholds.
+- **Medium risk**: Captured and reported. AI may lower confidence score by 5-10% to reflect elevated method risk.
+- **High risk**: Forces HOLD with human approval required, even if all other signals are perfect.
+
 ---
 
 ## Decision Logic
@@ -37,6 +54,7 @@ IF ALL of the following are true:
   ✓ Amount_Variance ≤ 2%
   ✓ Risk_Flags = None
   ✓ Policy_Status = Active
+  ✓ Payment_Method_Risk_Level = Low
 
 THEN → APPLY automatically
   Confidence: 90-100%
@@ -60,6 +78,17 @@ IF Risk_Flags = Present (high risk)
 THEN → HOLD regardless of scores
   Human Approval: Required
   Reason: Risk flags detected
+
+OR
+
+IF Payment_Method_Risk_Level = High (unknown method)
+THEN → HOLD regardless of other scores
+  Human Approval: Required
+  Reason: Unknown payment method — elevated risk
+
+NOTE: If Payment_Method_Risk_Level = Medium (Check/Wire),
+  processing continues normally but confidence score may be
+  reduced by 5-10% and the method risk is reported.
 ```
 
 ### **Path 3: Escalate**
@@ -123,6 +152,11 @@ THEN → ESCALATE (route to Scenario 4)
 - Compare payment date to expected due date
 - Days early/late
 - Quality: EXCELLENT / GOOD / ACCEPTABLE / POOR
+
+### 6. Payment Method Risk Level
+- **Derived from**: Payment method field
+- **Mapping**: ACH/Card → Low, Check/Wire → Medium, Unknown → High
+- **Impact**: High forces HOLD; Medium is reported and may reduce confidence
 
 ---
 
@@ -227,35 +261,45 @@ THEN → ESCALATE (route to Scenario 4)
         │ Amount variance ≤2%     │
         └────────────┬────────────┘
                      │
-          ┌──────────▼──────────┐
-          │  Risk Flags Present? │
-          └──────────┬──────────┘
+          ┌──────────▼───────────────┐
+          │  Payment Method Risk?     │
+          └──────────┬───────────────┘
                      │
-           ┌───YES───┴───NO───┐
-           │                  │
-           ▼                  ▼
-    ┌─────────────┐  ┌────────────────┐
-    │    HOLD     │  │ Policy Status  │
-    │  (approval  │  │ Active?        │
-    │  required)  │  └───────┬────────┘
-    └─────────────┘          │
-                    ┌──YES───┴───NO───┐
-                    │                 │
-                    ▼                 ▼
-           ┌────────────────┐  ┌─────────────┐
-           │ Name Similarity │  │    HOLD     │
-           │ Score?          │  │  "Inactive  │
-           └───────┬────────┘  │   policy"   │
-                   │           └─────────────┘
-        ┌──────────┼──────────┐
-        │          │          │
-    >90%│    75-90%│      <75%│
-        ▼          ▼          ▼
-  ┌──────────┐ ┌────────┐ ┌───────────┐
-  │  APPLY   │ │  HOLD  │ │ ESCALATE  │
-  │  (auto)  │ │(review)│ │(Scenario 4│
-  │No approve│ │approval│ │  routing) │
-  └──────────┘ └────────┘ └───────────┘
+           ┌──HIGH───┴───LOW/MED──┐
+           │                      │
+           ▼                      ▼
+    ┌─────────────┐    ┌──────────▼──────────┐
+    │    HOLD     │    │  Risk Flags Present? │
+    │  "Unknown   │    └──────────┬──────────┘
+    │   method"   │               │
+    └─────────────┘     ┌───YES───┴───NO───┐
+                        │                  │
+                        ▼                  ▼
+                 ┌─────────────┐  ┌────────────────┐
+                 │    HOLD     │  │ Policy Status  │
+                 │  (approval  │  │ Active?        │
+                 │  required)  │  └───────┬────────┘
+                 └─────────────┘          │
+                                 ┌──YES───┴───NO───┐
+                                 │                 │
+                                 ▼                 ▼
+                        ┌────────────────┐  ┌─────────────┐
+                        │ Name Similarity │  │    HOLD     │
+                        │ Score?          │  │  "Inactive  │
+                        └───────┬────────┘  │   policy"   │
+                                │           └─────────────┘
+                     ┌──────────┼──────────┐
+                     │          │          │
+                 >90%│    75-90%│      <75%│
+                     ▼          ▼          ▼
+               ┌──────────┐ ┌────────┐ ┌───────────┐
+               │  APPLY   │ │  HOLD  │ │ ESCALATE  │
+               │  (auto)  │ │(review)│ │(Scenario 4│
+               │No approve│ │approval│ │  routing) │
+               └──────────┘ └────────┘ └───────────┘
+
+Note: Medium risk (Check/Wire) proceeds normally but confidence
+may be reduced by 5-10% and method risk is reported.
 ```
 
 ---
