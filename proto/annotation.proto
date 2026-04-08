@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+import "google/protobuf/timestamp.proto";
+
+// Type of annotation on a case record.
+enum AnnotationType {
+  ANNOTATION_TYPE_UNSPECIFIED = 0;
+  ANNOTATION_TYPE_CASE_NOTE = 1;          // Priya: general note on a hold or decision
+  ANNOTATION_TYPE_OVERRIDE_REASON = 2;    // Priya: mandatory reason when overriding AI
+  ANNOTATION_TYPE_CONTACT_RECORD = 3;     // Damien: log of outreach to sender or bank
+  ANNOTATION_TYPE_INVESTIGATION_NOTE = 4; // Damien: in-progress investigation reasoning
+}
+
+// A persistent annotation on a case record.
+// Annotations are immutable once written — append-only for audit compliance.
+message CaseAnnotation {
+  // Auto-generated primary key.
+  int64 annotation_id = 1;
+
+  // References Payment.payment_id.
+  string payment_id = 2;
+
+  // References User.user_id — who wrote this annotation.
+  string author_user_id = 3;
+
+  AnnotationType annotation_type = 4;
+
+  // The annotation text.
+  string content = 5;
+
+  // --- Contact record fields (populated when annotation_type = CONTACT_RECORD) ---
+
+  // How contact was made: phone, email, letter.
+  string contact_method = 6;
+
+  // Outcome of the contact attempt: reached, no_answer, voicemail, bounced.
+  string contact_outcome = 7;
+
+  // Name or identifier of the party contacted (sender, bank, third party).
+  string contacted_party = 8;
+
+  google.protobuf.Timestamp created_at = 9;
+}

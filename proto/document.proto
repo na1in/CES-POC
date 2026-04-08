@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+import "google/protobuf/timestamp.proto";
+
+// Category of document attached to a case.
+enum DocumentType {
+  DOCUMENT_TYPE_UNSPECIFIED = 0;
+  DOCUMENT_TYPE_SUPPORTING_EVIDENCE = 1;   // Priya: anything backing her decision
+  DOCUMENT_TYPE_SENDER_CORRESPONDENCE = 2; // Damien: emails or letters from sender
+  DOCUMENT_TYPE_BANK_STATEMENT = 3;        // Damien: payment proof from bank
+  DOCUMENT_TYPE_FRAUD_REPORT = 4;          // Damien: fraud team documentation
+  DOCUMENT_TYPE_POLICY_DOCUMENT = 5;       // Either: policy-related paperwork
+  DOCUMENT_TYPE_OTHER = 6;
+}
+
+// A document attached to a payment case by an analyst or investigator.
+// Files are stored in object storage; this record holds the metadata.
+message CaseDocument {
+  // Auto-generated primary key.
+  int64 document_id = 1;
+
+  // References Payment.payment_id.
+  string payment_id = 2;
+
+  // References User.user_id — who uploaded this document.
+  string uploaded_by = 3;
+
+  // Original file name as uploaded.
+  string file_name = 4;
+
+  // MIME type (e.g., application/pdf, image/png).
+  string file_type = 5;
+
+  // File size in bytes.
+  int64 file_size_bytes = 6;
+
+  // Path or key in object storage (S3 key or local path).
+  string storage_path = 7;
+
+  DocumentType document_type = 8;
+
+  // Optional description of what this document contains.
+  string description = 9;
+
+  google.protobuf.Timestamp uploaded_at = 10;
+
+  // Soft delete only — documents are never hard-deleted for audit compliance.
+  bool is_deleted = 11;
+}

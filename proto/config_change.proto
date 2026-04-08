@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+import "google/protobuf/timestamp.proto";
+
+// Lifecycle state of a configuration change request.
+// Marcus proposes → Lorraine approves/rejects → Marcus deploys.
+enum ConfigChangeStatus {
+  CONFIG_CHANGE_STATUS_UNSPECIFIED = 0;
+  CONFIG_CHANGE_STATUS_PENDING = 1;      // Submitted by Marcus, awaiting Lorraine
+  CONFIG_CHANGE_STATUS_APPROVED = 2;     // Lorraine approved, not yet deployed
+  CONFIG_CHANGE_STATUS_REJECTED = 3;     // Lorraine rejected
+  CONFIG_CHANGE_STATUS_DEPLOYED = 4;     // Marcus deployed to production
+  CONFIG_CHANGE_STATUS_ROLLED_BACK = 5;  // Rolled back after deployment
+}
+
+// A formal request to change a configuration threshold.
+// Every production configuration change must have an approved request on record.
+message ConfigurationChangeRequest {
+  // Auto-generated primary key.
+  int64 change_id = 1;
+
+  // Which threshold parameter is being changed (e.g., NAME_MATCH_AUTO_APPLY).
+  string parameter_name = 2;
+
+  // Value at time of proposal.
+  string current_value = 3;
+
+  // Value being proposed.
+  string proposed_value = 4;
+
+  // Evidence-based rationale from Marcus (e.g., override rate data).
+  string rationale = 5;
+
+  // Projected operational impact (e.g., from back-test simulation).
+  string projected_impact = 6;
+
+  // References User.user_id — Marcus.
+  string proposed_by = 7;
+
+  // References User.user_id — Lorraine. Empty until reviewed.
+  string approved_by = 8;
+
+  // Populated if rejected or when Lorraine adds a comment on approval.
+  string review_comment = 9;
+
+  ConfigChangeStatus status = 10;
+
+  google.protobuf.Timestamp proposed_at = 11;
+
+  // When Lorraine approved or rejected.
+  google.protobuf.Timestamp reviewed_at = 12;
+
+  // When Marcus deployed to production.
+  google.protobuf.Timestamp deployed_at = 13;
+}
+
+// One entry in the append-only configuration version history.
+// Written when a change request is deployed or rolled back.
+message ConfigurationThresholdVersion {
+  // Auto-generated primary key.
+  int64 version_id = 1;
+
+  string parameter_name = 2;
+
+  string parameter_value = 3;
+
+  // References User.user_id — who deployed this version.
+  string changed_by = 4;
+
+  // References User.user_id — who approved this version.
+  string approved_by = 5;
+
+  string rationale = 6;
+
+  // References ConfigurationChangeRequest.change_id.
+  int64 change_request_id = 7;
+
+  // When this version became active.
+  google.protobuf.Timestamp effective_from = 8;
+
+  // When this version was superseded (null = currently active).
+  google.protobuf.Timestamp effective_to = 9;
+}

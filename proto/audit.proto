@@ -9,35 +9,58 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";
 
 // Type of action recorded in the audit trail.
+// All four users contribute to the same underlying audit log.
 enum AuditActionType {
   AUDIT_ACTION_TYPE_UNSPECIFIED = 0;
   AUDIT_ACTION_TYPE_RECEIVED = 1;
   AUDIT_ACTION_TYPE_SIGNALS_COMPUTED = 2;
   AUDIT_ACTION_TYPE_RECOMMENDATION_MADE = 3;
-  AUDIT_ACTION_TYPE_APPROVED = 4;
-  AUDIT_ACTION_TYPE_APPLIED = 5;
-  AUDIT_ACTION_TYPE_ESCALATED = 6;
+  AUDIT_ACTION_TYPE_APPROVED = 4;           // Human approved a HELD case → APPLIED
+  AUDIT_ACTION_TYPE_APPLIED = 5;            // Payment applied (auto or after approval)
+  AUDIT_ACTION_TYPE_ESCALATED = 6;          // Case escalated to investigation
+  AUDIT_ACTION_TYPE_HELD = 7;               // Case placed on hold
+  AUDIT_ACTION_TYPE_OVERRIDDEN = 8;         // Human disagreed with AI and changed outcome
+  AUDIT_ACTION_TYPE_ANNOTATED = 9;          // Case note or investigation note added
+  AUDIT_ACTION_TYPE_DOCUMENT_UPLOADED = 10; // Supporting document attached
+  AUDIT_ACTION_TYPE_CONTACT_LOGGED = 11;    // Damien logged outreach to sender or bank
+  AUDIT_ACTION_TYPE_RETURNED = 12;          // Payment returned to sender
+  AUDIT_ACTION_TYPE_GOVERNANCE_REVIEW_RECORDED = 13; // Lorraine recorded a period review
+  AUDIT_ACTION_TYPE_ANOMALY_FLAGGED = 14;   // Lorraine flagged a metric anomaly
+  AUDIT_ACTION_TYPE_CONFIG_CHANGE_PROPOSED = 15;  // Marcus submitted a change request
+  AUDIT_ACTION_TYPE_CONFIG_CHANGE_APPROVED = 16;  // Lorraine approved a change request
+  AUDIT_ACTION_TYPE_CONFIG_CHANGE_REJECTED = 17;  // Lorraine rejected a change request
+  AUDIT_ACTION_TYPE_CONFIG_CHANGE_DEPLOYED = 18;  // Marcus deployed an approved change
+  AUDIT_ACTION_TYPE_CONFIG_CHANGE_ROLLED_BACK = 19; // Emergency rollback
+  AUDIT_ACTION_TYPE_SLA_BREACHED = 20;      // Investigation SLA exceeded (system-generated)
 }
 
-// A single audit log entry for compliance tracking.
+// A single immutable audit log entry.
+// Append-only — never updated or deleted. Export-ready for regulatory review.
 message AuditLogEntry {
   int64 log_id = 1;
 
-  // References Payment.payment_id.
+  // References Payment.payment_id. Empty for system-wide events (e.g., config changes).
   string payment_id = 2;
 
   AuditActionType action_type = 3;
 
-  // System or user identifier that performed the action.
+  // Display name of actor: "system" for automated actions, user name for humans.
   string actor = 4;
 
-  // Full action details as a structured object.
-  google.protobuf.Struct details = 5;
+  // References User.user_id. Empty for system-generated actions.
+  string actor_user_id = 5;
 
-  google.protobuf.Timestamp timestamp = 6;
+  // Full action details as a structured object.
+  // For OVERRIDDEN: includes original_recommendation, override_action, reason.
+  // For CONFIG_CHANGE_*: includes parameter_name, old_value, new_value.
+  // For CONTACT_LOGGED: includes contact_method, outcome, contacted_party.
+  google.protobuf.Struct details = 6;
+
+  google.protobuf.Timestamp timestamp = 7;
 }
 
-// Externalized configuration threshold (tunable without code changes).
+// Current active value of a configuration threshold.
+// For version history, see ConfigurationThresholdVersion in config_change.proto.
 message ConfigurationThreshold {
   // e.g., NAME_MATCH_AUTO_APPLY.
   string parameter_name = 1;

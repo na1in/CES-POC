@@ -60,7 +60,7 @@ message PaymentSignals {
 
 // Signals related to identity and policy matching.
 message MatchingSignals {
-  // 0-100 score for sender name vs. customer name.
+  // 0-100 final name similarity score (max of deterministic and LLM if gray zone).
   double name_similarity_score = 1;
 
   // 0-100 confidence that the correct policy was identified.
@@ -77,6 +77,26 @@ message MatchingSignals {
 
   // Payment pattern matches historical behavior.
   bool historical_match = 6;
+
+  // --- Name matching algorithm breakdown (for Damien's algorithmic provenance) ---
+
+  // Raw Jaro-Winkler similarity score (0-100).
+  double jaro_winkler_score = 7;
+
+  // Raw Levenshtein-based similarity score (0-100).
+  double levenshtein_score = 8;
+
+  // Whether Soundex codes matched.
+  bool soundex_match = 9;
+
+  // Combined deterministic score before any LLM call (0-100).
+  double deterministic_score = 10;
+
+  // Whether the gray-zone LLM call was made (score was between 70-92%).
+  bool used_llm = 11;
+
+  // Claude Haiku score if called (0-100). 0 if used_llm = false.
+  double llm_score = 12;
 }
 
 // Signals related to payment amount analysis.
@@ -137,6 +157,12 @@ message RiskSignals {
 
   // Risk level derived from payment method (ACH/Card=Low, Check/Wire=Medium, Unknown=High).
   PaymentMethodRiskLevel payment_method_risk_level = 4;
+
+  // Outstanding balance on the matched policy at time of payment (cents).
+  int64 outstanding_balance_cents = 5;
+
+  // Whether the balance is current or past due.
+  string outstanding_balance_status = 6;  // "current" or "past_due"
 }
 
 // Signals related to duplicate payment detection.

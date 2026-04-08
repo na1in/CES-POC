@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+import "google/protobuf/timestamp.proto";
+
+// Role determines home screen, data access scope, and decision authority.
+enum UserRole {
+  USER_ROLE_UNSPECIFIED = 0;
+  USER_ROLE_ANALYST = 1;       // Priya — daily queue, apply/hold/escalate
+  USER_ROLE_INVESTIGATOR = 2;  // Damien — escalated cases only, final determination
+  USER_ROLE_DIRECTOR = 3;      // Lorraine — governance dashboard, config approval
+  USER_ROLE_ADMIN = 4;         // Marcus — config management, performance monitoring
+}
+
+// A system user. Role is assigned at auth time and controls access scope.
+message User {
+  // Unique identifier (e.g., USR-XXXX).
+  string user_id = 1;
+
+  string name = 2;
+
+  string email = 3;
+
+  UserRole role = 4;
+
+  bool is_active = 5;
+
+  google.protobuf.Timestamp created_date = 6;
+
+  // Populated on login — used for session audit.
+  google.protobuf.Timestamp last_login = 7;
+}

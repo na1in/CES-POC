@@ -6,6 +6,7 @@ option java_package = "com.ces.payment_resolution";
 option go_package = "ces/payment_resolution";
 
 import "google/protobuf/timestamp.proto";
+import "proto/analytics.proto";
 
 // Final AI agent recommendation for a payment.
 enum Recommendation {
@@ -55,4 +56,10 @@ message PaymentRecommendation {
   int32 processing_time_ms = 10;
 
   google.protobuf.Timestamp created_at = 11;
+
+  // Who ultimately made this decision. Populated at case closure.
+  // AI_AUTONOMOUS = no human touched it.
+  // HUMAN_CONFIRMED = human agreed with AI recommendation.
+  // HUMAN_OVERRIDE = human changed the outcome.
+  DecisionAttribution decision_attribution = 12;
 }

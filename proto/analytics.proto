@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package ces.payment_resolution;
+
+option java_package = "com.ces.payment_resolution";
+option go_package = "ces/payment_resolution";
+
+// Attribution of who made the final decision on a payment.
+// Used by Lorraine's governance dashboard and Marcus's performance analytics.
+enum DecisionAttribution {
+  DECISION_ATTRIBUTION_UNSPECIFIED = 0;
+  DECISION_ATTRIBUTION_AI_AUTONOMOUS = 1;   // Applied/escalated without any human touch
+  DECISION_ATTRIBUTION_HUMAN_CONFIRMED = 2; // Human agreed with AI recommendation
+  DECISION_ATTRIBUTION_HUMAN_OVERRIDE = 3;  // Human disagreed and changed the outcome
+}
+
+// Attribution counts broken down by decision maker.
+message DecisionAttributionBreakdown {
+  int64 ai_autonomous = 1;
+  int64 human_confirmed = 2;
+  int64 human_override = 3;
+}
+
+// Attribution breakdown for a specific payment method.
+message PaymentMethodBreakdown {
+  // e.g., ACH, Check, Wire, Credit Card.
+  string payment_method = 1;
+  DecisionAttributionBreakdown attribution = 2;
+  int64 total = 3;
+}
+
+// Per-scenario analytics for Marcus's admin dashboard.
+message ScenarioBreakdown {
+  // e.g., scenario_1 through scenario_5.
+  string scenario = 1;
+  int64 total_cases = 2;
+  DecisionAttributionBreakdown attribution = 3;
+  double avg_confidence_score = 4;
+  int64 override_count = 5;
+  // Decision distribution within this scenario.
+  int64 applied = 6;
+  int64 held = 7;
+  int64 escalated = 8;
+  int64 returned = 9;
+}
+
+// Response shape for GET /api/analytics/decisions.
+// Powers both Lorraine's governance dashboard and Marcus's admin dashboard.
+message AnalyticsDecisionsResponse {
+  // Summary counts — Lorraine's top-level metric cards.
+  int64 auto_applied_by_ai = 1;
+  int64 applied_after_human_review = 2;
+  int64 held_pending_review = 3;
+  int64 escalated_by_ai = 4;
+  int64 escalated_by_human = 5;
+  int64 human_overrides_total = 6;
+  int64 returned_total = 7;
+
+  // Override rate as a percentage — key governance metric.
+  double override_rate_pct = 8;
+
+  // Payment method breakdown — Lorraine's governance chart.
+  repeated PaymentMethodBreakdown by_payment_method = 9;
+
+  // Per-scenario breakdown — Marcus's admin dashboard.
+  repeated ScenarioBreakdown by_scenario = 10;
+
+  // Confidence score histogram buckets (0-10, 10-20, ..., 90-100).
+  repeated int64 confidence_histogram = 11;
+}
+
+// An anomaly flag raised by Lorraine or the system for Marcus to investigate.
+message AnomalyFlag {
+  // Auto-generated primary key.
+  int64 flag_id = 1;
+
+  // Which metric is anomalous (e.g., override_rate, escalation_rate).
+  string metric_name = 2;
+
+  // Which scenario type is driving the anomaly (empty = system-wide).
+  string scenario_type = 3;
+
+  // Human-readable description of the anomaly.
+  string description = 4;
+
+  // Date range exhibiting anomalous behaviour.
+  string period_start = 5;
+  string period_end = 6;
+
+  // References User.user_id — who raised the flag (Lorraine or system).
+  string flagged_by = 7;
+
+  // References User.user_id — Marcus assigned to investigate.
+  string assigned_to = 8;
+
+  // open, investigating, resolved.
+  string status = 9;
+
+  // Marcus's resolution notes.
+  string resolution_notes = 10;
+
+  string flagged_at = 11;
+  string resolved_at = 12;
+}

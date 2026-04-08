@@ -16,6 +16,10 @@ enum PaymentStatus {
   PAYMENT_STATUS_HELD = 4;
   PAYMENT_STATUS_ESCALATED = 5;
   PAYMENT_STATUS_PROCESSING_FAILED = 6;
+  // Damien initiated outreach; awaiting sender response. SLA timer running.
+  PAYMENT_STATUS_PENDING_SENDER_RESPONSE = 7;
+  // Payment returned to sender after investigation (Damien final determination).
+  PAYMENT_STATUS_RETURNED = 8;
 }
 
 // An incoming payment to be resolved by the AI agent.
@@ -58,4 +62,10 @@ message Payment {
 
   // When payment was ingested.
   google.protobuf.Timestamp created_timestamp = 13;
+
+  // Set when case is escalated to investigation. SLA deadline for Damien.
+  google.protobuf.Timestamp investigation_due_date = 14;
+
+  // True if case has exceeded the investigation SLA without resolution.
+  bool sla_breached = 15;
 }
