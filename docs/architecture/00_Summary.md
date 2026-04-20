@@ -1,7 +1,7 @@
 # CES Payment Resolution System — Architecture Summary
 
-**Version:** 1.0
-**Date:** March 13, 2026
+**Version:** 1.1
+**Date:** April 8, 2026
 **Status:** Proposed
 
 ---
@@ -14,6 +14,19 @@ The AI agent classifies each payment, identifies the likely policy/customer matc
 - **APPLY** — allocate payment to the identified policy
 - **HOLD** — keep in suspense for manual analyst review
 - **ESCALATE** — route to investigation queue
+
+---
+
+## User Roles
+
+Four personas interact with the system. Role is assigned at auth time and controls home screen, data access scope, and decision authority.
+
+| Role | Persona | Responsibilities |
+|------|---------|-----------------|
+| Analyst | Priya | Daily queue, apply/hold/escalate HELD payments, add case notes, upload documents |
+| Investigator | Damien | Escalated cases only — final determination, outreach logging, fraud review, mark returns |
+| Director | Lorraine | Governance dashboard, compliance export, exception dashboard, approve config changes |
+| Admin | Marcus | Config management, performance monitoring, override analysis, propose threshold changes |
 
 ---
 
@@ -99,10 +112,10 @@ Each stage of the pipeline is documented in its own file:
 | Document | Covers |
 |----------|--------|
 | [01_Ingest_Layer.md](./01_Ingest_Layer.md) | Payment ingestion, field validation, free-text reference parsing |
-| [02_Compute_Signals.md](./02_Compute_Signals.md) | 15 signals across 5 categories, 3-wave computation, hybrid name matching |
+| [02_Compute_Signals.md](./02_Compute_Signals.md) | 19 signals across 5 categories, 3-wave computation, hybrid name matching with full algorithm breakdown |
 | [03_AI_Agent.md](./03_AI_Agent.md) | Scenario routing, per-scenario decision logic, Claude API reasoning |
 | [04_Persist_Layer.md](./04_Persist_Layer.md) | Saving recommendations, ledger updates, retry & failure strategy |
-| [05_Human_Approval_Queue.md](./05_Human_Approval_Queue.md) | Frontend dashboard, payment detail view, approve/reject flow |
+| [05_Human_Approval_Queue.md](./05_Human_Approval_Queue.md) | 10 frontend pages across 4 roles (Analyst, Investigator, Director, Admin) |
 | [06_API_Reference.md](./06_API_Reference.md) | All REST endpoints, request/response formats |
 | [07_Data_Flow.md](./07_Data_Flow.md) | End-to-end sequence, pipeline orchestration, payment lifecycle |
 

@@ -1,7 +1,37 @@
+# Web framework
 fastapi
 uvicorn[standard]
+
+# Database
 sqlalchemy[asyncio]
-asyncpg
+asyncpg>=0.31.0
+greenlet
+
+# AI
 anthropic
+
+# Config
 pydantic-settings
 python-dotenv
+
+# Auth
+python-jose[cryptography]
+
+# File uploads
+python-multipart
+aiofiles
+
+# Name matching
+jellyfish
+
+# Protobuf runtime
+protobuf>=4.21.6,<5.0
+
+
+# Migrations
+alembic
+
+# Testing
+httpx
+pytest
+pytest-asyncio

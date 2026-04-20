@@ -151,11 +151,12 @@ The gray zone boundaries (70% lower, 92% upper) are stored in `configuration_thr
 
 ## Snapshot Rule
 
-After all 3 waves complete, all 15 signals are **persisted to the `payment_signals` table as a snapshot**. This is critical:
+After all 3 waves complete, all 19 signals are **persisted to the `payment_signals` table as a snapshot**. This is critical:
 
 - Even if the customer's data changes tomorrow (new risk flag, policy cancelled, etc.), we have a permanent record of what the system saw when it made its decision.
 - If an auditor asks "why was PMT-001 auto-applied?", we can show the exact signals that led to that recommendation.
 - The snapshot uses the `PaymentSignals` proto with 5 nested sub-messages (MatchingSignals, AmountSignals, TemporalSignals, RiskSignals, DuplicateSignals).
+- `MatchingSignals` includes the full algorithm breakdown: `jaro_winkler_score`, `levenshtein_score`, `soundex_match`, `deterministic_score`, `used_llm`, `llm_score`. This gives Damien (Investigator) complete algorithmic provenance when reviewing escalated cases.
 
 An audit log entry is written: `SIGNALS_COMPUTED`.
 

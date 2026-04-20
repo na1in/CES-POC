@@ -7,7 +7,6 @@ option go_package = "ces/payment_resolution";
 
 import "google/protobuf/timestamp.proto";
 import "proto/customer.proto";
-import "proto/policy.proto";
 
 // Quality of payment timing relative to due date.
 enum PaymentTimingQuality {
