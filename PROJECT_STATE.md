@@ -1,7 +1,7 @@
 # CES — Project State
 
-**Last updated:** 2026-04-08  
-**Current phase:** Phase 0 complete — ready to begin Phase 1  
+**Last updated:** 2026-04-22  
+**Current phase:** Phase 1 in progress — frontend types and mocks complete  
 **Repository:** https://github.com/na1in/CES-POC  
 **Team:** 2 Engineers (A & B) + 1 Designer
 
@@ -12,7 +12,7 @@
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **Phase 0 — Foundation** | ✅ Complete | DB schema, protos, docs, scaffold all done |
-| **Phase 1 — Core Pipeline + Frontend Shell** | ⬜ Not started | Weeks 2–4 per implementation plan |
+| **Phase 1 — Core Pipeline + Frontend Shell** | 🔄 In progress | TypeScript types + mocks done (CES-12) |
 | **Phase 2 — AI Agent + Real APIs** | ⬜ Not started | Weeks 5–6 |
 | **Phase 3 — Integration & Polish** | ⬜ Not started | Week 7 |
 
@@ -38,6 +38,15 @@
 - [x] `docs/Personas.pdf` — 4 user personas (Priya, Damien, Lorraine, Marcus)
 - [x] `docs/User Flow.pdf` — 4 detailed user flows with alt paths and error states
 - [x] `docs/user-flow-diagram.pdf` — cross-role flow diagram
+
+### Frontend — Phase 1 (partial)
+- [x] `frontend/src/types/payment.ts` — PaymentStatus, PaymentMethod, Payment
+- [x] `frontend/src/types/signals.ts` — PaymentSignals, MatchingSignals, AmountSignals, TemporalSignals, RiskSignals, DuplicateSignals + enums
+- [x] `frontend/src/types/recommendation.ts` — PaymentRecommendation, Recommendation, ScenarioRoute, DecisionAttribution
+- [x] `frontend/src/types/annotation.ts` — CaseAnnotation, AnnotationType
+- [x] `frontend/src/types/document.ts` — CaseDocument, DocumentType
+- [x] `frontend/src/types/user.ts` — User, UserRole, AuditLogEntry, AuditActionType, ConfigurationThreshold
+- [x] `frontend/src/mocks/payments.ts` — 8 mock payments covering all 5 scenarios + processing_failed + sla_breached, with full signals, recommendations, annotations, and audit logs
 
 ### Stub directories (empty `__init__.py` only)
 - [ ] `backend/app/models/`
@@ -85,8 +94,8 @@
 - [ ] Governance endpoints (`/api/governance/*`)
 
 ### Frontend — Phase 1 (Engineer B + Designer)
-- [ ] TypeScript types from proto definitions
-- [ ] Mock API responses for all endpoints
+- [x] TypeScript types from proto definitions (CES-12 ✅)
+- [x] Mock API responses for all endpoints (CES-12 ✅)
 - [ ] Queue Dashboard (`/`) — Priya, sorted by confidence score, includes payment_method column
 - [ ] Investigation Queue (`/investigations`) — Damien, escalated only, risk-sorted
 - [ ] Payment Detail (`/payments/[id]`) — signals with algorithm breakdown, annotation panel, document upload

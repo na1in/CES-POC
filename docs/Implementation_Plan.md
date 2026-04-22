@@ -56,7 +56,7 @@ Fully parallel with Track A — uses mock data matching the API contract.
 
 | Ticket | Owner | Description | Depends On | Est. |
 |--------|-------|-------------|------------|------|
-| **API types & mock data** | Engineer B | TypeScript types from all proto definitions, mock API responses for analyst/investigator endpoints (queue, detail, signals, recommendation, audit trail, annotations, documents) | Phase 0 | 2d |
+| ~~**API types & mock data**~~ ✅ | Engineer B | TypeScript types from all proto definitions, mock API responses for analyst/investigator endpoints (queue, detail, signals, recommendation, audit trail, annotations, documents) | Phase 0 | 2d |
 | **Queue Dashboard** | Engineer B + Designer | `/` — Priya's home. Open cases sorted by AI confidence score (lowest first). Columns: scenario, sender name, amount, payment method, AI recommendation, confidence band, age. Filters: scenario, confidence, payment method. PROCESSING_FAILED alert + reprocess link | Types | 2d |
 | **Investigation Queue** | Engineer B + Designer | `/investigations` — Damien's home. Escalated cases sorted by risk level. Columns: sender, amount, risk indicator, payment method, time since escalation. SLA breach warning | Types | 2d |
 | **Payment Detail page** | Engineer B + Designer | `/payments/[id]` — shared across Priya and Damien. Sections: payment info (incl. payment method), signals panel (visual bars + algorithm breakdown for name matching), AI reasoning panel, audit timeline, annotation panel (add/view), document panel (upload/list). Role-gated action buttons: Approve/Reject/Override (Priya), Return/Log Contact (Damien) | Types | 4d |
