@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CES — Payment Resolution",
-  description: "Customer Exception System — AI-assisted payment resolution queue",
+  title: "Paywise",
+  description: "AI-assisted payment resolution queue",
 };
 
 export default function RootLayout({

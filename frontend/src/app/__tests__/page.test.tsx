@@ -24,7 +24,7 @@ beforeEach(() => {
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
-describe("Queue Dashboard — rendering (CES-13)", () => {
+describe("Queue Dashboard — rendering", () => {
   it("renders a table row for every mock payment", () => {
     render(<QueueDashboard />)
     // getAllByRole('row') includes the header row, so subtract 1
@@ -79,7 +79,7 @@ describe("Queue Dashboard — rendering (CES-13)", () => {
 
 // ── Sort order ────────────────────────────────────────────────────────────────
 
-describe("Queue Dashboard — default sort (CES-13)", () => {
+describe("Queue Dashboard — default sort", () => {
   it("sorts rows by confidence score ascending (lowest first)", () => {
     render(<QueueDashboard />)
     const rows = screen.getAllByRole("row").slice(1) // skip header
@@ -94,7 +94,7 @@ describe("Queue Dashboard — default sort (CES-13)", () => {
 
 // ── Processing-failed banner ──────────────────────────────────────────────────
 
-describe("Queue Dashboard — processing-failed banner (CES-13)", () => {
+describe("Queue Dashboard — processing-failed banner", () => {
   it("shows the banner when a payment has status=processing_failed", () => {
     const hasFailedPayment = mockPayments.some(p => p.status === "processing_failed")
     expect(hasFailedPayment).toBe(true) // guard: mock data must have one
@@ -113,7 +113,7 @@ describe("Queue Dashboard — processing-failed banner (CES-13)", () => {
 
 // ── Filters ───────────────────────────────────────────────────────────────────
 
-describe("Queue Dashboard — scenario filter (CES-13)", () => {
+describe("Queue Dashboard — scenario filter", () => {
   it("clicking Sc5 shows only scenario_5 payments", () => {
     render(<QueueDashboard />)
     // The filter bar has a Sc5 chip; click it
@@ -138,7 +138,7 @@ describe("Queue Dashboard — scenario filter (CES-13)", () => {
   })
 })
 
-describe("Queue Dashboard — confidence band filter (CES-13)", () => {
+describe("Queue Dashboard — confidence band filter", () => {
   it("clicking Low shows only payments with confidence < 40", () => {
     render(<QueueDashboard />)
     // Click the "Low" filter chip in the Confidence row
@@ -154,7 +154,7 @@ describe("Queue Dashboard — confidence band filter (CES-13)", () => {
   })
 })
 
-describe("Queue Dashboard — payment method filter (CES-13)", () => {
+describe("Queue Dashboard — payment method filter", () => {
   it("clicking ACH shows only ACH payments", () => {
     render(<QueueDashboard />)
     fireEvent.click(screen.getByRole("button", { name: "ACH" }))
@@ -176,7 +176,7 @@ describe("Queue Dashboard — payment method filter (CES-13)", () => {
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 
-describe("Queue Dashboard — empty state (CES-13)", () => {
+describe("Queue Dashboard — empty state", () => {
   it("shows empty state when filters eliminate all rows", () => {
     render(<QueueDashboard />)
     // Apply two conflicting filters to guarantee zero results:
@@ -218,7 +218,7 @@ describe("Queue Dashboard — empty state (CES-13)", () => {
 
 // ── Row-click navigation ──────────────────────────────────────────────────────
 
-describe("Queue Dashboard — navigation (CES-13)", () => {
+describe("Queue Dashboard — navigation", () => {
   it("clicking a row calls router.push with the correct payment detail URL", () => {
     render(<QueueDashboard />)
     const rows = screen.getAllByRole("row").slice(1)
