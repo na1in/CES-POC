@@ -57,6 +57,51 @@ async def _llm_score(a: str, b: str) -> float | None:
         return None
 
 
+def compute_policy_match_confidence(
+    name_similarity_score: float,
+    extracted_policy_number: str | None,
+    actual_policy_number: str | None,
+    amount_variance_pct: float | None,
+) -> float:
+    """
+    Weighted combination: name (40%) + policy number match (40%) + amount match (20%).
+    Returns 0 if no policy candidate found.
+    """
+    if actual_policy_number is None:
+        return 0.0
+
+    policy_number_score = 100.0 if (
+        extracted_policy_number and
+        extracted_policy_number.strip().upper() == actual_policy_number.strip().upper()
+    ) else 0.0
+
+    amount_score = 100.0 if (amount_variance_pct is not None and amount_variance_pct <= 2.0) else 0.0
+
+    confidence = (
+        name_similarity_score * 0.4
+        + policy_number_score * 0.4
+        + amount_score * 0.2
+    )
+    return round(min(confidence, 100.0), 2)
+
+
+def compute_customer_match_confidence(
+    name_similarity_score: float,
+    account_match: bool,
+    historical_match: bool,
+) -> float:
+    """
+    Weighted combination: name (60%) + account match (20%) + historical match (20%).
+    Returns 0–100.
+    """
+    confidence = (
+        name_similarity_score * 0.6
+        + (100.0 if account_match else 0.0) * 0.2
+        + (100.0 if historical_match else 0.0) * 0.2
+    )
+    return round(min(confidence, 100.0), 2)
+
+
 async def compute_name_similarity(
     sender_name: str,
     customer_name: str,
