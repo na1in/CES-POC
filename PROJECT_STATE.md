@@ -1,7 +1,7 @@
 # CES — Project State
 
-**Last updated:** 2026-04-08  
-**Current phase:** Phase 0 complete — ready to begin Phase 1  
+**Last updated:** 2026-04-24  
+**Current phase:** Phase 1 in progress — Signal Engine complete (Waves 1–3), CES-11 next  
 **Repository:** https://github.com/na1in/CES-POC  
 **Team:** 2 Engineers (A & B) + 1 Designer
 
@@ -12,7 +12,7 @@
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **Phase 0 — Foundation** | ✅ Complete | DB schema, protos, docs, scaffold all done |
-| **Phase 1 — Core Pipeline + Frontend Shell** | ⬜ Not started | Weeks 2–4 per implementation plan |
+| **Phase 1 — Core Pipeline + Frontend Shell** | 🔄 In progress | CES-7 through CES-10 done; CES-11 next |
 | **Phase 2 — AI Agent + Real APIs** | ⬜ Not started | Weeks 5–6 |
 | **Phase 3 — Integration & Polish** | ⬜ Not started | Week 7 |
 
@@ -39,22 +39,23 @@
 - [x] `docs/User Flow.pdf` — 4 detailed user flows with alt paths and error states
 - [x] `docs/user-flow-diagram.pdf` — cross-role flow diagram
 
-### Stub directories (empty `__init__.py` only)
-- [ ] `backend/app/models/`
-- [ ] `backend/app/routers/`
-- [ ] `backend/app/services/`
+### Phase 1 — Core Pipeline (Engineer A)
+- [x] `backend/app/db.py` — async SQLAlchemy session management (NullPool for tests)
+- [x] `backend/app/routers/payments.py` — `POST /api/payments/ingest` (CES-7)
+- [x] `backend/app/services/ingest.py` — Claude Haiku reference parsing with fallback (CES-7)
+- [x] `backend/app/services/signals/matching.py` — hybrid name matching + policy/customer confidence (CES-8, CES-9)
+- [x] `backend/app/services/signals/amount.py` — variance, historical consistency, multi-period, multi-method, third-party (CES-8, CES-10)
+- [x] `backend/app/services/signals/temporal.py` — timing quality, days since last payment (CES-8)
+- [x] `backend/app/services/signals/duplicate.py` — 72hr duplicate detection with $2 tolerance (CES-8)
+- [x] `backend/app/services/signals/risk.py` — risk flags, account status, balance snapshot, payment method risk, supporting signals (CES-10)
+- [x] `backend/tests/` — full test suite (77 tests across waves 1–3, all passing)
 
 ---
 
 ## What's NOT Built Yet
 
 ### Backend — Phase 1 (Engineer A)
-- [ ] DB session management (async SQLAlchemy + asyncpg)
-- [ ] `POST /api/payments/ingest` — validate, parse refs via Claude API, persist as RECEIVED
-- [ ] Signal Engine Wave 1 — name matching (hybrid + Haiku), amount variance, timing, duplicate
-- [ ] Signal Engine Wave 2 — policy/customer confidence, over/underpayment, historical consistency
-- [ ] Signal Engine Wave 3 — risk flags, account status, balance snapshot, multi-period/method/third-party
-- [ ] Signal snapshot — persist to `payment_signals`, write SIGNALS_COMPUTED audit log
+- [ ] Signal snapshot — persist all 19 signals to `payment_signals`, write SIGNALS_COMPUTED audit log (CES-11)
 - [ ] `backend/app/services/storage.py` — document storage abstraction
 - [ ] `backend/app/services/sla.py` — SLA deadline computation and breach detection
 
@@ -131,7 +132,7 @@
 | In the PoC, is Marcus a dedicated role or a senior analyst wearing two hats? | PM | Medium — affects role seeding in DB |
 | What is the notification channel for policyholder outreach — in-system template, email, or phone only? | PM | Medium — affects contact record model |
 | Does the staging/simulation environment use anonymised production data or synthetic data? | Engineering | Medium — affects `sla.py` and back-test scope |
-| Does `jellyfish` need to be added to `requirements.txt`? | Engineer A | High — needed for Wave 1 name matching |
+| ~~Does `jellyfish` need to be added to `requirements.txt`?~~ | ~~Engineer A~~ | ~~Resolved — jellyfish added and in use~~ |
 
 ---
 
