@@ -1,7 +1,7 @@
 # CES — Project State
 
-**Last updated:** 2026-04-24  
-**Current phase:** Phase 1 in progress — Signal Engine complete (Waves 1–3), CES-11 next  
+**Last updated:** 2026-04-25  
+**Current phase:** Phase 1 in progress — Signal Engine (Waves 1–3) + TypeScript types + mocks complete; CES-11, CES-13 next  
 **Repository:** https://github.com/na1in/CES-POC  
 **Team:** 2 Engineers (A & B) + 1 Designer
 
@@ -12,7 +12,7 @@
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **Phase 0 — Foundation** | ✅ Complete | DB schema, protos, docs, scaffold all done |
-| **Phase 1 — Core Pipeline + Frontend Shell** | 🔄 In progress | CES-7 through CES-10 done; CES-11 next |
+| **Phase 1 — Core Pipeline + Frontend Shell** | 🔄 In progress | CES-7–CES-10 (backend), CES-12 (frontend types + mocks) done; CES-11, CES-13 next |
 | **Phase 2 — AI Agent + Real APIs** | ⬜ Not started | Weeks 5–6 |
 | **Phase 3 — Integration & Polish** | ⬜ Not started | Week 7 |
 
@@ -50,6 +50,15 @@
 - [x] `backend/app/services/signals/risk.py` — risk flags, account status, balance snapshot, payment method risk, supporting signals (CES-10)
 - [x] `backend/tests/` — full test suite (77 tests across waves 1–3, all passing)
 
+### Phase 1 — Frontend (Engineer B + Designer)
+- [x] `frontend/src/types/payment.ts` — PaymentStatus, PaymentMethod, Payment
+- [x] `frontend/src/types/signals.ts` — PaymentSignals, MatchingSignals, AmountSignals, TemporalSignals, RiskSignals, DuplicateSignals + enums
+- [x] `frontend/src/types/recommendation.ts` — PaymentRecommendation, Recommendation, ScenarioRoute, DecisionAttribution
+- [x] `frontend/src/types/annotation.ts` — CaseAnnotation, AnnotationType
+- [x] `frontend/src/types/document.ts` — CaseDocument, DocumentType
+- [x] `frontend/src/types/user.ts` — User, UserRole, AuditLogEntry, AuditActionType, ConfigurationThreshold
+- [x] `frontend/src/mocks/payments.ts` — 8 mock payments covering all 5 scenarios + processing_failed + sla_breached, with full signals, recommendations, annotations, and audit logs (CES-12)
+
 ---
 
 ## What's NOT Built Yet
@@ -86,8 +95,8 @@
 - [ ] Governance endpoints (`/api/governance/*`)
 
 ### Frontend — Phase 1 (Engineer B + Designer)
-- [ ] TypeScript types from proto definitions
-- [ ] Mock API responses for all endpoints
+- [x] TypeScript types from proto definitions (CES-12 ✅)
+- [x] Mock API responses for all endpoints (CES-12 ✅)
 - [ ] Queue Dashboard (`/`) — Priya, sorted by confidence score, includes payment_method column
 - [ ] Investigation Queue (`/investigations`) — Damien, escalated only, risk-sorted
 - [ ] Payment Detail (`/payments/[id]`) — signals with algorithm breakdown, annotation panel, document upload
