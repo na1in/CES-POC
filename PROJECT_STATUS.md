@@ -13,7 +13,7 @@
 | **Repo** | https://github.com/na1in/CES-POC |
 | **Current week** | Week 1 |
 | **Active phase** | Phase 0 complete → Phase 1 starting |
-| **Last updated** | 2026-04-18 |
+| **Last updated** | 2026-04-22 |
 
 ## Team
 
@@ -73,8 +73,8 @@
 
 | Ticket | Est | Status | Owner | Notes |
 |--------|-----|--------|-------|-------|
-| **Ingest endpoint** `POST /api/payments/ingest` — validate fields, call Claude API to parse free-text refs (policy #, intent, period count), generate PMT-XXX ID, INSERT as RECEIVED, write RECEIVED audit log | 3d | ⬜ | Eng A | |
-| **Signal Wave 1** — name similarity (hybrid: jaro-winkler + levenshtein + soundex → deterministic, then Haiku for 70–92% gray zone), amount variance, timing quality, duplicate check (3 exact + $2 tolerance / 72hr window) | 4d | ⬜ | Eng A | |
+| **Ingest endpoint** `POST /api/payments/ingest` — validate fields, call Claude API to parse free-text refs (policy #, intent, period count), generate PMT-XXX ID, INSERT as RECEIVED, write RECEIVED audit log | 3d | ✅ | Eng A | PR #1 open on nalin-dev. 23 tests passing. |
+| **Signal Wave 1** — name similarity (hybrid: jaro-winkler + levenshtein + soundex → deterministic, then Haiku for 70–92% gray zone), amount variance, timing quality, duplicate check (3 exact + $2 tolerance / 72hr window) | 4d | ✅ | Eng A | PR #1. 25 tests passing. |
 | **Signal Wave 2** — policy match confidence, customer match confidence, over/underpayment, historical consistency (z-score) | 3d | ⬜ | Eng A | Depends on Wave 1 |
 | **Signal Wave 3** — risk flags, account status, balance snapshot, payment method risk, supporting signals (account/amount/historical match), multi-period indicator, multi-method indicator, third-party indicator | 3d | ⬜ | Eng A | Depends on Wave 2 |
 | **Signal snapshot** — persist all 19 signals to `payment_signals`, write SIGNALS_COMPUTED audit log | 1d | ⬜ | Eng A | Depends on all waves |
