@@ -5,14 +5,53 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+
+  /* ── PayWise brand tokens ──────────────────────────────── */
+  --pw-primary:        #7C4DFF;
+  --pw-primary-hover:  #6A3FE8;
+  --pw-secondary:      #00E5FF;
+
+  --pw-apply:          #10B981;
+  --pw-apply-hover:    #059669;
+  --pw-apply-tint:     rgba(16, 185, 129, 0.10);
+
+  --pw-hold:           #F59E0B;
+  --pw-hold-hover:     #D97706;
+  --pw-hold-tint:      rgba(245, 158, 11, 0.10);
+
+  --pw-escalate:       #EF4444;
+  --pw-escalate-hover: #DC2626;
+  --pw-escalate-tint:  rgba(239, 68, 68, 0.10);
+
+  --pw-info:           #3B82F6;
+  --pw-info-tint:      rgba(59, 130, 246, 0.10);
+
+  --pw-text-primary:   #1E293B;
+  --pw-text-secondary: #64748B;
+  --pw-text-muted:     #94A3B8;
+  --pw-border:         #E2E8F0;
+  --pw-bg:             #F8F9FA;
+  --pw-surface:        #FFFFFF;
+  --pw-surface-elevated: #F1F3F5;
+
+  --pw-font-sans:      'Inter', sans-serif;
+  --pw-font-mono:      'JetBrains Mono', monospace;
+  --pw-font-display:   'DM Sans', sans-serif;
+
+  --pw-nav-height:     52px;
+  --pw-footer-height:  28px;
+  --pw-shadow-sm:      0 1px 2px rgba(0, 0, 0, 0.05);
+  --pw-shadow-md:      0 4px 6px rgba(0, 0, 0, 0.07);
+
+  /* Override shadcn/Tailwind defaults with PayWise brand */
+  --background: #F8F9FA;
+  --foreground: #1E293B;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: #7C4DFF;
+  --primary-foreground: #ffffff;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -116,5 +155,32 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--pw-font-sans);
   }
+}
+
+/* ── PayWise badge utilities ──────────────────────────────── */
+.pw-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.pw-badge-apply    { background: var(--pw-apply-tint);    color: var(--pw-apply);    }
+.pw-badge-hold     { background: var(--pw-hold-tint);     color: var(--pw-hold);     }
+.pw-badge-escalate { background: var(--pw-escalate-tint); color: var(--pw-escalate); }
+.pw-badge-neutral  { background: var(--pw-surface-elevated); color: var(--pw-text-secondary); }
+.pw-badge-info     { background: var(--pw-info-tint);     color: var(--pw-info);     }
+
+/* ── PayWise card ─────────────────────────────────────────── */
+.pw-card {
+  background: var(--pw-surface);
+  border: 1px solid var(--pw-border);
+  border-radius: 12px;
+  box-shadow: var(--pw-shadow-sm);
 }
