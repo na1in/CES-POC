@@ -1,7 +1,7 @@
 # CES — Project State
 
-**Last updated:** 2026-04-22  
-**Current phase:** Phase 1 in progress — frontend types and mocks complete  
+**Last updated:** 2026-04-25  
+**Current phase:** Phase 1 in progress — Signal Engine (Waves 1–3) + TypeScript types + mocks + Queue Dashboard complete; CES-11 (signal snapshot) next for backend, Investigation Queue next for frontend  
 **Repository:** https://github.com/na1in/CES-POC  
 **Team:** 2 Engineers (A & B) + 1 Designer
 
@@ -12,7 +12,7 @@
 | Phase | Status | Notes |
 |-------|--------|-------|
 | **Phase 0 — Foundation** | ✅ Complete | DB schema, protos, docs, scaffold all done |
-| **Phase 1 — Core Pipeline + Frontend Shell** | 🔄 In progress | TypeScript types + mocks done (CES-12) |
+| **Phase 1 — Core Pipeline + Frontend Shell** | 🔄 In progress | CES-7–CES-10 (backend), CES-12 + CES-13 (frontend) done; CES-11 next |
 | **Phase 2 — AI Agent + Real APIs** | ⬜ Not started | Weeks 5–6 |
 | **Phase 3 — Integration & Polish** | ⬜ Not started | Week 7 |
 
@@ -39,31 +39,35 @@
 - [x] `docs/User Flow.pdf` — 4 detailed user flows with alt paths and error states
 - [x] `docs/user-flow-diagram.pdf` — cross-role flow diagram
 
-### Frontend — Phase 1 (partial)
+### Phase 1 — Core Pipeline (Engineer A)
+- [x] `backend/app/db.py` — async SQLAlchemy session management (NullPool for tests)
+- [x] `backend/app/routers/payments.py` — `POST /api/payments/ingest` (CES-7)
+- [x] `backend/app/services/ingest.py` — Claude Haiku reference parsing with fallback (CES-7)
+- [x] `backend/app/services/signals/matching.py` — hybrid name matching + policy/customer confidence (CES-8, CES-9)
+- [x] `backend/app/services/signals/amount.py` — variance, historical consistency, multi-period, multi-method, third-party (CES-8, CES-10)
+- [x] `backend/app/services/signals/temporal.py` — timing quality, days since last payment (CES-8)
+- [x] `backend/app/services/signals/duplicate.py` — 72hr duplicate detection with $2 tolerance (CES-8)
+- [x] `backend/app/services/signals/risk.py` — risk flags, account status, balance snapshot, payment method risk, supporting signals (CES-10)
+- [x] `backend/tests/` — full test suite (77 tests across waves 1–3, all passing)
+
+### Phase 1 — Frontend (Engineer B + Designer)
 - [x] `frontend/src/types/payment.ts` — PaymentStatus, PaymentMethod, Payment
 - [x] `frontend/src/types/signals.ts` — PaymentSignals, MatchingSignals, AmountSignals, TemporalSignals, RiskSignals, DuplicateSignals + enums
 - [x] `frontend/src/types/recommendation.ts` — PaymentRecommendation, Recommendation, ScenarioRoute, DecisionAttribution
 - [x] `frontend/src/types/annotation.ts` — CaseAnnotation, AnnotationType
 - [x] `frontend/src/types/document.ts` — CaseDocument, DocumentType
 - [x] `frontend/src/types/user.ts` — User, UserRole, AuditLogEntry, AuditActionType, ConfigurationThreshold
-- [x] `frontend/src/mocks/payments.ts` — 8 mock payments covering all 5 scenarios + processing_failed + sla_breached, with full signals, recommendations, annotations, and audit logs
-
-### Stub directories (empty `__init__.py` only)
-- [ ] `backend/app/models/`
-- [ ] `backend/app/routers/`
-- [ ] `backend/app/services/`
+- [x] `frontend/src/mocks/payments.ts` — 8 mock payments covering all 5 scenarios + processing_failed + sla_breached, with full signals, recommendations, annotations, and audit logs (CES-12)
+- [x] `frontend/src/app/page.tsx` — Queue Dashboard: confidence-sorted table, scenario/method/confidence filters, processing-failed banner, empty state, row-click navigation (CES-13)
+- [x] `frontend/src/mocks/__tests__/payments.test.ts` — 35 mock data contract validation tests
+- [x] `frontend/src/app/__tests__/page.test.tsx` — 23 Queue Dashboard component tests (58 total passing)
 
 ---
 
 ## What's NOT Built Yet
 
 ### Backend — Phase 1 (Engineer A)
-- [ ] DB session management (async SQLAlchemy + asyncpg)
-- [ ] `POST /api/payments/ingest` — validate, parse refs via Claude API, persist as RECEIVED
-- [ ] Signal Engine Wave 1 — name matching (hybrid + Haiku), amount variance, timing, duplicate
-- [ ] Signal Engine Wave 2 — policy/customer confidence, over/underpayment, historical consistency
-- [ ] Signal Engine Wave 3 — risk flags, account status, balance snapshot, multi-period/method/third-party
-- [ ] Signal snapshot — persist to `payment_signals`, write SIGNALS_COMPUTED audit log
+- [ ] Signal snapshot — persist all 19 signals to `payment_signals`, write SIGNALS_COMPUTED audit log (CES-11)
 - [ ] `backend/app/services/storage.py` — document storage abstraction
 - [ ] `backend/app/services/sla.py` — SLA deadline computation and breach detection
 
@@ -96,7 +100,7 @@
 ### Frontend — Phase 1 (Engineer B + Designer)
 - [x] TypeScript types from proto definitions (CES-12 ✅)
 - [x] Mock API responses for all endpoints (CES-12 ✅)
-- [ ] Queue Dashboard (`/`) — Priya, sorted by confidence score, includes payment_method column
+- [x] Queue Dashboard (`/`) — Priya, sorted by confidence score, includes payment_method column (CES-13 ✅)
 - [ ] Investigation Queue (`/investigations`) — Damien, escalated only, risk-sorted
 - [ ] Payment Detail (`/payments/[id]`) — signals with algorithm breakdown, annotation panel, document upload
 - [ ] Settings (`/settings`) — threshold viewer, change request flow for admin
@@ -140,7 +144,7 @@
 | In the PoC, is Marcus a dedicated role or a senior analyst wearing two hats? | PM | Medium — affects role seeding in DB |
 | What is the notification channel for policyholder outreach — in-system template, email, or phone only? | PM | Medium — affects contact record model |
 | Does the staging/simulation environment use anonymised production data or synthetic data? | Engineering | Medium — affects `sla.py` and back-test scope |
-| Does `jellyfish` need to be added to `requirements.txt`? | Engineer A | High — needed for Wave 1 name matching |
+| ~~Does `jellyfish` need to be added to `requirements.txt`?~~ | ~~Engineer A~~ | ~~Resolved — jellyfish added and in use~~ |
 
 ---
 
@@ -156,12 +160,12 @@
 ## Phase 1 Entry Checklist
 
 Before Engineer A starts the ingest endpoint:
-- [ ] PostgreSQL instance running with `schema.sql` applied
-- [ ] `configuration_thresholds` table seeded with defaults (see CLAUDE.md thresholds table)
-- [ ] Test customers, policies, and payment history seeded
-- [ ] `ANTHROPIC_API_KEY` set in `.env`
-- [ ] `jellyfish` added to `requirements.txt`
-- [ ] Proto Python classes generated from `proto/`
+- [x] PostgreSQL instance running with `schema.sql` applied
+- [x] `configuration_thresholds` table seeded with defaults (see CLAUDE.md thresholds table)
+- [x] Test customers, policies, and payment history seeded
+- [x] `ANTHROPIC_API_KEY` set in `.env`
+- [x] `jellyfish` added to `requirements.txt`
+- [x] Proto Python classes generated from `proto/`
 
 ---
 
@@ -170,9 +174,10 @@ Before Engineer A starts the ingest endpoint:
 ```
 Engineer A                          Engineer B + Designer
 ──────────────────────              ──────────────────────────────
-Ingest endpoint                     API types + mock data  (parallel)
-Signal Engine Wave 1+2              Queue Dashboard + Payment List  (parallel)
-Signal Engine Wave 3 + snapshot     Payment Detail + Settings  (parallel)
+Ingest endpoint          ✅         API types + mock data  ✅ (parallel)
+Signal Engine Wave 1+2   ✅         Queue Dashboard        ✅ (parallel)
+Signal Engine Wave 3     ✅         Investigation Queue       (next)
+Signal snapshot          (next)     Payment Detail + Settings (next)
 ```
 
 Frontend never waits for backend — mock data defined upfront from proto types.

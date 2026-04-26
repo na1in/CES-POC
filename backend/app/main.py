@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import CurrentUser, create_access_token, get_current_user
 from app.database import engine, get_db
 from app.models.user import User
+from app.routers.payments import router as payments_router
 
 
 @asynccontextmanager
@@ -20,6 +21,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="CES — Payment Resolution System", lifespan=lifespan)
+app.include_router(payments_router)
 
 
 # ── Exception handlers ────────────────────────────────────────────────────────
