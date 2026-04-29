@@ -289,6 +289,7 @@ export default function QueueDashboard() {
   const [bandFilter, setBandFilter] = useState<Set<ConfidenceBand>>(new Set())
   const [methodFilter, setMethodFilter] = useState<Set<PaymentMethod>>(new Set())
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [sortKey, setSortKey] = useState<string>("confidence_desc")
 
   function toggle<T>(set: Set<T>, value: T): Set<T> {
     const next = new Set(set)
@@ -309,7 +310,19 @@ export default function QueueDashboard() {
 
   const rows = mockPayments
     .map(p => ({ payment: p, rec: mockRecommendations[p.payment_id] ?? null }))
-    .sort((a, b) => (a.rec?.confidence_score ?? 0) - (b.rec?.confidence_score ?? 0))
+    .sort((a, b) => {
+      switch (sortKey) {
+        case "confidence_desc": return (b.rec?.confidence_score ?? 0) - (a.rec?.confidence_score ?? 0)
+        case "confidence_asc":  return (a.rec?.confidence_score ?? 0) - (b.rec?.confidence_score ?? 0)
+        case "sender_asc":      return a.payment.sender_name.localeCompare(b.payment.sender_name)
+        case "sender_desc":     return b.payment.sender_name.localeCompare(a.payment.sender_name)
+        case "amount_desc":     return b.payment.amount - a.payment.amount
+        case "amount_asc":      return a.payment.amount - b.payment.amount
+        case "newest":          return new Date(b.payment.created_timestamp).getTime() - new Date(a.payment.created_timestamp).getTime()
+        case "oldest":          return new Date(a.payment.created_timestamp).getTime() - new Date(b.payment.created_timestamp).getTime()
+        default:                return 0
+      }
+    })
 
   const filtered = rows.filter(({ payment, rec }) => {
     if (!rec) return true
@@ -470,6 +483,37 @@ export default function QueueDashboard() {
                   {method}
                 </FilterChip>
               ))}
+            </div>
+
+            {/* Sort */}
+            <div className="flex items-center gap-1.5 ml-auto">
+              <span className="font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)", fontSize: 10 }}>
+                Sort
+              </span>
+              <select
+                aria-label="Sort by"
+                value={sortKey}
+                onChange={e => setSortKey(e.target.value)}
+                style={{
+                  fontSize: 12,
+                  color: "var(--pw-text-primary)",
+                  background: "var(--pw-surface)",
+                  border: "1px solid var(--pw-border)",
+                  borderRadius: 6,
+                  padding: "2px 6px",
+                  cursor: "pointer",
+                  outline: "none",
+                }}
+              >
+                <option value="confidence_desc">Confidence: High → Low</option>
+                <option value="confidence_asc">Confidence: Low → High</option>
+                <option value="sender_asc">Sender: A → Z</option>
+                <option value="sender_desc">Sender: Z → A</option>
+                <option value="amount_desc">Amount: High → Low</option>
+                <option value="amount_asc">Amount: Low → High</option>
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+              </select>
             </div>
 
             {hasFilters && (
