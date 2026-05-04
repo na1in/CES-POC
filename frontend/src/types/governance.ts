@@ -22,6 +22,22 @@ export interface ConfigChangeRequest {
   proposed_at: string
   status: ChangeRequestStatus
   review_comment: string | null
+  rationale?: string
+  projected_impact?: string | null
+  reviewed_by?: string | null
+  reviewed_at?: string | null
+  deployed_at?: string | null
+  deployed_by?: string | null
+}
+
+export interface ThresholdVersionEntry {
+  version_id: string
+  parameter_name: string
+  old_value: string
+  new_value: string
+  changed_by: string
+  changed_at: string
+  change_request_id: string | null
 }
 
 export interface SlaBreachedPayment {
