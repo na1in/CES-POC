@@ -32,3 +32,12 @@ export interface SlaBreachedPayment {
   investigation_due_date: string
   investigator: string
 }
+
+export interface GovernanceReview {
+  review_id: string
+  period: string
+  reviewed_by: string
+  reviewed_at: string
+  notes: string | null
+  export_scope: string[]
+}
