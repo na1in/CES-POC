@@ -1,26 +1,32 @@
 import json
 import logging
 
-import anthropic
+import openai
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_client: anthropic.AsyncAnthropic | None = None
+_client: openai.AsyncOpenAI | None = None
+
+_MODEL = "google/gemini-2.5-flash-preview"
+_OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 
 
-def _get_client() -> anthropic.AsyncAnthropic:
+def _get_client() -> openai.AsyncOpenAI:
     global _client
     if _client is None:
-        _client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        _client = openai.AsyncOpenAI(
+            api_key=settings.OPENROUTER_API_KEY,
+            base_url=_OPENROUTER_BASE,
+        )
     return _client
 
 
 async def parse_reference_fields(ref1: str | None, ref2: str | None) -> dict:
     """
-    Uses Claude Haiku to extract structured data from free-text reference fields.
-    Returns defaults on any failure — never raises.
+    Uses Gemini Flash via OpenRouter to extract structured data from free-text
+    reference fields. Returns defaults on any failure — never raises.
     """
     defaults = {"extracted_policy_number": None, "payment_intent": "unknown", "period_count": 1}
 
@@ -40,13 +46,15 @@ Return a JSON object with exactly these fields:
 Return only valid JSON, no explanation."""
 
     try:
-        response = await _get_client().messages.create(
-            model="claude-haiku-4-5",
+        response = await _get_client().chat.completions.create(
+            model=_MODEL,
             max_tokens=256,
             timeout=3.0,
             messages=[{"role": "user", "content": prompt}],
         )
-        text = response.content[0].text.strip()
+        text = response.choices[0].message.content.strip()
+        if text.startswith("```"):
+            text = "\n".join(text.split("\n")[1:-1])
         parsed = json.loads(text)
         return {
             "extracted_policy_number": parsed.get("extracted_policy_number") or None,

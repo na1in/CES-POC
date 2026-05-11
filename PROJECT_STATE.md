@@ -1,8 +1,9 @@
 # CES — Project State
 
-**Last updated:** 2026-04-25  
-**Current phase:** Phase 1 in progress — Signal Engine (Waves 1–3) + TypeScript types + mocks complete; CES-11, CES-13 next  
+**Last updated:** 2026-05-11  
+**Current phase:** Phase 2 complete (backend) · Phase 3 starting  
 **Repository:** https://github.com/na1in/CES-POC  
+**Branch:** `nalin-dev` (open PR #9 against main)  
 **Team:** 2 Engineers (A & B) + 1 Designer
 
 ---
@@ -11,36 +12,27 @@
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| **Phase 0 — Foundation** | ✅ Complete | DB schema, protos, docs, scaffold all done |
-| **Phase 1 — Core Pipeline + Frontend Shell** | 🔄 In progress | CES-7–CES-10 (backend), CES-12 (frontend types + mocks) done; CES-11, CES-13 next |
-| **Phase 2 — AI Agent + Real APIs** | ⬜ Not started | Weeks 5–6 |
-| **Phase 3 — Integration & Polish** | ⬜ Not started | Week 7 |
+| **Phase 0 — Foundation** | ✅ Complete | DB schema, protos, docs, scaffold, auth, seed data |
+| **Phase 1 — Core Pipeline + Frontend Shell** | ✅ Complete | Ingest → signals → snapshot (backend); Queue/Detail/Settings pages (frontend) |
+| **Phase 2 — AI Agent + Analyst/Investigator APIs** | ✅ Backend complete · 🔄 Frontend wire-up pending | All backend APIs live; Praneetha wiring frontend to real APIs |
+| **Phase 3 — Director/Admin + Governance/Analytics/Config APIs** | ⬜ Not started | Next up for Engineer A |
+| **Phase 4 — Integration & Polish** | ⬜ Not started | Week 10 |
 
 ---
 
 ## What's Built
 
-### Foundation
+### Foundation (Phase 0)
 - [x] `db/schema.sql` — complete PostgreSQL schema (all tables, enums, indexes)
 - [x] `proto/*.proto` — all 11 proto files (source of truth for data models)
-- [x] `backend/app/main.py` — FastAPI skeleton with `/health` endpoint
-- [x] `backend/app/config.py` — Pydantic settings (DATABASE_URL, ANTHROPIC_API_KEY)
-- [x] `backend/requirements.txt` — fastapi, uvicorn, sqlalchemy, asyncpg, anthropic, pydantic-settings
-- [x] `frontend/` — Next.js + Tailwind scaffold (default page only)
-- [x] `docs/` — full specification docs
+- [x] `backend/app/main.py` — FastAPI app with JWT auth, role guards, health check
+- [x] `backend/app/auth.py` — JWT + `require_roles()` dependency factory; Priya/Damien/Lorraine/Marcus role guards
+- [x] `backend/app/config.py` — Pydantic settings (DATABASE_URL, ANTHROPIC_API_KEY, JWT_SECRET_KEY)
+- [x] `backend/requirements.txt` — fastapi, uvicorn, sqlalchemy, asyncpg, anthropic, jellyfish, python-jose, alembic
+- [x] Docker Compose + Alembic migrations + idempotent seed data
+- [x] `docs/` — all specification, architecture, scenario, and implementation docs
 
-### Documentation
-- [x] `docs/Final_Scenario_Definitions.md` — authoritative decision logic for all 5 scenarios
-- [x] `docs/Step3_Feature_Signals.md` — all 19 signals with computation methods
-- [x] `docs/architecture/00-07` — architecture docs per pipeline stage
-- [x] `docs/scenarios/Scenario_1-5` — per-scenario decision logic and edge cases
-- [x] `docs/Implementation_Plan.md` — phased plan with tickets and estimates
-- [x] `docs/Personas.pdf` — 4 user personas (Priya, Damien, Lorraine, Marcus)
-- [x] `docs/User Flow.pdf` — 4 detailed user flows with alt paths and error states
-- [x] `docs/user-flow-diagram.pdf` — cross-role flow diagram
-
-### Phase 1 — Core Pipeline (Engineer A)
-- [x] `backend/app/db.py` — async SQLAlchemy session management (NullPool for tests)
+### Phase 1 — Backend Pipeline (Engineer A) ✅
 - [x] `backend/app/routers/payments.py` — `POST /api/payments/ingest` (CES-7)
 - [x] `backend/app/services/ingest.py` — Claude Haiku reference parsing with fallback (CES-7)
 - [x] `backend/app/services/signals/matching.py` — hybrid name matching + policy/customer confidence (CES-8, CES-9)
@@ -48,67 +40,66 @@
 - [x] `backend/app/services/signals/temporal.py` — timing quality, days since last payment (CES-8)
 - [x] `backend/app/services/signals/duplicate.py` — 72hr duplicate detection with $2 tolerance (CES-8)
 - [x] `backend/app/services/signals/risk.py` — risk flags, account status, balance snapshot, payment method risk, supporting signals (CES-10)
-- [x] `backend/tests/` — full test suite (77 tests across waves 1–3, all passing)
+- [x] `backend/app/services/signal_engine.py` — 3-wave orchestrator + snapshot to `payment_signals` (CES-11)
+- [x] 77 unit tests across signal waves; all passing without DB
 
-### Phase 1 — Frontend (Engineer B + Designer)
-- [x] `frontend/src/types/payment.ts` — PaymentStatus, PaymentMethod, Payment
-- [x] `frontend/src/types/signals.ts` — PaymentSignals, MatchingSignals, AmountSignals, TemporalSignals, RiskSignals, DuplicateSignals + enums
-- [x] `frontend/src/types/recommendation.ts` — PaymentRecommendation, Recommendation, ScenarioRoute, DecisionAttribution
-- [x] `frontend/src/types/annotation.ts` — CaseAnnotation, AnnotationType
-- [x] `frontend/src/types/document.ts` — CaseDocument, DocumentType
-- [x] `frontend/src/types/user.ts` — User, UserRole, AuditLogEntry, AuditActionType, ConfigurationThreshold
-- [x] `frontend/src/mocks/payments.ts` — 8 mock payments covering all 5 scenarios + processing_failed + sla_breached, with full signals, recommendations, annotations, and audit logs (CES-12)
+### Phase 1 — Frontend Shell (Engineer B + Designer) ✅
+- [x] TypeScript types from all 11 proto definitions (CES-12)
+- [x] Mock API responses for all analyst/investigator endpoints (CES-12)
+- [x] Queue Dashboard `/` — sorted by confidence score, payment method column, scenario filter (CES-13)
+- [x] Investigation Queue `/investigations` — escalated cases, risk-sorted, SLA breach indicator (CES-14)
+- [x] Payment Detail `/payments/[id]` — signals panel, reasoning, audit timeline, action buttons, annotations, documents (CES-15)
+- [x] Settings `/settings` — threshold viewer, read-only for non-admin (CES-16)
+
+### Phase 2 — AI Agent + Persist + Pipeline (Engineer A) ✅
+- [x] `backend/app/services/agent/router.py` — deterministic scenario routing: S5→S4→S3→S1→S2 (CES-17)
+- [x] `backend/app/services/agent/scenarios/sc1.py` — Strong Policy Match (CES-18)
+- [x] `backend/app/services/agent/scenarios/sc2.py` — Customer Match, No Policy (CES-19)
+- [x] `backend/app/services/agent/scenarios/sc3.py` — High Amount Variance, 5 tiers (CES-20)
+- [x] `backend/app/services/agent/scenarios/sc4.py` — No Matching Customer (CES-21)
+- [x] `backend/app/services/agent/scenarios/sc5.py` — Duplicate Payment (CES-22)
+- [x] `backend/app/services/agent/reasoning.py` — shared Claude Sonnet wrapper with fallback
+- [x] `backend/app/services/persist.py` — single-transaction save; auto-apply ledger; `_target_status()` (CES-23)
+- [x] `backend/app/services/pipeline.py` — 3-attempt retry orchestrator; `_mark_failed()` (CES-24)
+
+### Phase 2 — Analyst/Investigator APIs (Engineer A + B) ✅
+- [x] `backend/app/routers/approvals.py` — approve, reject, override, return, reprocess (CES-25/26)
+- [x] `backend/app/routers/payments.py` — `GET /api/payments` (filtered/paginated list) + `GET /api/payments/{id}` (full detail, signals grouped by category) (CES-28)
+- [x] `backend/app/routers/annotations.py` — POST/GET annotations; contact_record → pending_sender_response (CES-29/31)
+- [x] `backend/app/routers/documents.py` — multipart upload, list, stream, soft delete (CES-30)
+- [x] `backend/app/services/storage.py` — local FS abstraction (UPLOAD_DIR env, MIME allowlist, 20MB cap) (CES-30)
+- [x] `backend/app/services/sla.py` — `compute_due_date()`, `check_and_mark_breaches()`, asyncio background monitor (CES-27)
+- [x] 176 unit tests total; all passing without DB
+
+### Phase 2 — Frontend Wire-up (Engineer B) 🔄 In Progress
+- [x] Governance Dashboard `/governance` — Lorraine's metrics (CES-34/36) [built with mock data]
+- [x] Compliance Export `/governance/export` (CES-35) [built with mock data]
+- [x] Exception Dashboard `/governance/exceptions` (CES-36) [built with mock data]
+- [x] Admin Dashboard `/admin` (CES-37) [built with mock data]
+- [x] Override Analysis `/admin/overrides` (CES-38) [built with mock data]
+- [x] Configuration Management `/admin/config` (CES-39) [built with mock data]
+- [ ] Wire analyst/investigator pages to real APIs (replace mock data in Queue, Detail, Investigations, Settings)
 
 ---
 
 ## What's NOT Built Yet
 
-### Backend — Phase 1 (Engineer A)
-- [ ] Signal snapshot — persist all 19 signals to `payment_signals`, write SIGNALS_COMPUTED audit log (CES-11)
-- [ ] `backend/app/services/storage.py` — document storage abstraction
-- [ ] `backend/app/services/sla.py` — SLA deadline computation and breach detection
-
-### Backend — Phase 2 (Engineer A)
-- [ ] Scenario Router (`router.py`) — deterministic if/else routing
-- [ ] Scenarios 1–5 (`agent/scenarios/`) — Claude API prompts + output parsing
-- [ ] Persist layer (`persist.py`) — single transaction, sets `decision_attribution`
-- [ ] Pipeline orchestrator (`pipeline.py`) — retry wrapper (3 attempts, 1s/3s backoff)
-
-### API Endpoints — Phase 2 (Engineer B)
-- [ ] `GET /api/payments` with full filter/sort support (incl. payment_method, confidence_score)
-- [ ] `GET /api/payments/{id}` — full detail with signals, recommendation, audit, annotations, documents
-- [ ] `POST /api/payments/{id}/approve`
-- [ ] `POST /api/payments/{id}/reject`
-- [ ] `POST /api/payments/{id}/override` — mandatory reason field
-- [ ] `POST /api/payments/{id}/return`
-- [ ] `POST /api/payments/{id}/reprocess`
-- [ ] `POST /api/payments/{id}/annotations`
-- [ ] `GET /api/payments/{id}/annotations`
-- [ ] `POST /api/payments/{id}/documents`
-- [ ] `GET /api/payments/{id}/documents`
-- [ ] `GET /api/payments/{id}/documents/{doc_id}`
-- [ ] `DELETE /api/payments/{id}/documents/{doc_id}`
-- [ ] `GET /api/analytics/decisions`
-- [ ] `GET /api/analytics/overrides`
-- [ ] Config change request workflow (`/api/settings/change-requests/*`)
+### Phase 3 — Governance/Analytics/Config APIs (Engineer A)
+- [ ] `GET /api/analytics/decisions` — attribution counts, method breakdown, per-scenario breakdown, confidence histogram
+- [ ] `GET /api/analytics/overrides` — filterable by scenario, confidence band, date, reason category
+- [ ] `POST/GET /api/governance/reviews` — Lorraine period review log
+- [ ] `POST/GET /api/governance/anomalies` + `PATCH .../anomalies/{id}` — anomaly flag workflow
+- [ ] `GET /api/governance/export` — audit-ready report (date range + scope)
+- [ ] `POST /api/settings/change-requests` + full workflow (approve/reject/deploy/rollback)
 - [ ] `GET /api/settings/thresholds/history`
-- [ ] Governance endpoints (`/api/governance/*`)
 
-### Frontend — Phase 1 (Engineer B + Designer)
-- [x] TypeScript types from proto definitions (CES-12 ✅)
-- [x] Mock API responses for all endpoints (CES-12 ✅)
-- [ ] Queue Dashboard (`/`) — Priya, sorted by confidence score, includes payment_method column
-- [ ] Investigation Queue (`/investigations`) — Damien, escalated only, risk-sorted
-- [ ] Payment Detail (`/payments/[id]`) — signals with algorithm breakdown, annotation panel, document upload
-- [ ] Settings (`/settings`) — threshold viewer, change request flow for admin
+### Phase 3 — Director/Admin Frontend Wire-up (Engineer B)
+- [ ] Wire Governance Dashboard, Exception Dashboard, Admin Dashboard, Override Analysis, Config Management to real APIs
 
-### Frontend — Phase 2 (Engineer B + Designer)
-- [ ] Governance Dashboard (`/governance`) — Lorraine's metric cards + payment method breakdown chart
-- [ ] Compliance Export (`/governance/export`)
-- [ ] Exception Dashboard (`/governance/exceptions`)
-- [ ] Admin Dashboard (`/admin`) — Marcus's per-scenario analytics
-- [ ] Override Analysis (`/admin/overrides`)
-- [ ] Configuration Management (`/admin/config`) — change request form, version history, simulation
+### Phase 4 — Integration & Polish
+- [ ] E2E tests for all 5 scenarios + analyst/investigator/config flows
+- [ ] Frontend integration testing across all 10 pages
+- [ ] UI polish, accessibility, empty/error states
 
 ---
 
@@ -123,57 +114,53 @@
 | Postgres enums | lowercase snake_case | e.g., `fraud_history` not `FRAUD_HISTORY` |
 | Thresholds | Stored in DB, never hardcoded | Tunable without code deploy |
 | Name matching | Hybrid: deterministic + Haiku for 70–92% gray zone | Full algorithm breakdown stored |
-| Override reason | Mandatory (form blocks submit without it) | Marcus's feedback loop + audit |
-| Document storage | Object storage (local FS for PoC, S3-compatible interface) | Swap with one config change |
+| Override reason | Mandatory (form blocks submit) | Marcus's feedback loop + audit |
+| Document storage | Local FS for PoC (`UPLOAD_DIR`), S3-compatible interface | Swap with one config change |
 | Decision attribution | Set at case closure in `persist.py` | Lorraine's AI vs human metrics |
 | Config changes | Require formal change request + Lorraine approval | Separation of duties (compliance) |
-| Scenario 5 | Always runs first on every payment | Duplicate check before any other routing |
+| Scenario 5 | Always runs first on every payment | Duplicate check before any routing |
 | Update order | protos → schema → scenario docs → architecture docs → reference docs | Maintain consistency |
+| SLA default | 72 hours (`_SLA_HOURS` in `persist.py`) | Imported by approvals.py and sla.py |
+| contact_record annotation | Transitions escalated → pending_sender_response | SLA timer starts at first contact log |
 
 ---
 
-## Open Questions
+## Open Questions (Resolved + Outstanding)
 
-| Question | Owner | Priority |
-|----------|-------|----------|
-| Does "Hold requires approval" mean a peer analyst reviews, or does Priya hold and await system timeout? | PM | High — affects approval flow design |
-| Is there a defined SLA for Damien's investigation queue? Who sets it — Lorraine or ops policy? | PM | High — needed before `sla.py` is built |
-| In the PoC, is Marcus a dedicated role or a senior analyst wearing two hats? | PM | Medium — affects role seeding in DB |
-| What is the notification channel for policyholder outreach — in-system template, email, or phone only? | PM | Medium — affects contact record model |
-| Does the staging/simulation environment use anonymised production data or synthetic data? | Engineering | Medium — affects `sla.py` and back-test scope |
-| ~~Does `jellyfish` need to be added to `requirements.txt`?~~ | ~~Engineer A~~ | ~~Resolved — jellyfish added and in use~~ |
-
----
-
-## Phase 0 Exit Criteria (All Met)
-
-- [x] DB schema complete with all tables, enums, indexes
-- [x] All 11 proto files complete and consistent with schema
-- [x] FastAPI app starts (`/health` returns 200)
-- [x] All specification docs reviewed and in `/docs`
-- [x] User personas and flows documented
-- [x] Designer has wireframe reference (`docs/architecture/05_Human_Approval_Queue.md`)
-
-## Phase 1 Entry Checklist
-
-Before Engineer A starts the ingest endpoint:
-- [ ] PostgreSQL instance running with `schema.sql` applied
-- [ ] `configuration_thresholds` table seeded with defaults (see CLAUDE.md thresholds table)
-- [ ] Test customers, policies, and payment history seeded
-- [ ] `ANTHROPIC_API_KEY` set in `.env`
-- [ ] `jellyfish` added to `requirements.txt`
-- [ ] Proto Python classes generated from `proto/`
+| Question | Status |
+|----------|--------|
+| Does "Hold requires approval" mean peer analyst review or system timeout? | **Resolved:** Priya approves HELD → APPLIED or rejects HELD → ESCALATED. No peer review. |
+| Is there a defined SLA for Damien's investigation queue? | **Resolved:** 72 hours, configurable via `_SLA_HOURS`. Breach detection runs every 60s in background. |
+| Is Marcus a dedicated admin role or senior analyst? | **Resolved for PoC:** dedicated `admin` role (USR-0004) |
+| Notification channel for policyholder outreach? | **Open** — contact_record model logs phone/email/letter; no notification service built |
+| Staging environment — anonymised production or synthetic data? | **Open** — PoC uses synthetic seed data only |
 
 ---
 
-## Dependencies Between Tracks (Phase 1)
+## Developer Setup
 
-```
-Engineer A                          Engineer B + Designer
-──────────────────────              ──────────────────────────────
-Ingest endpoint                     API types + mock data  (parallel)
-Signal Engine Wave 1+2              Queue Dashboard + Payment List  (parallel)
-Signal Engine Wave 3 + snapshot     Payment Detail + Settings  (parallel)
+```bash
+git clone https://github.com/na1in/CES-POC
+cd CES-POC
+cp backend/.env.example backend/.env
+# Add ANTHROPIC_API_KEY to backend/.env
+make setup        # installs deps + starts Docker Postgres + migrates + seeds
+make proto        # compile proto files → backend/app/proto_gen/
+make dev          # FastAPI on :8000
+make dev-frontend # Next.js on :3000 (separate terminal)
 ```
 
-Frontend never waits for backend — mock data defined upfront from proto types.
+Test users (password not checked in PoC — use user_id as username):
+
+| User ID | Name | Role |
+|---------|------|------|
+| USR-0001 | Priya Sharma | analyst |
+| USR-0002 | Damien Torres | investigator |
+| USR-0003 | Lorraine Chen | director |
+| USR-0004 | Marcus Webb | admin |
+
+Run tests (no DB required for pure-helper tests):
+```bash
+cd backend && python -m pytest tests/ -v
+# 176 pass; 1 expected DB-integration error (needs Postgres running)
+```
