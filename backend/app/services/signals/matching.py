@@ -2,20 +2,25 @@ import json
 import logging
 
 import jellyfish
+import openai
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Lazy Anthropic client (same pattern as ingest.py)
-_client = None
+_client: openai.AsyncOpenAI | None = None
+
+_MODEL = "google/gemini-2.5-flash-preview"
+_OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 
 
-def _get_client():
+def _get_client() -> openai.AsyncOpenAI:
     global _client
     if _client is None:
-        import anthropic
-        _client = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+        _client = openai.AsyncOpenAI(
+            api_key=settings.OPENROUTER_API_KEY,
+            base_url=_OPENROUTER_BASE,
+        )
     return _client
 
 
@@ -44,13 +49,16 @@ async def _llm_score(a: str, b: str) -> float | None:
         'Return JSON only: {"score": 0-100, "reasoning": "one sentence"}'
     )
     try:
-        response = await _get_client().messages.create(
-            model="claude-haiku-4-5",
+        response = await _get_client().chat.completions.create(
+            model=_MODEL,
             max_tokens=128,
             timeout=3.0,
             messages=[{"role": "user", "content": prompt}],
         )
-        parsed = json.loads(response.content[0].text.strip())
+        text = response.choices[0].message.content.strip()
+        if text.startswith("```"):
+            text = "\n".join(text.split("\n")[1:-1])
+        parsed = json.loads(text)
         return float(parsed["score"])
     except Exception as exc:
         logger.warning("LLM name match failed, using deterministic score: %s", exc)

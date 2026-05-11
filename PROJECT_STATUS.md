@@ -11,18 +11,18 @@
 | Field | Value |
 |-------|-------|
 | **Repo** | https://github.com/na1in/CES-POC |
-| **Current week** | Week 1 |
-| **Active phase** | Phase 0 complete → Phase 1 starting |
-| **Last updated** | 2026-04-22 |
+| **Current week** | Week 5 |
+| **Active phase** | Phase 2 backend complete → Phase 3 starting |
+| **Last updated** | 2026-05-11 |
+| **Open PR** | #9 — CES-17–31 (Phase 2 complete) against `main` |
 
 ## Team
 
 | Role | Name | Tracks |
 |------|------|--------|
-| PM | Nalin | Coordination, Linear, this doc |
-| Engineer A | — | Backend pipeline, AI agent, DB |
-| Engineer B | — | Frontend, read APIs, docs/annotations |
-| Designer | — | Figma designs for all 10 pages |
+| PM + Engineer A | Nalin | Backend pipeline, AI agent, DB, APIs |
+| Engineer B | Praneetha | Frontend pages (all 10 built with mock data); wire-up pending |
+| Designer | — | Figma designs (referenced in docs) |
 
 ---
 
@@ -31,154 +31,139 @@
 | Phase | Weeks | Focus | Status |
 |-------|-------|-------|--------|
 | **Phase 0 — Foundation** | 1 | DB, protos, FastAPI skeleton, frontend scaffold | ✅ Done |
-| **Phase 1 — Core Pipeline + Frontend Shell** | 2–4 | Ingest → signals, analyst/investigator pages | ⬜ Not Started |
-| **Phase 2 — AI Agent + Analyst APIs** | 5–7 | Scenarios 1–5, approve/reject/override, wire frontend | ⬜ Not Started |
-| **Phase 3 — Director/Admin + Governance APIs** | 8–9 | All remaining pages + analytics/config APIs | ⬜ Not Started |
+| **Phase 1 — Core Pipeline + Frontend Shell** | 2–4 | Ingest → signals, analyst/investigator pages | ✅ Done |
+| **Phase 2 — AI Agent + Analyst APIs** | 5–7 | Scenarios 1–5, approve/reject/override, annotations, documents, SLA | ✅ Backend done · 🔄 Frontend wire-up in progress |
+| **Phase 3 — Director/Admin + Governance APIs** | 8–9 | Analytics/Governance/Config APIs + wire Director/Admin pages | ⬜ Not Started |
 | **Phase 4 — Integration & Polish** | 10 | E2E tests, role-gating, UI polish | ⬜ Not Started |
 
 ---
 
 ## Phase 0 — Foundation ✅ Complete
 
-### What was delivered
-
 | Ticket | Owner | Status | Notes |
 |--------|-------|--------|-------|
 | PostgreSQL setup + `schema.sql` applied | Eng A | ✅ | Docker Compose — `docker compose up -d` |
 | Alembic migrations (versioned, async) | Eng A | ✅ | `make migrate` runs `alembic upgrade head` |
-| Seed data (users, customers, policies, thresholds) | Eng A | ✅ | `make seed` — idempotent, safe to re-run |
+| Seed data (users, customers, policies, thresholds) | Eng A | ✅ | `make seed` — idempotent |
 | Proto compilation pipeline | Eng A | ✅ | `make proto` — uses system `protoc` |
-| Python classes generated from 11 protos | Eng A | ✅ | Output: `backend/app/proto_gen/proto/` |
-| FastAPI skeleton — DB session, auth middleware | Eng A | ✅ | `app/database.py`, `app/auth.py`, JWT + role guards |
+| Python classes generated from 11 protos | Eng A | ✅ | Output: `backend/app/proto_gen/` |
+| FastAPI skeleton — DB session, auth middleware | Eng A | ✅ | JWT + role guards in `auth.py` |
 | `requirements.txt` complete | Eng A | ✅ | All deps incl. jellyfish, python-jose, alembic |
 | Next.js + Tailwind v4 scaffold | Eng B | ✅ | |
-| shadcn/ui initialized (Tailwind v4 compatible) | Eng B | ✅ | Button, Card, Badge, Table, Separator in `src/components/ui/` |
+| shadcn/ui initialized | Eng B | ✅ | Button, Card, Badge, Table, Separator |
 | All 11 `.proto` files authored | PM / Eng A | ✅ | Source of truth for all data models |
 | All architecture + scenario docs | PM | ✅ | `docs/architecture/`, `docs/scenarios/` |
-| Figma — Analyst & Investigator pages | Designer | ⬜ | 4 pages: Queue, Investigations, Detail, Settings |
-| Figma — Director & Admin pages | Designer | ⬜ | 6 pages: Governance, Export, Exceptions, Admin, Overrides, Config |
-
-### Phase 0 exit checklist
-- [x] DB running with test data
-- [x] FastAPI app starts + `/health` returns 200
-- [x] Proto classes generated
-- [x] `ANTHROPIC_API_KEY` slot in `.env`
-- [ ] Figma designs reviewed and approved ← **blocking designer**
 
 ---
 
-## Phase 1 — Core Pipeline + Frontend Shell (Weeks 2–4)
+## Phase 1 — Core Pipeline + Frontend Shell ✅ Complete
 
 ### Track A: Backend Pipeline (Engineer A)
 
-| Ticket | Est | Status | Owner | Notes |
-|--------|-----|--------|-------|-------|
-| **Ingest endpoint** `POST /api/payments/ingest` — validate fields, call Claude API to parse free-text refs (policy #, intent, period count), generate PMT-XXX ID, INSERT as RECEIVED, write RECEIVED audit log | 3d | ✅ | Eng A | PR #1 open on nalin-dev. 23 tests passing. |
-| **Signal Wave 1** — name similarity (hybrid: jaro-winkler + levenshtein + soundex → deterministic, then Haiku for 70–92% gray zone), amount variance, timing quality, duplicate check (3 exact + $2 tolerance / 72hr window) | 4d | ✅ | Eng A | PR #1. 25 tests passing. |
-| **Signal Wave 2** — policy match confidence, customer match confidence, over/underpayment, historical consistency (z-score) | 3d | ⬜ | Eng A | Depends on Wave 1 |
-| **Signal Wave 3** — risk flags, account status, balance snapshot, payment method risk, supporting signals (account/amount/historical match), multi-period indicator, multi-method indicator, third-party indicator | 3d | ⬜ | Eng A | Depends on Wave 2 |
-| **Signal snapshot** — persist all 19 signals to `payment_signals`, write SIGNALS_COMPUTED audit log | 1d | ⬜ | Eng A | Depends on all waves |
+| Ticket | Est | Status | Notes |
+|--------|-----|--------|-------|
+| **CES-7** `POST /api/payments/ingest` — validate fields, Claude Haiku ref parsing, PMT-XXX ID, INSERT RECEIVED + audit | 3d | ✅ | 23 tests passing |
+| **CES-8** Signal Wave 1 — name similarity (hybrid jaro-winkler + levenshtein + soundex + Haiku gray zone 70–92%), amount variance, timing quality, duplicate check | 4d | ✅ | 25 tests |
+| **CES-9** Signal Wave 2 — policy/customer match confidence, over/underpayment, historical consistency (z-score) | 3d | ✅ | |
+| **CES-10** Signal Wave 3 — risk flags, account status, balance snapshot, payment method risk, supporting signals, multi-period, multi-method, third-party | 3d | ✅ | |
+| **CES-11** Signal snapshot — persist all 19 signals to `payment_signals`, write SIGNALS_COMPUTED audit | 1d | ✅ | |
 
-### Track B: Analyst/Investigator Frontend Shell (Engineer B + Designer)
+### Track B: Frontend Shell (Engineer B + Designer)
 
-| Ticket | Est | Status | Owner | Notes |
-|--------|-----|--------|-------|-------|
-| **TypeScript types** from all proto definitions + mock API responses for all analyst/investigator endpoints | 2d | ⬜ | Eng B | Unblocked — run parallel with Track A |
-| **Queue Dashboard** `/` — open cases sorted by AI confidence score (lowest first); columns: scenario, sender, amount, payment method, AI rec, confidence band, age; filters: scenario, confidence, method; PROCESSING_FAILED alert | 2d | ⬜ | Eng B + Designer | Depends on TS types |
-| **Investigation Queue** `/investigations` — Damien's home; escalated cases sorted by risk level; columns: sender, amount, risk indicator, method, time since escalation; SLA breach warning | 2d | ⬜ | Eng B + Designer | Depends on TS types |
-| **Payment Detail** `/payments/[id]` — payment info (incl. method), signal bars with algorithm breakdown, AI reasoning panel, audit timeline, annotation panel (add/view), document panel (upload/list); role-gated action buttons | 4d | ⬜ | Eng B + Designer | Depends on TS types |
-| **Settings** `/settings` — threshold viewer (read-only for non-admin), admin link to change-request flow | 1d | ⬜ | Eng B + Designer | Depends on TS types |
-
-**Phase 1 exit criteria:**
-- [ ] Full pipeline: ingest → signal snapshot works end-to-end
-- [ ] Queue Dashboard, Investigation Queue, Payment Detail, Settings built with mock data
+| Ticket | Est | Status | Notes |
+|--------|-----|--------|-------|
+| **CES-12** TypeScript types from all protos + mock API responses | 2d | ✅ | 8 mock payments covering all 5 scenarios |
+| **CES-13** Queue Dashboard `/` — confidence-sorted, payment method column, scenario filter | 2d | ✅ | |
+| **CES-14** Investigation Queue `/investigations` — risk-sorted, SLA breach indicator | 2d | ✅ | |
+| **CES-15** Payment Detail `/payments/[id]` — signals panel, reasoning, audit timeline, action buttons, annotations, docs | 4d | ✅ | |
+| **CES-16** Settings `/settings` — threshold viewer, read-only for non-admin | 1d | ✅ | |
 
 ---
 
-## Phase 2 — AI Agent + Analyst/Investigator APIs (Weeks 5–7)
+## Phase 2 — AI Agent + Analyst/Investigator APIs
 
-### Track A: AI Agent + Persist + Action APIs (Engineer A)
+### Track A: AI Agent + Persist + Action APIs (Engineer A) ✅ Complete
 
-| Ticket | Est | Status | Owner | Notes |
-|--------|-----|--------|-------|-------|
-| **Scenario Router** `router.py` — Sc5 first (duplicate), then Sc1–4: policy ref + name ≥75% + variance ≤2% → Sc1; no policy + customer match → Sc2; variance >2% → Sc3; all fail → Sc4 | 2d | ⬜ | Eng A | Pure Python, unit-testable |
-| **Scenario 1** — Strong Policy Match: Claude API prompt, auto-apply (name >90%, no risk flags, active policy, low-risk method) vs hold | 1.5d | ⬜ | Eng A | |
-| **Scenario 2** — Customer Match, No Policy: single policy → APPLY w/ approval; ambiguous → HOLD; reroute to Sc3 if variance >15% | 1.5d | ⬜ | Eng A | |
-| **Scenario 3** — High Amount Variance: 5 tiers; special cases 15–50% (multi-period, multi-method, third-party → HOLD); name must be ≥90% else → Sc4 | 2d | ⬜ | Eng A | |
-| **Scenario 4** — No Matching Customer: third-party check first (valid policy + pattern + amount ≤15% → HOLD); else ESCALATE with best fuzzy match | 1d | ⬜ | Eng A | |
-| **Scenario 5** — Duplicate Payment: 3 exact + $2 tolerance + 72hr window; balance >0 → HOLD, =0 → ESCALATE | 1d | ⬜ | Eng A | |
-| **Persist layer** `persist.py` — single transaction: INSERT recommendation, UPDATE payment status + matched IDs, SET investigation_due_date on ESCALATED, auto-apply ledger, write RECOMMENDATION_MADE audit log | 1.5d | ⬜ | Eng A | |
-| **Pipeline orchestrator** `pipeline.py` — 3-retry wrapper (1s, 3s backoff); retryable: DB/Claude timeouts, deadlocks; not retryable: constraint violations; → PROCESSING_FAILED | 1d | ⬜ | Eng A | |
-| **`POST /api/payments/{id}/approve`** — HELD → APPLIED, ledger update, decision_attribution = HUMAN_CONFIRMED | 1.5d | ⬜ | Eng A | |
-| **`POST /api/payments/{id}/reject`** — HELD → ESCALATED, set investigation_due_date | 0.5d | ⬜ | Eng A | |
-| **`POST /api/payments/{id}/override`** — update status, ledger if APPLIED, INSERT override_reason annotation, decision_attribution = HUMAN_OVERRIDE | 1d | ⬜ | Eng A | |
-| **`POST /api/payments/{id}/return`** — Investigator only; → RETURNED | 0.5d | ⬜ | Eng A | |
-| **`POST /api/payments/{id}/reprocess`** — PROCESSING_FAILED → RECEIVED, re-run pipeline | 0.5d | ⬜ | Eng A | |
-| **SLA service** `sla.py` — compute investigation_due_date on escalation; background job sets sla_breached + writes SLA_BREACHED audit log | 1d | ⬜ | Eng A | |
+| Ticket | Est | Status | Notes |
+|--------|-----|--------|-------|
+| **CES-17** Scenario Router — S5→S4→S3→S1→S2 deterministic routing; thresholds from DB | 2d | ✅ | 32 unit tests |
+| **CES-18** Scenario 1 — Strong Policy Match; auto-apply path (name >90%, no risk, active, low-risk method) | 1.5d | ✅ | |
+| **CES-19** Scenario 2 — Customer Match, No Policy; always requires human approval | 1.5d | ✅ | |
+| **CES-20** Scenario 3 — High Amount Variance; 5 tiers; multi-period/multi-method/third-party special cases | 2d | ✅ | |
+| **CES-21** Scenario 4 — No Matching Customer; third-party hold path | 1d | ✅ | 49 scenario tests total |
+| **CES-22** Scenario 5 — Duplicate Payment; balance >0 → HOLD, =0 → ESCALATE | 1d | ✅ | |
+| **CES-23** Persist layer — single transaction: INSERT rec, UPDATE payments, auto-apply ledger, audit | 1.5d | ✅ | 12 tests |
+| **CES-24** Pipeline orchestrator — 3-retry wrapper (1s/3s backoff); PROCESSING_FAILED on exhaustion | 1d | ✅ | 13 tests |
+| **CES-25** `POST /approve` — analyst; HELD → applied + ledger + human_confirmed | 1.5d | ✅ | 17 tests |
+| **CES-26** `POST /reject`, `/override`, `/return`, `/reprocess` | 1.5d | ✅ | |
+| **CES-27** SLA service — `compute_due_date()`, `check_and_mark_breaches()`, asyncio background monitor | 1d | ✅ | 8 tests |
 
-### Track B: Real APIs + Frontend Wire-up (Engineer B)
+### Track B: Read APIs + Annotations + Documents (Engineer A) ✅ Complete
 
-| Ticket | Est | Status | Owner | Notes |
-|--------|-----|--------|-------|-------|
-| **`GET /api/payments`** — filters (status, scenario, date, search), pagination, sort by confidence_score / has_risk_flags / payment_method | 1.5d | ⬜ | Eng B | |
-| **`GET /api/payments/{id}`** — full detail: payment + signals (incl. algorithm breakdown) + recommendation + audit trail + annotations + documents | 1d | ⬜ | Eng B | |
-| **Annotations endpoints** — `POST/GET /api/payments/{id}/annotations` (case_note, override_reason, contact_record, investigation_note) | 1d | ⬜ | Eng B | |
-| **Documents endpoints** — upload (multipart), list, stream download, soft delete; wire to `storage.py` | 2d | ⬜ | Eng B | |
-| **PENDING_SENDER_RESPONSE flow** — CONTACT_RECORD annotation triggers status update; Damien logs outreach, SLA tracked | 1d | ⬜ | Eng B | |
-| **Wire frontend to real APIs** — replace mock data in all 4 analyst/investigator pages; add loading, error, empty states | 2d | ⬜ | Eng B | Depends on real APIs + Phase 1 frontend |
+| Ticket | Est | Status | Notes |
+|--------|-----|--------|-------|
+| **CES-28** `GET /api/payments` (filtered/paginated) + `GET /api/payments/{id}` (full detail, signals by category) | 2.5d | ✅ | 10 tests |
+| **CES-29** Annotations — `POST/GET /api/payments/{id}/annotations`; all 4 types | 1d | ✅ | 19 tests |
+| **CES-30** Documents — upload (multipart, 20MB, MIME allowlist), list, stream, soft delete + `storage.py` | 2d | ✅ | 9 tests |
+| **CES-31** PENDING_SENDER_RESPONSE flow — contact_record → pending_sender_response status transition | 1d | ✅ | Covered by annotation tests |
 
-**Phase 2 exit criteria:**
-- [ ] End-to-end: ingest → signals → route → recommend → approve/reject/override/return
-- [ ] Annotations + document upload working
-- [ ] Frontend connected to real APIs for all Priya + Damien pages
+### Track B: Frontend Wire-up (Engineer B) 🔄 In Progress
 
----
+| Ticket | Est | Status | Notes |
+|--------|-----|--------|-------|
+| **CES-32** Wire analyst/investigator pages to real APIs — Queue, Detail, Investigations, Settings | 2d | 🔄 | Replace mock data; add loading/error/empty states |
 
-## Phase 3 — Director/Admin Pages + Governance/Analytics/Config APIs (Weeks 8–9)
+### Track B: Director/Admin Pages (Engineer B) ✅ Built (with mock data)
 
-### Track A: Analytics, Governance & Config APIs (Engineer A)
-
-| Ticket | Est | Status | Owner | Notes |
-|--------|-----|--------|-------|-------|
-| **`GET /api/analytics/decisions`** — summary counts, override rate %, payment method breakdown, per-scenario breakdown, confidence histogram (10 buckets) | 2d | ⬜ | Eng A | |
-| **`GET /api/analytics/overrides`** — filterable by scenario, confidence band, date, reason category | 1d | ⬜ | Eng A | |
-| **Governance endpoints** — `POST/GET /api/governance/reviews`, `POST/GET /api/governance/anomalies`, `PATCH /api/governance/anomalies/{id}`, `GET /api/governance/export` | 2d | ⬜ | Eng A | |
-| **Config change-request workflow** — propose → approve → reject → deploy (creates ThresholdVersion, atomically updates active) → rollback → history | 3d | ⬜ | Eng A | |
-
-### Track B: Director/Admin Frontend (Engineer B + Designer)
-
-| Ticket | Est | Status | Owner | Notes |
-|--------|-----|--------|-------|-------|
-| **Governance Dashboard** `/governance` — metric cards (Auto-Applied, Human Review, Held, Escalated AI/Human, Overrides, Returned); payment method chart; override rate trend; SLA adherence; confidence histogram; date filter | 3d | ⬜ | Eng B + Designer | |
-| **Compliance Export** `/governance/export` — date range, export scope, download | 1d | ⬜ | Eng B + Designer | |
-| **Exception Dashboard** `/governance/exceptions` — SLA-breached cases, anomaly flags, pending config approvals | 2d | ⬜ | Eng B + Designer | |
-| **Admin Dashboard** `/admin` — per-scenario: volume trend, decision distribution, override rate by confidence band, confidence histogram | 2d | ⬜ | Eng B + Designer | |
-| **Override Analysis** `/admin/overrides` — filterable table (scenario, confidence band, date, reason) | 1d | ⬜ | Eng B + Designer | |
-| **Configuration Management** `/admin/config` — thresholds table, propose form, change request list (PENDING/APPROVED/REJECTED/DEPLOYED/ROLLED_BACK), version history, deploy/rollback controls | 3d | ⬜ | Eng B + Designer | |
-
-**Phase 3 exit criteria:**
-- [ ] All 10 frontend pages functional with real APIs
-- [ ] Config change-request workflow (propose → approve → deploy → rollback) works end-to-end
-- [ ] Governance + analytics dashboards showing real data
+| Ticket | Est | Status | Notes |
+|--------|-----|--------|-------|
+| **CES-34** Governance Dashboard `/governance` | 3d | ✅ | Mock data — needs Phase 3 API wire-up |
+| **CES-35** Compliance Export `/governance/export` | 1d | ✅ | Mock data |
+| **CES-36** Exception Dashboard `/governance/exceptions` | 2d | ✅ | Mock data |
+| **CES-37** Admin Dashboard `/admin` | 2d | ✅ | Mock data |
+| **CES-38** Override Analysis `/admin/overrides` | 1d | ✅ | Mock data |
+| **CES-39** Configuration Management `/admin/config` | 3d | ✅ | Mock data |
 
 ---
 
-## Phase 4 — Integration & Polish (Week 10)
+## Phase 3 — Governance/Analytics/Config APIs ⬜ Not Started
 
-| Ticket | Owner | Status | Notes |
-|--------|-------|--------|-------|
-| E2E test: Scenario 1 — auto-apply + hold (ambiguous name, risk flags, high-risk method) | Eng A | ⬜ | |
-| E2E test: Scenario 2 — single policy, amount disambiguates, ambiguous multi-policy | Eng A | ⬜ | |
-| E2E test: Scenario 3 — each variance tier + multi-period + multi-method + third-party | Eng A | ⬜ | |
-| E2E test: Scenario 4 — no match escalate + third-party hold | Eng A | ⬜ | |
-| E2E test: Scenario 5 — exact duplicate, $2 tolerance, balance justifies, outside window | Eng A | ⬜ | |
-| E2E test: Analyst flows — approve, reject, override (APPLY + ESCALATE), reprocess; verify decision_attribution | Eng A | ⬜ | |
-| E2E test: Investigator flows — return, log contact → PENDING_SENDER_RESPONSE, SLA breach | Eng A | ⬜ | |
-| E2E test: Config workflow — propose → approve → deploy → verify new threshold; rollback → verify reverted | Eng A | ⬜ | |
-| E2E test: Retry + failure — simulate DB/Claude timeouts, verify 3 retries, PROCESSING_FAILED, reprocess | Eng A | ⬜ | |
-| Frontend integration — real APIs across all 10 pages, error states, empty states, loading, role-gating | Eng B | ⬜ | |
-| Analytics accuracy — verify decision attribution counts, override rate %, confidence histogram | Eng B | ⬜ | |
-| UI polish — responsive layout, empty states, error toasts, edge case screens, accessibility | Designer + Eng B | ⬜ | |
+### Track A: APIs (Engineer A)
+
+| Ticket | Est | Status | Notes |
+|--------|-----|--------|-------|
+| `GET /api/analytics/decisions` — attribution counts, method breakdown, per-scenario, confidence histogram | 2d | ⬜ | Powers Lorraine + Marcus dashboards |
+| `GET /api/analytics/overrides` — filterable by scenario, confidence band, date, reason | 1d | ⬜ | |
+| `POST/GET /api/governance/reviews` | 1d | ⬜ | Lorraine period review log |
+| `POST/GET /api/governance/anomalies` + `PATCH .../anomalies/{id}` | 1d | ⬜ | Anomaly flag workflow |
+| `GET /api/governance/export` — audit-ready report | 1d | ⬜ | |
+| Config change-request workflow — propose → approve → reject → deploy → rollback + history | 3d | ⬜ | Atomic threshold swap, ThresholdVersion row |
+
+### Track B: Director/Admin Wire-up (Engineer B)
+
+| Ticket | Est | Status | Notes |
+|--------|-----|--------|-------|
+| Wire Governance Dashboard + Export + Exceptions to real APIs | 2d | ⬜ | Depends on Phase 3 APIs |
+| Wire Admin Dashboard + Override Analysis + Config Management to real APIs | 2d | ⬜ | |
+
+---
+
+## Phase 4 — Integration & Polish ⬜ Not Started
+
+| Ticket | Owner | Status |
+|--------|-------|--------|
+| E2E test: Scenario 1 — auto-apply + hold | Eng A | ⬜ |
+| E2E test: Scenario 2 — single policy, ambiguous multi-policy | Eng A | ⬜ |
+| E2E test: Scenario 3 — variance tiers + special cases | Eng A | ⬜ |
+| E2E test: Scenario 4 — no match + third-party hold | Eng A | ⬜ |
+| E2E test: Scenario 5 — exact dup, $2 tolerance, outside window | Eng A | ⬜ |
+| E2E test: Analyst flows — approve, reject, override, reprocess | Eng A | ⬜ |
+| E2E test: Investigator flows — return, contact → PENDING_SENDER_RESPONSE, SLA breach | Eng A | ⬜ |
+| E2E test: Config workflow — propose → approve → deploy → verify → rollback | Eng A | ⬜ |
+| E2E test: Retry + failure — simulate DB/Claude timeouts, PROCESSING_FAILED, reprocess | Eng A | ⬜ |
+| Frontend integration — real APIs across all 10 pages, error/empty/loading states, role-gating | Eng B | ⬜ |
+| Analytics accuracy — verify attribution counts, override rate %, histogram | Eng B | ⬜ |
+| UI polish — responsive layout, empty states, error toasts, accessibility | Designer + Eng B | ⬜ |
 
 ---
 
@@ -186,11 +171,8 @@
 
 | # | Question | Owner | Priority | Status |
 |---|----------|-------|----------|--------|
-| 1 | Does "Hold requires approval" mean a peer analyst reviews, or does Priya hold and await system timeout? | PM | 🔴 High | Open — affects approval flow |
-| 2 | Is there a defined SLA for Damien's investigation queue? Who sets it — Lorraine or ops policy? | PM | 🔴 High | Open — needed before `sla.py` |
-| 3 | In the PoC, is Marcus a dedicated admin role or a senior analyst with two hats? | PM | 🟡 Medium | Open — affects role seeding |
-| 4 | Notification channel for policyholder outreach — in-system template, email, or phone only? | PM | 🟡 Medium | Open — affects contact record model |
-| 5 | Staging/simulation environment — anonymised production data or synthetic data only? | Eng A | 🟡 Medium | Open |
+| 1 | Notification channel for policyholder outreach — in-system, email, phone? | PM | 🟡 Medium | Open — contact_record model supports phone/email/letter but no dispatch service |
+| 2 | Staging/simulation environment — anonymised production data or synthetic data? | Eng A | 🟡 Medium | Open — PoC uses synthetic seed data only |
 
 ---
 
@@ -206,23 +188,23 @@
 | Thresholds | Stored in DB, never hardcoded |
 | Name matching | Hybrid: deterministic + Haiku for 70–92% gray zone; full breakdown stored |
 | Override reason | Mandatory — form blocks submit without it |
-| Document storage | Local FS for PoC, S3-compatible interface for swap |
+| Document storage | Local FS for PoC (`UPLOAD_DIR`), S3-compatible interface |
 | Decision attribution | Set at case closure in `persist.py` |
 | Config changes | Require formal change request + Lorraine approval (compliance) |
 | Scenario 5 | Always runs first on every payment |
-| Update order | protos → schema → scenario docs → architecture docs → reference docs |
+| SLA default | 72 hours — `_SLA_HOURS` in `persist.py`; imported by `approvals.py` and `sla.py` |
+| contact_record annotation | Transitions `escalated` → `pending_sender_response`; SLA timer starts |
 
 ---
 
-## Developer Setup (new engineer checklist)
+## Developer Setup
 
 ```bash
 git clone https://github.com/na1in/CES-POC
 cd CES-POC
 cp backend/.env.example backend/.env
-# Add your ANTHROPIC_API_KEY to backend/.env
+# Add ANTHROPIC_API_KEY to backend/.env
 make setup        # installs deps + starts Docker Postgres + migrates + seeds
-make proto        # compile proto files → backend/app/proto_gen/
 make dev          # FastAPI on :8000
 make dev-frontend # Next.js on :3000 (separate terminal)
 ```
@@ -235,3 +217,9 @@ Test users (password not checked in PoC — use user_id as username):
 | USR-0002 | Damien Torres | investigator |
 | USR-0003 | Lorraine Chen | director |
 | USR-0004 | Marcus Webb | admin |
+
+Tests:
+```bash
+cd backend && python -m pytest tests/ -v
+# 176 pass; 1 expected DB error (needs Postgres)
+```

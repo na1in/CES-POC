@@ -9,7 +9,7 @@ Entry point: run_pipeline(payment_id, db)
 
 Retry strategy:
   - 3 attempts total (immediate → +1s → +3s)
-  - Retryable: DB operational errors, deadlocks, Claude API timeouts / rate limits
+  - Retryable: DB operational errors, deadlocks, OpenRouter/LLM API timeouts / rate limits
   - Non-retryable: constraint violations, validation errors, unknown errors
   - After exhausting all attempts: status → processing_failed
 """
@@ -17,8 +17,8 @@ import asyncio
 import logging
 import time
 
-import anthropic
 import jellyfish
+import openai
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -53,9 +53,9 @@ def _is_retryable(exc: Exception) -> bool:
     if isinstance(exc, (IntegrityError, ProgrammingError, ValueError)):
         return False
     if isinstance(exc, (
-        anthropic.APITimeoutError,
-        anthropic.RateLimitError,
-        anthropic.APIConnectionError,
+        openai.APITimeoutError,
+        openai.RateLimitError,
+        openai.APIConnectionError,
     )):
         return True
     if isinstance(exc, OperationalError):

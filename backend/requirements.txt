@@ -8,7 +8,7 @@ asyncpg>=0.31.0
 greenlet
 
 # AI
-anthropic
+openai
 
 # Config
 pydantic-settings
