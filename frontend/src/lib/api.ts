@@ -1,4 +1,6 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+// Empty string → relative URLs, proxied by Next.js rewrites to the FastAPI backend.
+// Set NEXT_PUBLIC_API_URL only when calling the API directly (e.g. server-side or curl).
+const API_BASE = ""
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null
