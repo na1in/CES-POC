@@ -12,7 +12,6 @@ What it does:
   4. Inserts 2 audit_log entries (received + held)
 """
 import asyncio
-import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -101,12 +100,12 @@ async def inject(db: AsyncSession) -> None:
     """), {"id": payment_id, "now": now})
 
     # 3. Recommendation
-    reasoning = json.dumps([
+    reasoning = [
         "Name similarity 83 — gray zone; LLM raised confidence to 83",
         "Policy reference POL-77201 partially matched",
         "Amount matches expected premium exactly",
         "Below auto-apply threshold (90); requires analyst confirmation",
-    ])
+    ]
     await db.execute(text("""
         INSERT INTO payment_recommendations (
             payment_id, recommendation, confidence_score,
@@ -118,7 +117,7 @@ async def inject(db: AsyncSession) -> None:
             :id, 'hold', 83,
             'scenario_1', 'scenario_1_hold_name_mismatch',
             true, 'Name similarity 83 is below auto-apply threshold (90)',
-            CAST(:reasoning AS jsonb),
+            :reasoning,
             'Verify sender identity; apply to POL-77201 if confirmed',
             310,
             null, :now

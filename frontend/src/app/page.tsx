@@ -57,9 +57,9 @@ function getBand(score: number): ConfidenceBand {
 function getFlags(payment: Payment, signals: PaymentSignals | null | undefined): string[] {
   const flags: string[] = []
   if (!signals) return flags
-  if (signals.duplicate.is_duplicate_match) flags.push("Duplicate")
-  if (signals.amount.amount_variance_pct > 2) flags.push("Amount Variance")
-  if (signals.risk.risk_flag_types.length > 0) {
+  if (signals.duplicate?.is_duplicate_match) flags.push("Duplicate")
+  if ((signals.amount?.amount_variance_pct ?? 0) > 2) flags.push("Amount Variance")
+  if ((signals.risk?.risk_flag_types?.length ?? 0) > 0) {
     signals.risk.risk_flag_types.forEach(f =>
       flags.push(f.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()))
     )
