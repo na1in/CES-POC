@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -7,23 +8,36 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import CurrentUser, create_access_token, get_current_user
-from app.database import engine, get_db
+from app.database import AsyncSessionLocal, engine, get_db
 from app.models.user import User
+from app.routers.annotations import router as annotations_router
 from app.routers.approvals import router as approvals_router
+from app.routers.documents import router as documents_router
 from app.routers.payments import router as payments_router
+from app.services.sla import run_sla_monitor
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.connect() as conn:
         await conn.execute(select(1))
-    yield
-    await engine.dispose()
+    sla_task = asyncio.create_task(run_sla_monitor(AsyncSessionLocal))
+    try:
+        yield
+    finally:
+        sla_task.cancel()
+        try:
+            await sla_task
+        except asyncio.CancelledError:
+            pass
+        await engine.dispose()
 
 
 app = FastAPI(title="CES — Payment Resolution System", lifespan=lifespan)
 app.include_router(payments_router)
 app.include_router(approvals_router)
+app.include_router(annotations_router)
+app.include_router(documents_router)
 
 
 # ── Exception handlers ────────────────────────────────────────────────────────
