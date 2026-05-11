@@ -1,24 +1,71 @@
 /**
- * CES-16 — Settings page tests
+ * CES-16 (updated for CES-30) — Settings page tests
  *
- * Covers: all 8 thresholds shown, column headers, Propose Change button
- * visible only for admin role, non-admin notice, role switching, navigation.
+ * Pages now fetch thresholds via SWR. SWR is mocked to return mock threshold
+ * fixtures synchronously so all rendering/role/navigation tests remain
+ * behaviorally identical to the original version.
  */
 
+import React from "react"
 import { render, screen, fireEvent } from "@testing-library/react"
 import { useRouter } from "next/navigation"
 import SettingsPage from "@/app/settings/page"
 import { mockThresholds } from "@/mocks/thresholds"
 
+// ── Mocks ─────────────────────────────────────────────────────────────────────
+
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(),
 }))
 
+jest.mock("swr", () => ({
+  __esModule: true,
+  default: jest.fn(),
+  SWRConfig: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
+jest.mock("@/lib/api", () => ({
+  apiFetch: jest.fn().mockResolvedValue({}),
+  ApiError: class ApiError extends Error {
+    status: number
+    constructor(status: number, message: string) { super(message); this.status = status }
+  },
+  fetcher: jest.fn(),
+  getToken: jest.fn(),
+  setToken: jest.fn(),
+  clearToken: jest.fn(),
+}))
+
+jest.mock("@/contexts/ToastContext", () => ({
+  useToast: () => ({ showToast: jest.fn() }),
+  ToastProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
+import useSWR from "swr"
+
 const mockPush = jest.fn()
+const mockMutate = jest.fn()
 
 beforeEach(() => {
   mockPush.mockClear()
+  mockMutate.mockClear()
   ;(useRouter as jest.Mock).mockReturnValue({ push: mockPush })
+  ;(useSWR as jest.Mock).mockReturnValue({
+    data: { thresholds: mockThresholds },
+    isLoading: false,
+    error: null,
+    mutate: mockMutate,
+  })
+})
+
+// ── Loading state ─────────────────────────────────────────────────────────────
+
+describe("Settings — loading state", () => {
+  it("shows skeleton rows while loading", () => {
+    ;(useSWR as jest.Mock).mockReturnValue({ data: undefined, isLoading: true, error: null, mutate: mockMutate })
+    const { container } = render(<SettingsPage />)
+    expect(container.querySelector(".animate-pulse")).toBeInTheDocument()
+  })
 })
 
 // ── All thresholds shown ───────────────────────────────────────────────────────
@@ -158,9 +205,7 @@ describe("Settings — role switching", () => {
 
   it("shows current user name in footer after switching role", () => {
     render(<SettingsPage />)
-    // Default is analyst: Priya Venkataraman
     expect(screen.getByText(/Priya Venkataraman/)).toBeInTheDocument()
-    // Switch to director
     fireEvent.click(screen.getByRole("button", { name: /Switch role/i }))
     fireEvent.click(screen.getByText(/Lorraine Chen/))
     expect(screen.getByText(/Lorraine Chen/)).toBeInTheDocument()
