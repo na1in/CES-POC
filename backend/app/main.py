@@ -10,9 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import CurrentUser, create_access_token, get_current_user
 from app.database import AsyncSessionLocal, engine, get_db
 from app.models.user import User
+from app.routers.analytics import router as analytics_router
 from app.routers.annotations import router as annotations_router
 from app.routers.approvals import router as approvals_router
+from app.routers.config import router as config_router
 from app.routers.documents import router as documents_router
+from app.routers.governance import router as governance_router
 from app.routers.payments import router as payments_router
 from app.services.sla import run_sla_monitor
 
@@ -38,6 +41,9 @@ app.include_router(payments_router)
 app.include_router(approvals_router)
 app.include_router(annotations_router)
 app.include_router(documents_router)
+app.include_router(analytics_router)
+app.include_router(governance_router)
+app.include_router(config_router)
 
 
 # ── Exception handlers ────────────────────────────────────────────────────────
