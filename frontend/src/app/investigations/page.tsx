@@ -1,13 +1,18 @@
 "use client"
 
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import useSWR from "swr"
 import { Search, Bell, Settings, Clock, AlertTriangle, CheckCircle2, Search as SearchIcon } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { mockPayments, mockPaymentSignals, mockRecommendations, mockAuditLogs } from "@/mocks/payments"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
+import { ApiError } from "@/lib/api"
+import { useToast } from "@/contexts/ToastContext"
+import type { PaymentListResponse, PaymentListItem } from "@/types/api"
 import type { Payment } from "@/types/payment"
-import type { AuditLogEntry } from "@/types/user"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -25,16 +30,6 @@ function formatTimeSince(iso: string): string {
   return `${days}d ${hours}h ago`
 }
 
-function formatEscalationDate(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  })
-}
-
 function formatToday(): string {
   return new Date().toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -44,32 +39,27 @@ function formatToday(): string {
 type RiskLevel = "high" | "medium" | "low"
 type InvestigationStatus = "sla_breached" | "pending_outreach" | "new"
 
-function getRiskLevel(paymentId: string): RiskLevel {
-  const signals = mockPaymentSignals[paymentId]
+function getRiskLevel(item: PaymentListItem): RiskLevel {
+  const signals = item.signals
   if (!signals) return "medium"
   if (signals.risk.has_risk_flags) return "high"
   return signals.risk.payment_method_risk_level
 }
 
-function getInvestigationStatus(payment: Payment, logs: AuditLogEntry[]): InvestigationStatus {
+function getInvestigationStatus(payment: Payment): InvestigationStatus {
   if (payment.sla_breached) return "sla_breached"
   if (payment.status === "pending_sender_response") return "pending_outreach"
-  if (logs.some(l => l.action_type === "contact_logged")) return "pending_outreach"
   return "new"
 }
 
-function getEscalationEntry(logs: AuditLogEntry[]): AuditLogEntry | null {
-  return [...logs].reverse().find(l => l.action_type === "escalated") ?? null
-}
-
-function getReason(paymentId: string): string {
-  const signals = mockPaymentSignals[paymentId]
-  const rec = mockRecommendations[paymentId]
+function getReason(item: PaymentListItem): string {
+  const signals = item.signals
+  const rec = item.recommendation
   if (signals?.duplicate?.is_duplicate_match) return "Duplicate payment detected within 72h"
   if (rec?.scenario_route === "scenario_4") return "No matching customer found"
-  if (rec?.scenario_route === "scenario_3") return "High amount variance — 20% overpayment"
+  if (rec?.scenario_route === "scenario_3") return "High amount variance"
   if (rec?.scenario_route === "scenario_2") return "Customer match, no policy reference"
-  return rec?.reasoning[0]?.slice(0, 60) ?? "—"
+  return rec?.reasoning?.[0]?.slice(0, 60) ?? "—"
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -82,29 +72,16 @@ function RiskLevelBadge({ level }: { level: RiskLevel }) {
   }
   const s = styles[level]
   return (
-    <span
-      className="pw-badge"
-      style={{ background: s.bg, color: s.color, textTransform: "capitalize" }}
-    >
+    <span className="pw-badge" style={{ background: s.bg, color: s.color, textTransform: "capitalize" }}>
       {level}
     </span>
   )
 }
 
 function StatusBadge({ status }: { status: InvestigationStatus }) {
-  if (status === "sla_breached") {
-    return (
-      <span className="pw-badge pw-badge-escalate">SLA BREACHED</span>
-    )
-  }
-  if (status === "pending_outreach") {
-    return (
-      <span className="pw-badge pw-badge-hold">Pending Outreach</span>
-    )
-  }
-  return (
-    <span className="pw-badge pw-badge-neutral">New</span>
-  )
+  if (status === "sla_breached") return <span className="pw-badge pw-badge-escalate">SLA BREACHED</span>
+  if (status === "pending_outreach") return <span className="pw-badge pw-badge-hold">Pending Outreach</span>
+  return <span className="pw-badge pw-badge-neutral">New</span>
 }
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
@@ -113,11 +90,7 @@ function Nav() {
   return (
     <nav
       className="flex items-center gap-3 px-5 border-b"
-      style={{
-        height: "var(--pw-nav-height)",
-        background: "var(--pw-surface)",
-        borderColor: "var(--pw-border)",
-      }}
+      style={{ height: "var(--pw-nav-height)", background: "var(--pw-surface)", borderColor: "var(--pw-border)" }}
     >
       <div className="flex items-center gap-2 flex-1">
         <div
@@ -126,10 +99,7 @@ function Nav() {
         >
           P
         </div>
-        <span
-          className="font-semibold text-sm"
-          style={{ fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)" }}
-        >
+        <span className="font-semibold text-sm" style={{ fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)" }}>
           PayWise
         </span>
       </div>
@@ -139,12 +109,7 @@ function Nav() {
       >
         <Search size={13} />
         <span>Search...</span>
-        <kbd
-          className="ml-1 rounded px-1 text-[10px]"
-          style={{ background: "var(--pw-border)", color: "var(--pw-text-secondary)" }}
-        >
-          ⌘K
-        </kbd>
+        <kbd className="ml-1 rounded px-1 text-[10px]" style={{ background: "var(--pw-border)", color: "var(--pw-text-secondary)" }}>⌘K</kbd>
       </div>
       <Bell size={18} style={{ color: "var(--pw-text-secondary)" }} />
       <Settings size={18} style={{ color: "var(--pw-text-secondary)" }} />
@@ -160,35 +125,40 @@ function Nav() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+const INV_KEY = "/api/payments?status=escalated,pending_sender_response&sort_by=has_risk_flags"
+
 export default function InvestigationQueue() {
   const router = useRouter()
+  const { showToast } = useToast()
 
-  const investigationPayments = mockPayments.filter(
-    p => p.status === "escalated" || p.status === "pending_sender_response"
-  )
+  const { data, error, isLoading, mutate } = useSWR<PaymentListResponse>(INV_KEY)
 
-  const sortedRows = investigationPayments
-    .map(p => {
-      const logs = mockAuditLogs[p.payment_id] ?? []
-      const escalationEntry = getEscalationEntry(logs)
-      const riskLevel = getRiskLevel(p.payment_id)
-      const invStatus = getInvestigationStatus(p, logs)
-      const reason = getReason(p.payment_id)
-      return { payment: p, logs, escalationEntry, riskLevel, invStatus, reason }
-    })
+  const items: PaymentListItem[] = data?.data ?? []
+
+  useEffect(() => {
+    if (!error) return
+    if (error instanceof ApiError) {
+      if (error.status === 403) showToast({ title: "Permission denied", type: "warning" })
+      else if (error.status >= 500) showToast({ title: "Something went wrong", type: "error" })
+    }
+  }, [error, showToast])
+
+  const sortedRows = items
+    .map(item => ({
+      item,
+      payment: item.payment,
+      riskLevel: getRiskLevel(item),
+      invStatus: getInvestigationStatus(item.payment),
+      reason: getReason(item),
+    }))
     .sort((a, b) => {
-      const aFlagged = mockPaymentSignals[a.payment.payment_id]?.risk.has_risk_flags ?? false
-      const bFlagged = mockPaymentSignals[b.payment.payment_id]?.risk.has_risk_flags ?? false
+      const aFlagged = a.item.signals?.risk.has_risk_flags ?? false
+      const bFlagged = b.item.signals?.risk.has_risk_flags ?? false
       if (aFlagged !== bFlagged) return aFlagged ? -1 : 1
-      const aTime = a.escalationEntry ? new Date(a.escalationEntry.timestamp).getTime() : 0
-      const bTime = b.escalationEntry ? new Date(b.escalationEntry.timestamp).getTime() : 0
-      return aTime - bTime
+      return new Date(a.payment.created_timestamp).getTime() - new Date(b.payment.created_timestamp).getTime()
     })
 
-  const fraudFlaggedCount = investigationPayments.filter(
-    p => mockPaymentSignals[p.payment_id]?.risk.has_risk_flags
-  ).length
-
+  const fraudFlaggedCount = items.filter(i => i.signals?.risk.has_risk_flags).length
   const pendingOutreachCount = sortedRows.filter(r => r.invStatus === "pending_outreach").length
 
   return (
@@ -199,20 +169,14 @@ export default function InvestigationQueue() {
         {/* Page header */}
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-              Investigation Queue
-            </h1>
+            <h1 className="text-2xl font-bold" style={{ color: "var(--pw-text-primary)" }}>Investigation Queue</h1>
             <p className="text-sm mt-0.5" style={{ color: "var(--pw-text-secondary)" }}>
               Escalated cases requiring specialist investigation
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--pw-text-muted)" }}>
-              Today
-            </p>
-            <p className="text-sm" style={{ color: "var(--pw-text-secondary)" }}>
-              {formatToday()}
-            </p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--pw-text-muted)" }}>Today</p>
+            <p className="text-sm" style={{ color: "var(--pw-text-secondary)" }}>{formatToday()}</p>
           </div>
         </div>
 
@@ -223,12 +187,10 @@ export default function InvestigationQueue() {
               <SearchIcon size={14} style={{ color: "var(--pw-info)" }} />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
-                Open Investigations
-              </p>
-              <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-                {investigationPayments.length}
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>Open Investigations</p>
+              {isLoading ? <Skeleton className="mt-1 h-8 w-12" /> : (
+                <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>{items.length}</p>
+              )}
             </div>
           </div>
 
@@ -237,12 +199,10 @@ export default function InvestigationQueue() {
               <AlertTriangle size={14} style={{ color: "var(--pw-escalate)" }} />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
-                Fraud Flagged
-              </p>
-              <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-                {fraudFlaggedCount}
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>Fraud Flagged</p>
+              {isLoading ? <Skeleton className="mt-1 h-8 w-12" /> : (
+                <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>{fraudFlaggedCount}</p>
+              )}
             </div>
           </div>
 
@@ -251,12 +211,10 @@ export default function InvestigationQueue() {
               <Clock size={14} style={{ color: "var(--pw-hold)" }} />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
-                Pending Outreach
-              </p>
-              <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-                {pendingOutreachCount}
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>Pending Outreach</p>
+              {isLoading ? <Skeleton className="mt-1 h-8 w-12" /> : (
+                <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>{pendingOutreachCount}</p>
+              )}
             </div>
           </div>
 
@@ -265,42 +223,25 @@ export default function InvestigationQueue() {
               <CheckCircle2 size={14} style={{ color: "var(--pw-apply)" }} />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
-                Cases Closed Today
-              </p>
-              <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-                0
-              </p>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>Cases Closed Today</p>
+              <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>0</p>
             </div>
           </div>
         </div>
 
         {/* Table card */}
         <div className="pw-card overflow-hidden">
-          {/* Card header */}
-          <div
-            className="flex items-center justify-between px-5 py-3 border-b"
-            style={{ borderColor: "var(--pw-border)" }}
-          >
+          <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "var(--pw-border)" }}>
             <div>
-              <h2 className="text-sm font-semibold" style={{ color: "var(--pw-text-primary)" }}>
-                Escalated Cases
-              </h2>
-              <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
-                Sorted by risk level (highest first)
-              </p>
+              <h2 className="text-sm font-semibold" style={{ color: "var(--pw-text-primary)" }}>Escalated Cases</h2>
+              <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>Sorted by risk level (highest first)</p>
             </div>
-            {/* Decorative filter dropdowns */}
             <div className="flex items-center gap-2">
               {["All Risk Levels", "All Ages", "All Statuses"].map(label => (
                 <select
                   key={label}
                   className="rounded-md px-3 py-1.5 text-xs border"
-                  style={{
-                    borderColor: "var(--pw-border)",
-                    color: "var(--pw-text-secondary)",
-                    background: "var(--pw-surface)",
-                  }}
+                  style={{ borderColor: "var(--pw-border)", color: "var(--pw-text-secondary)", background: "var(--pw-surface)" }}
                   aria-label={label}
                 >
                   <option>{label}</option>
@@ -309,127 +250,107 @@ export default function InvestigationQueue() {
             </div>
           </div>
 
-          {/* Table / Empty state */}
-          {sortedRows.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <p style={{ color: "var(--pw-text-secondary)" }}>No escalated cases.</p>
-              <a
-                href="/"
-                className="mt-2 text-sm underline underline-offset-2"
-                style={{ color: "var(--pw-primary)" }}
-              >
-                Back to Queue Dashboard
-              </a>
+          {/* Loading */}
+          {isLoading && (
+            <div className="p-5 space-y-3">
+              {Array.from({ length: 5 }, (_: unknown, i: number) => (
+                <Skeleton key={i} style={{ height: 44, width: "100%" }} />
+              ))}
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow style={{ borderColor: "var(--pw-border)" }}>
-                  {["CASE ID", "SENDER", "AMOUNT", "RISK LEVEL", "REASON", "ESCALATED BY", "AGE", "STATUS"].map(h => (
-                    <TableHead
-                      key={h}
-                      style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}
-                    >
-                      {h}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedRows.map(({ payment, escalationEntry, riskLevel, invStatus, reason }) => (
-                  <TableRow
-                    key={payment.payment_id}
-                    className="cursor-pointer"
-                    style={{
-                      borderColor: "var(--pw-border)",
-                      background: invStatus === "sla_breached" ? "rgba(239,68,68,0.06)" : undefined,
-                    }}
-                    onClick={() => router.push(`/payments/${payment.payment_id}`)}
-                  >
-                    {/* Case ID */}
-                    <TableCell>
-                      <span
-                        className="text-xs font-medium"
-                        style={{ fontFamily: "var(--pw-font-mono)", color: "var(--pw-primary)" }}
-                      >
-                        {payment.payment_id}
-                      </span>
-                    </TableCell>
+          )}
 
-                    {/* Sender */}
-                    <TableCell className="font-medium text-sm" style={{ color: "var(--pw-text-primary)" }}>
-                      {payment.sender_name}
-                    </TableCell>
+          {/* Error */}
+          {error && !isLoading && (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <p style={{ color: "var(--pw-escalate)" }}>
+                {error instanceof ApiError && error.status === 404
+                  ? "No escalated cases found."
+                  : "Failed to load investigations."}
+              </p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => mutate()}>
+                Retry
+              </Button>
+            </div>
+          )}
 
-                    {/* Amount */}
-                    <TableCell
-                      className="text-sm font-medium"
-                      style={{ fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)" }}
-                    >
-                      {formatUSD(payment.amount)}
-                    </TableCell>
-
-                    {/* Risk level */}
-                    <TableCell>
-                      <RiskLevelBadge level={riskLevel} />
-                    </TableCell>
-
-                    {/* Reason */}
-                    <TableCell
-                      className="text-sm max-w-[220px] truncate"
-                      style={{ color: "var(--pw-text-secondary)" }}
-                      title={reason}
-                    >
-                      {reason}
-                    </TableCell>
-
-                    {/* Escalated by */}
-                    <TableCell>
-                      {escalationEntry ? (
-                        <div>
-                          <p className="text-sm font-medium" style={{ color: "var(--pw-text-primary)" }}>
-                            {escalationEntry.actor === "system" ? "AI System" : escalationEntry.actor}
-                          </p>
-                          <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
-                            {formatEscalationDate(escalationEntry.timestamp)}
-                          </p>
-                        </div>
-                      ) : (
-                        <span style={{ color: "var(--pw-text-muted)" }}>—</span>
-                      )}
-                    </TableCell>
-
-                    {/* Age */}
-                    <TableCell className="text-sm font-medium" style={{ color: "var(--pw-text-secondary)" }}>
-                      {escalationEntry ? formatTimeSince(escalationEntry.timestamp) : "—"}
-                    </TableCell>
-
-                    {/* Status */}
-                    <TableCell>
-                      <StatusBadge status={invStatus} />
-                    </TableCell>
+          {/* Empty / Table */}
+          {!isLoading && !error && (
+            sortedRows.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <p style={{ color: "var(--pw-text-secondary)" }}>No escalated cases.</p>
+                <a href="/" className="mt-2 text-sm underline underline-offset-2" style={{ color: "var(--pw-primary)" }}>
+                  Back to Queue Dashboard
+                </a>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ borderColor: "var(--pw-border)" }}>
+                    {["CASE ID", "SENDER", "AMOUNT", "RISK LEVEL", "REASON", "ESCALATED", "AGE", "STATUS"].map(h => (
+                      <TableHead key={h} style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>{h}</TableHead>
+                    ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {sortedRows.map(({ payment, riskLevel, invStatus, reason }) => (
+                    <TableRow
+                      key={payment.payment_id}
+                      className="cursor-pointer"
+                      style={{
+                        borderColor: "var(--pw-border)",
+                        background: invStatus === "sla_breached" ? "rgba(239,68,68,0.06)" : undefined,
+                      }}
+                      onClick={() => router.push(`/payments/${payment.payment_id}`)}
+                    >
+                      <TableCell>
+                        <span className="text-xs font-medium" style={{ fontFamily: "var(--pw-font-mono)", color: "var(--pw-primary)" }}>
+                          {payment.payment_id}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium text-sm" style={{ color: "var(--pw-text-primary)" }}>
+                        {payment.sender_name}
+                      </TableCell>
+                      <TableCell
+                        className="text-sm font-medium"
+                        style={{ fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)" }}
+                      >
+                        {formatUSD(payment.amount)}
+                      </TableCell>
+                      <TableCell>
+                        <RiskLevelBadge level={riskLevel} />
+                      </TableCell>
+                      <TableCell
+                        className="text-sm max-w-[220px] truncate"
+                        style={{ color: "var(--pw-text-secondary)" }}
+                        title={reason}
+                      >
+                        {reason}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm" style={{ color: "var(--pw-text-muted)" }}>AI System</span>
+                      </TableCell>
+                      <TableCell className="text-sm font-medium" style={{ color: "var(--pw-text-secondary)" }}>
+                        {formatTimeSince(payment.created_timestamp)}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={invStatus} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )
           )}
 
           {/* Card footer */}
-          <div
-            className="flex items-center justify-between px-5 py-3 border-t"
-            style={{ borderColor: "var(--pw-border)" }}
-          >
+          <div className="flex items-center justify-between px-5 py-3 border-t" style={{ borderColor: "var(--pw-border)" }}>
             <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
               Showing {sortedRows.length} escalated case{sortedRows.length !== 1 ? "s" : ""}
             </p>
             <div className="flex gap-2">
               <button
                 className="rounded-md px-3 py-1.5 text-xs font-medium border"
-                style={{
-                  borderColor: "var(--pw-border)",
-                  color: "var(--pw-text-secondary)",
-                  background: "var(--pw-surface)",
-                }}
+                style={{ borderColor: "var(--pw-border)", color: "var(--pw-text-secondary)", background: "var(--pw-surface)" }}
               >
                 View SLA Report
               </button>
@@ -460,14 +381,11 @@ export default function InvestigationQueue() {
             Audit Active
           </div>
           <span>User: Damien Okafor</span>
-          <span>Last sync: 2 minutes ago</span>
         </div>
         <span>
           Press{" "}
-          <kbd className="rounded px-1 py-0.5 text-[10px]" style={{ background: "var(--pw-surface-elevated)" }}>
-            ?
-          </kbd>{" "}
-          for keyboard shortcuts
+          <kbd className="rounded px-1 py-0.5 text-[10px]" style={{ background: "var(--pw-surface-elevated)" }}>?</kbd>
+          {" "}for keyboard shortcuts
         </span>
       </footer>
     </div>

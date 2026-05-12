@@ -145,8 +145,15 @@ async def list_payments(
     params: dict = {}
 
     if status_filter:
-        conditions.append("p.status = CAST(:status AS payment_status)")
-        params["status"] = status_filter
+        statuses = [s.strip() for s in status_filter.split(",") if s.strip()]
+        if len(statuses) == 1:
+            conditions.append("p.status = CAST(:status AS payment_status)")
+            params["status"] = statuses[0]
+        elif len(statuses) > 1:
+            placeholders = ", ".join(f"CAST(:status_{i} AS payment_status)" for i in range(len(statuses)))
+            conditions.append(f"p.status IN ({placeholders})")
+            for i, s in enumerate(statuses):
+                params[f"status_{i}"] = s
     if scenario:
         conditions.append("pr.scenario_route = CAST(:scenario AS scenario_route)")
         params["scenario"] = scenario
@@ -178,12 +185,25 @@ async def list_payments(
     rows = await db.execute(text(f"""
         SELECT
             p.payment_id, p.amount, p.sender_name, p.sender_account,
-            p.payment_method, p.payment_date, p.status, p.matched_customer_id,
-            p.matched_policy_id, p.investigation_due_date, p.sla_breached,
-            p.created_timestamp,
-            pr.recommendation, pr.confidence_score, pr.scenario_route,
-            pr.requires_human_approval, pr.decision_attribution,
-            ps.has_risk_flags
+            p.beneficiary_name, p.payment_method, p.payment_date, p.status,
+            p.reference_field_1, p.reference_field_2,
+            p.matched_customer_id, p.matched_policy_id,
+            p.investigation_due_date, p.sla_breached, p.created_timestamp,
+            pr.recommendation      AS rec_recommendation,
+            pr.confidence_score    AS rec_confidence_score,
+            pr.scenario_route      AS rec_scenario_route,
+            pr.decision_path       AS rec_decision_path,
+            pr.requires_human_approval AS rec_requires_human_approval,
+            pr.approval_reason     AS rec_approval_reason,
+            pr.reasoning           AS rec_reasoning,
+            pr.suggested_action    AS rec_suggested_action,
+            pr.processing_time_ms  AS rec_processing_time_ms,
+            pr.decision_attribution AS rec_decision_attribution,
+            pr.created_at          AS rec_created_at,
+            ps.has_risk_flags      AS sig_has_risk_flags,
+            ps.payment_method_risk_level AS sig_pm_risk,
+            ps.name_similarity_score AS sig_name_sim,
+            ps.account_status      AS sig_account_status
         FROM payments p
         LEFT JOIN payment_recommendations pr ON pr.payment_id = p.payment_id
         LEFT JOIN payment_signals ps ON ps.payment_id = p.payment_id
@@ -192,8 +212,46 @@ async def list_payments(
         LIMIT :page_size OFFSET :offset
     """), params)
 
-    payments = [dict(r) for r in rows.mappings()]
-    return {"payments": payments, "total": total, "page": page, "page_size": page_size}
+    data = []
+    for r in rows.mappings():
+        row = dict(r)
+        payment_fields = [
+            "payment_id", "amount", "sender_name", "sender_account", "beneficiary_name",
+            "payment_method", "payment_date", "status", "reference_field_1", "reference_field_2",
+            "matched_customer_id", "matched_policy_id", "investigation_due_date",
+            "sla_breached", "created_timestamp",
+        ]
+        payment = {k: row[k] for k in payment_fields if k in row}
+        recommendation = None
+        if row.get("rec_recommendation") is not None:
+            recommendation = {
+                "payment_id":            row["payment_id"],
+                "recommendation":        row["rec_recommendation"],
+                "confidence_score":      row["rec_confidence_score"],
+                "scenario_route":        row["rec_scenario_route"],
+                "decision_path":         row["rec_decision_path"],
+                "requires_human_approval": row["rec_requires_human_approval"],
+                "approval_reason":       row["rec_approval_reason"],
+                "reasoning":             row["rec_reasoning"] or [],
+                "suggested_action":      row["rec_suggested_action"],
+                "processing_time_ms":    row["rec_processing_time_ms"],
+                "decision_attribution":  row["rec_decision_attribution"],
+                "created_at":            row["rec_created_at"],
+            }
+        signals = None
+        if row.get("sig_has_risk_flags") is not None:
+            signals = {
+                "payment_id": row["payment_id"],
+                "risk": {
+                    "has_risk_flags":            row["sig_has_risk_flags"],
+                    "payment_method_risk_level": row["sig_pm_risk"],
+                    "account_status":            row["sig_account_status"],
+                },
+                "matching": {"name_similarity_score": row["sig_name_sim"]},
+            }
+        data.append({"payment": payment, "recommendation": recommendation, "signals": signals})
+
+    return {"data": data, "total": total, "page": page, "page_size": page_size}
 
 
 # ── GET /api/payments/{id} ────────────────────────────────────────────────────
@@ -228,14 +286,12 @@ async def get_payment(
                 "account_match":             s.get("account_match"),
                 "amount_match":              s.get("amount_match"),
                 "historical_match":          s.get("historical_match"),
-                "algorithm_breakdown": {
-                    "jaro_winkler_score":   s.get("jaro_winkler_score"),
-                    "levenshtein_score":    s.get("levenshtein_score"),
-                    "soundex_match":        s.get("soundex_match"),
-                    "deterministic_score":  s.get("deterministic_score"),
-                    "used_llm":             s.get("used_llm"),
-                    "llm_score":            s.get("llm_score"),
-                },
+                "jaro_winkler_score":        s.get("jaro_winkler_score"),
+                "levenshtein_score":         s.get("levenshtein_score"),
+                "soundex_match":             s.get("soundex_match"),
+                "deterministic_score":       s.get("deterministic_score"),
+                "used_llm":                  s.get("used_llm"),
+                "llm_score":                 s.get("llm_score"),
             },
             "amount": {
                 "amount_variance_pct":          s.get("amount_variance_pct"),
@@ -312,7 +368,7 @@ async def get_payment(
         "payment": payment,
         "signals": signals,
         "recommendation": recommendation,
-        "audit_trail": audit_trail,
+        "audit_logs": audit_trail,
         "annotations": annotations,
         "documents": documents,
     }

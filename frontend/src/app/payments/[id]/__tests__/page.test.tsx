@@ -1,33 +1,104 @@
 /**
- * CES-15 — Payment Detail page tests
+ * CES-15 (updated for CES-30) — Payment Detail page tests
  *
- * Covers: not-found state, payment info rendering, recommendation banner,
- * signal grid, policy sidebar, audit trail, decision action buttons,
- * override modal flow, and navigation.
+ * Pages now fetch data via SWR. SWR is mocked to return mock fixtures
+ * keyed by payment ID. apiFetch is mocked so action buttons work in tests.
+ * All original behavioral tests preserved; override modal toast assertion
+ * now uses mockShowToast (context-based) instead of role="status".
  */
 
-import { render, screen, fireEvent, within } from "@testing-library/react"
+import React from "react"
+import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { useRouter, useParams } from "next/navigation"
 import PaymentDetail from "@/app/payments/[id]/page"
+import {
+  mockPayments, mockRecommendations, mockPaymentSignals, mockAuditLogs, mockAnnotations,
+} from "@/mocks/payments"
+import type { PaymentDetailResponse } from "@/types/api"
+
+// ── Mocks ─────────────────────────────────────────────────────────────────────
 
 jest.mock("next/navigation", () => ({
   useRouter: jest.fn(),
   useParams: jest.fn(),
 }))
 
+jest.mock("swr", () => ({
+  __esModule: true,
+  default: jest.fn(),
+  SWRConfig: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
+jest.mock("@/lib/api", () => ({
+  apiFetch: jest.fn().mockResolvedValue({}),
+  ApiError: class ApiError extends Error {
+    status: number
+    constructor(status: number, message: string) { super(message); this.status = status }
+  },
+  fetcher: jest.fn(),
+  getToken: jest.fn(),
+  setToken: jest.fn(),
+  clearToken: jest.fn(),
+}))
+
+// mockShowToast is hoisted with jest.mock — "mock" prefix allows this
+const mockShowToast = jest.fn()
+
+jest.mock("@/contexts/ToastContext", () => ({
+  useToast: () => ({ showToast: mockShowToast }),
+  ToastProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
+import useSWR from "swr"
+
 const mockPush = jest.fn()
 const mockBack = jest.fn()
+const mockMutate = jest.fn()
+
+function buildDetailResponse(id: string): PaymentDetailResponse {
+  const payment = mockPayments.find(p => p.payment_id === id)!
+  return {
+    payment,
+    recommendation: mockRecommendations[id] ?? null,
+    signals: mockPaymentSignals[id] ?? null,
+    audit_logs: mockAuditLogs[id] ?? [],
+    annotations: mockAnnotations[id] ?? [],
+  }
+}
 
 beforeEach(() => {
   mockPush.mockClear()
   mockBack.mockClear()
+  mockMutate.mockClear()
+  mockShowToast.mockClear()
   ;(useRouter as jest.Mock).mockReturnValue({ push: mockPush, back: mockBack })
+  ;(useSWR as jest.Mock).mockImplementation((key: string | null) => {
+    if (!key) return { data: undefined, isLoading: false, error: null, mutate: mockMutate }
+    const id = key.split("/").pop()!
+    const found = mockPayments.find(p => p.payment_id === id)
+    if (!found) {
+      const { ApiError } = jest.requireMock("@/lib/api")
+      return { data: undefined, isLoading: false, error: new ApiError(404, "Not found"), mutate: mockMutate }
+    }
+    return { data: buildDetailResponse(id), isLoading: false, error: null, mutate: mockMutate }
+  })
 })
 
 function renderWith(id: string) {
   ;(useParams as jest.Mock).mockReturnValue({ id })
   return render(<PaymentDetail />)
 }
+
+// ── Loading state ─────────────────────────────────────────────────────────────
+
+describe("Payment Detail — loading state", () => {
+  it("shows skeleton while loading", () => {
+    ;(useSWR as jest.Mock).mockReturnValue({ data: undefined, isLoading: true, error: null, mutate: mockMutate })
+    ;(useParams as jest.Mock).mockReturnValue({ id: "PMT-001" })
+    const { container } = render(<PaymentDetail />)
+    expect(container.querySelector(".animate-pulse")).toBeInTheDocument()
+  })
+})
 
 // ── Not found ─────────────────────────────────────────────────────────────────
 
@@ -176,13 +247,11 @@ describe("Payment Detail — payment information", () => {
 
   it("shows sender name", () => {
     renderWith("PMT-001")
-    // Appears in both sender name and policy holder fields
     expect(screen.getAllByText("Riverside Medical Group").length).toBeGreaterThan(0)
   })
 
   it("shows formatted amount for PMT-001 ($2,450.00)", () => {
     renderWith("PMT-001")
-    // Amount appears in both the large display and payment history rows
     expect(screen.getAllByText("$2,450.00").length).toBeGreaterThan(0)
   })
 
@@ -193,7 +262,6 @@ describe("Payment Detail — payment information", () => {
 
   it("shows reference field when present", () => {
     renderWith("PMT-001")
-    // POL-88341 appears in reference field and policy sidebar
     expect(screen.getAllByText(/POL-88341/).length).toBeGreaterThan(0)
   })
 })
@@ -264,7 +332,7 @@ describe("Payment Detail — override modal", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
   })
 
-  it("closes the modal and shows toast after submitting a reason", () => {
+  it("closes the modal and shows toast after submitting a reason", async () => {
     renderWith("PMT-002")
     fireEvent.click(screen.getByRole("button", { name: /Override Recommendation/i }))
     fireEvent.change(screen.getByRole("textbox", { name: /Override reason/i }), {
@@ -272,7 +340,9 @@ describe("Payment Detail — override modal", () => {
     })
     fireEvent.click(screen.getByRole("button", { name: /Submit Override/i }))
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
-    expect(screen.getByRole("status")).toHaveTextContent(/Override recorded/i)
+    await waitFor(() => {
+      expect(mockShowToast).toHaveBeenCalledWith({ title: "Override recorded", type: "success" })
+    })
   })
 })
 
@@ -291,7 +361,6 @@ describe("Payment Detail — matched policy sidebar", () => {
 
   it("shows policy holder name", () => {
     renderWith("PMT-001")
-    // "Riverside Medical Group" appears in both sender name and policy holder
     const instances = screen.getAllByText("Riverside Medical Group")
     expect(instances.length).toBeGreaterThan(0)
   })
@@ -317,7 +386,6 @@ describe("Payment Detail — case metadata", () => {
 
   it("shows the payment ID in case metadata", () => {
     renderWith("PMT-001")
-    // PMT-001 appears in heading and metadata
     expect(screen.getAllByText("PMT-001").length).toBeGreaterThan(0)
   })
 
