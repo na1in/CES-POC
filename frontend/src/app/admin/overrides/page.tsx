@@ -1,34 +1,41 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   Bell, Settings as SettingsIcon, ChevronDown, ChevronLeft, TrendingUp,
 } from "lucide-react"
-import { mockOverrides } from "@/mocks/overrides"
-import { mockUsers } from "@/mocks/thresholds"
-import type { OverrideEntry, PaymentDecision, ConfidenceBand } from "@/types/analytics"
-import type { UserRole } from "@/types/user"
+import { getOverrides, type OverrideRow } from "@/lib/api"
+import { useAuth } from "@/contexts/auth"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const SCENARIO_OPTIONS = ["All", "Scenario 1", "Scenario 2", "Scenario 3", "Scenario 4", "Scenario 5"]
-const BAND_OPTIONS: ("All" | ConfidenceBand)[] = ["All", "Low", "Medium", "High"]
+const SCENARIO_OPTIONS = [
+  { value: "",           label: "All" },
+  { value: "scenario_1", label: "Scenario 1" },
+  { value: "scenario_2", label: "Scenario 2" },
+  { value: "scenario_3", label: "Scenario 3" },
+  { value: "scenario_4", label: "Scenario 4" },
+  { value: "scenario_5", label: "Scenario 5" },
+]
 
-const REC_COLORS: Record<PaymentDecision, { bg: string; color: string }> = {
+const BAND_OPTIONS = [
+  { value: "",      label: "All" },
+  { value: "0-25",  label: "Low <25" },
+  { value: "25-50", label: "Medium 25–50" },
+  { value: "50-75", label: "High 50–75" },
+  { value: "75-100",label: "Very High >75" },
+]
+
+const REC_COLORS: Record<string, { bg: string; color: string }> = {
   APPLY:    { bg: "var(--pw-apply-tint)",    color: "var(--pw-apply)"    },
   HOLD:     { bg: "var(--pw-hold-tint)",     color: "var(--pw-hold)"     },
   ESCALATE: { bg: "var(--pw-escalate-tint)", color: "var(--pw-escalate)" },
 }
 
-function confidenceColor(band: ConfidenceBand): string {
-  return band === "High" ? "var(--pw-apply)" : band === "Medium" ? "var(--pw-hold)" : "var(--pw-escalate)"
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function RecBadge({ rec }: { rec: PaymentDecision }) {
-  const { bg, color } = REC_COLORS[rec]
+function RecBadge({ rec }: { rec: string | null }) {
+  if (!rec) return <span style={{ color: "var(--pw-text-muted)", fontSize: 12 }}>—</span>
+  const { bg, color } = REC_COLORS[rec] ?? { bg: "var(--pw-bg)", color: "var(--pw-text-secondary)" }
   return (
     <span style={{
       display: "inline-flex", alignItems: "center",
@@ -40,8 +47,9 @@ function RecBadge({ rec }: { rec: PaymentDecision }) {
   )
 }
 
-function OverrideReasonCell({ reason }: { reason: string }) {
+function OverrideReasonCell({ reason }: { reason: string | null }) {
   const [expanded, setExpanded] = useState(false)
+  if (!reason) return <span style={{ color: "var(--pw-text-muted)", fontSize: 12 }}>—</span>
   const truncated = reason.length > 80
   const display = expanded || !truncated ? reason : reason.slice(0, 80) + "…"
   return (
@@ -64,30 +72,33 @@ function OverrideReasonCell({ reason }: { reason: string }) {
 
 export default function OverrideAnalysisPage() {
   const router = useRouter()
-  const [activeRole, setActiveRole] = useState<UserRole>("admin")
+  const { user, logout } = useAuth()
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
 
-  // Filters
-  const [scenario, setScenario] = useState("All")
-  const [band, setBand] = useState<"All" | ConfidenceBand>("All")
+  const [scenario, setScenario] = useState("")
+  const [band, setBand] = useState("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
-  const [reasonSearch, setReasonSearch] = useState("")
 
-  const currentUser = mockUsers.find(u => u.role === activeRole) ?? mockUsers[0]
+  const [overrides, setOverrides] = useState<OverrideRow[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
 
-  // In production: filters would trigger GET /api/analytics/overrides?scenario=...&band=...
-  // For the PoC we filter the mock locally to simulate the same behaviour.
-  const filtered = useMemo<OverrideEntry[]>(() => {
-    return mockOverrides.filter(o => {
-      if (scenario !== "All" && o.scenario !== scenario) return false
-      if (band !== "All" && o.confidence_band !== band) return false
-      if (dateFrom && o.override_date < dateFrom) return false
-      if (dateTo && o.override_date > dateTo + "T23:59:59") return false
-      if (reasonSearch && !o.override_reason.toLowerCase().includes(reasonSearch.toLowerCase())) return false
-      return true
+  const load = useCallback(() => {
+    setLoading(true)
+    getOverrides({
+      scenario: scenario || undefined,
+      confidence_band: band || undefined,
+      from_date: dateFrom || undefined,
+      to_date: dateTo || undefined,
+      page_size: 200,
     })
-  }, [scenario, band, dateFrom, dateTo, reasonSearch])
+      .then(res => { setOverrides(res.overrides); setTotal(res.total) })
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [scenario, band, dateFrom, dateTo])
+
+  useEffect(() => { load() }, [load])
 
   const selectStyle: React.CSSProperties = {
     border: "1px solid var(--pw-border)", borderRadius: 8,
@@ -134,26 +145,25 @@ export default function OverrideAnalysisPage() {
         <SettingsIcon size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} onClick={() => router.push("/settings")} />
         <div style={{ position: "relative" }}>
           <button
-            aria-label="Switch role"
+            aria-label="User menu"
             onClick={() => setRoleMenuOpen(o => !o)}
             style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--pw-bg)", border: "1px solid var(--pw-border)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: "var(--pw-text-secondary)", cursor: "pointer" }}
           >
             <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--pw-primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 10 }}>
-              {currentUser.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}
+              {user?.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) ?? "?"}
             </div>
-            {currentUser.name.split(" ")[0]}
+            {user?.name.split(" ")[0] ?? "User"}
             <ChevronDown size={12} />
           </button>
           {roleMenuOpen && (
             <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "var(--pw-surface)", border: "1px solid var(--pw-border)", borderRadius: 8, boxShadow: "var(--pw-shadow-md)", zIndex: 60, minWidth: 180, overflow: "hidden" }}>
-              {mockUsers.map((u: { user_id: string; role: UserRole; name: string }) => (
-                <button key={u.user_id} onClick={() => { setActiveRole(u.role); setRoleMenuOpen(false) }}
-                  style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 14px", fontSize: 13, cursor: "pointer", background: u.role === activeRole ? "var(--pw-bg)" : "transparent", border: "none", color: "var(--pw-text-primary)" }}
-                >
-                  {u.name}
-                  <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>({u.role})</span>
-                </button>
-              ))}
+              <button
+                onClick={() => { logout(); router.push("/login"); setRoleMenuOpen(false) }}
+                style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 14px", fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--pw-escalate)" }}
+              >
+                Sign out
+                <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>({user?.role})</span>
+              </button>
             </div>
           )}
         </div>
@@ -174,7 +184,7 @@ export default function OverrideAnalysisPage() {
             Override Analysis
           </h1>
           <span style={{ marginLeft: 8, fontSize: 13, color: "var(--pw-text-muted)" }}>
-            {filtered.length} override{filtered.length !== 1 ? "s" : ""}
+            {total} override{total !== 1 ? "s" : ""}
           </span>
         </div>
         <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "4px 0 0 54px" }}>
@@ -189,25 +199,15 @@ export default function OverrideAnalysisPage() {
         <div className="pw-card" style={{ padding: 16, marginBottom: 16, display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: "var(--pw-text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Scenario</label>
-            <select
-              value={scenario}
-              onChange={e => setScenario(e.target.value)}
-              style={selectStyle}
-              aria-label="Filter by scenario"
-            >
-              {SCENARIO_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            <select value={scenario} onChange={e => setScenario(e.target.value)} style={selectStyle} aria-label="Filter by scenario">
+              {SCENARIO_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             <label style={{ fontSize: 11, fontWeight: 600, color: "var(--pw-text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Confidence Band</label>
-            <select
-              value={band}
-              onChange={e => setBand(e.target.value as "All" | ConfidenceBand)}
-              style={selectStyle}
-              aria-label="Filter by confidence band"
-            >
-              {BAND_OPTIONS.map(b => <option key={b} value={b}>{b === "All" ? "All" : `${b} ${b === "Low" ? "<40" : b === "Medium" ? "40–70" : ">70"}`}</option>)}
+            <select value={band} onChange={e => setBand(e.target.value)} style={selectStyle} aria-label="Filter by confidence band">
+              {BAND_OPTIONS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
             </select>
           </div>
 
@@ -219,23 +219,15 @@ export default function OverrideAnalysisPage() {
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={inputStyle} aria-label="Date to" />
             </div>
           </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, minWidth: 200 }}>
-            <label style={{ fontSize: 11, fontWeight: 600, color: "var(--pw-text-secondary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Override Reason</label>
-            <input
-              type="text"
-              placeholder="Search reason…"
-              value={reasonSearch}
-              onChange={e => setReasonSearch(e.target.value)}
-              style={inputStyle}
-              aria-label="Search override reason"
-            />
-          </div>
         </div>
 
         {/* Table */}
         <div className="pw-card" style={{ overflow: "hidden" }}>
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div style={{ padding: "48px 24px", textAlign: "center" }}>
+              <p style={{ fontSize: 14, color: "var(--pw-text-muted)", margin: 0 }}>Loading overrides…</p>
+            </div>
+          ) : overrides.length === 0 ? (
             <div style={{ padding: "48px 24px", textAlign: "center" }}>
               <p style={{ fontSize: 14, color: "var(--pw-text-muted)", margin: 0 }}>No overrides match your filters.</p>
             </div>
@@ -247,7 +239,6 @@ export default function OverrideAnalysisPage() {
                     <th style={TH}>Payment ID</th>
                     <th style={TH}>Scenario</th>
                     <th style={TH}>AI Rec</th>
-                    <th style={TH}>Human Decision</th>
                     <th style={TH}>Confidence</th>
                     <th style={{ ...TH, width: "28%" }}>Override Reason</th>
                     <th style={TH}>Date</th>
@@ -255,7 +246,7 @@ export default function OverrideAnalysisPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(o => (
+                  {overrides.map(o => (
                     <tr key={o.payment_id} style={{ background: "var(--pw-surface)" }}>
                       <td style={TD}>
                         <button
@@ -265,19 +256,26 @@ export default function OverrideAnalysisPage() {
                           {o.payment_id}
                         </button>
                       </td>
-                      <td style={{ ...TD, color: "var(--pw-text-secondary)", whiteSpace: "nowrap" }}>{o.scenario}</td>
-                      <td style={TD}><RecBadge rec={o.ai_recommendation} /></td>
-                      <td style={TD}><RecBadge rec={o.human_decision} /></td>
+                      <td style={{ ...TD, color: "var(--pw-text-secondary)", whiteSpace: "nowrap", fontSize: 12 }}>
+                        {o.scenario_route?.replace("scenario_", "Scenario ") ?? "—"}
+                      </td>
+                      <td style={TD}><RecBadge rec={o.original_recommendation} /></td>
                       <td style={TD}>
-                        <span style={{ fontFamily: "var(--pw-font-mono)", fontWeight: 600, color: confidenceColor(o.confidence_band) }}>
-                          {o.confidence_score}%
-                        </span>
+                        {o.confidence_score !== null
+                          ? <span style={{ fontFamily: "var(--pw-font-mono)", fontWeight: 600, color: "var(--pw-primary)" }}>{Math.round(o.confidence_score)}%</span>
+                          : <span style={{ color: "var(--pw-text-muted)" }}>—</span>
+                        }
                       </td>
                       <td style={TD}><OverrideReasonCell reason={o.override_reason} /></td>
                       <td style={{ ...TD, color: "var(--pw-text-secondary)", whiteSpace: "nowrap", fontSize: 12 }}>
-                        {new Date(o.override_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        {o.overridden_at
+                          ? new Date(o.overridden_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                          : "—"
+                        }
                       </td>
-                      <td style={{ ...TD, color: "var(--pw-text-secondary)", whiteSpace: "nowrap", fontSize: 12 }}>{o.analyst_name}</td>
+                      <td style={{ ...TD, color: "var(--pw-text-secondary)", whiteSpace: "nowrap", fontSize: 12 }}>
+                        {o.overridden_by ?? "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -295,8 +293,8 @@ export default function OverrideAnalysisPage() {
         color: "var(--pw-text-muted)", position: "sticky", bottom: 0, zIndex: 40,
       }}>
         <span style={{ color: "var(--pw-apply)", fontWeight: 600 }}>● Audit Active</span>
-        <span>User: {currentUser.name}</span>
-        <span>Role: {currentUser.role}</span>
+        <span>User: {user?.name ?? "—"}</span>
+        <span>Role: {user?.role ?? "—"}</span>
         <span style={{ marginLeft: "auto" }}>
           Press{" "}
           <kbd style={{ background: "var(--pw-surface-elevated)", padding: "1px 5px", borderRadius: 3, fontFamily: "var(--pw-font-mono)" }}>?</kbd>

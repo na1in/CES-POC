@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import useSWR from "swr"
 import { AlertTriangle, X, Search, Bell, Settings, CheckCircle2, Clock, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,13 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Skeleton } from "@/components/ui/skeleton"
-import { apiFetch, ApiError } from "@/lib/api"
-import { useToast } from "@/contexts/ToastContext"
-import type { PaymentListResponse, PaymentListItem } from "@/types/api"
+import { listPayments, type PaymentRow } from "@/lib/api"
+import { useAuth } from "@/contexts/auth"
 import type { ScenarioRoute } from "@/types/recommendation"
-import type { PaymentMethod, Payment } from "@/types/payment"
-import type { PaymentSignals } from "@/types/signals"
+import type { PaymentMethod } from "@/types/payment"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -54,16 +50,9 @@ function getBand(score: number): ConfidenceBand {
   return "High"
 }
 
-function getFlags(payment: Payment, signals: PaymentSignals | null | undefined): string[] {
+function getFlags(payment: PaymentRow): string[] {
   const flags: string[] = []
-  if (!signals) return flags
-  if (signals.duplicate?.is_duplicate_match) flags.push("Duplicate")
-  if ((signals.amount?.amount_variance_pct ?? 0) > 2) flags.push("Amount Variance")
-  if ((signals.risk?.risk_flag_types?.length ?? 0) > 0) {
-    signals.risk.risk_flag_types.forEach(f =>
-      flags.push(f.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()))
-    )
-  }
+  if (payment.has_risk_flags) flags.push("Risk Flag")
   if (payment.sla_breached) flags.push("SLA Breach")
   return flags
 }
@@ -141,6 +130,15 @@ function ConfidencePct({ score }: { score: number }) {
 // ── Nav ───────────────────────────────────────────────────────────────────────
 
 function Nav() {
+  const { user, logout } = useAuth()
+  const router = useRouter()
+  const initials = user?.name.split(" ").map(w => w[0]).join("").slice(0, 2) ?? "?"
+
+  function handleLogout() {
+    logout()
+    router.push("/login")
+  }
+
   return (
     <nav
       className="flex items-center gap-3 px-5 border-b"
@@ -150,6 +148,7 @@ function Nav() {
         borderColor: "var(--pw-border)",
       }}
     >
+      {/* Logo */}
       <div className="flex items-center gap-2 flex-1">
         <div
           className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
@@ -165,6 +164,7 @@ function Nav() {
         </span>
       </div>
 
+      {/* Search */}
       <div
         className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs"
         style={{ background: "var(--pw-surface-elevated)", color: "var(--pw-text-muted)" }}
@@ -182,99 +182,102 @@ function Nav() {
       <Bell size={18} style={{ color: "var(--pw-text-secondary)" }} />
       <Settings size={18} style={{ color: "var(--pw-text-secondary)" }} />
 
-      <div
+      {/* Avatar + logout */}
+      <button
+        onClick={handleLogout}
+        title={`${user?.name} (${user?.role}) — click to sign out`}
         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
-        style={{ background: "var(--pw-primary)" }}
+        style={{ background: "var(--pw-primary)", border: "none", cursor: "pointer" }}
       >
-        PV
-      </div>
+        {initials}
+      </button>
     </nav>
   )
 }
 
 // ── Stat cards ────────────────────────────────────────────────────────────────
 
-function StatCards({ items, loading }: { items: PaymentListItem[]; loading: boolean }) {
-  const payments = items.map(i => i.payment)
+function StatCards({ payments }: { payments: PaymentRow[] }) {
   const total = payments.length
   const onHold = payments.filter(p => p.status === "held").length
   const escalated = payments.filter(p => p.status === "escalated" || p.status === "pending_sender_response").length
   const applied = payments.filter(p => p.status === "applied").length
-
-  const statStyle = { height: 56 }
 
   return (
     <div
       className="pw-card grid grid-cols-4 divide-x"
       style={{ borderColor: "var(--pw-border)" }}
     >
+      {/* Cases total */}
       <div className="px-5 py-4">
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
           Cases Open
         </p>
-        {loading ? (
-          <Skeleton className="mt-1 h-8 w-16" />
-        ) : (
-          <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-            {total - applied}
-          </p>
-        )}
+        <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
+          {total - applied}
+        </p>
       </div>
 
+      {/* Applied */}
       <div className="px-5 py-4 flex items-start gap-3">
-        <div className="mt-0.5 rounded-full p-1.5" style={{ background: "var(--pw-apply-tint)" }}>
+        <div
+          className="mt-0.5 rounded-full p-1.5"
+          style={{ background: "var(--pw-apply-tint)" }}
+        >
           <CheckCircle2 size={14} style={{ color: "var(--pw-apply)" }} />
         </div>
-        <div style={statStyle}>
+        <div>
           <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
             Auto-Applied
           </p>
-          {loading ? <Skeleton className="mt-1 h-8 w-12" /> : (
-            <>
-              <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>{applied}</p>
-              <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
-                {total > 0 ? Math.round((applied / total) * 100) : 0}%
-              </p>
-            </>
-          )}
+          <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
+            {applied}
+          </p>
+          <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
+            {total > 0 ? Math.round((applied / total) * 100) : 0}%
+          </p>
         </div>
       </div>
 
+      {/* On Hold */}
       <div className="px-5 py-4 flex items-start gap-3">
-        <div className="mt-0.5 rounded-full p-1.5" style={{ background: "var(--pw-hold-tint)" }}>
+        <div
+          className="mt-0.5 rounded-full p-1.5"
+          style={{ background: "var(--pw-hold-tint)" }}
+        >
           <Clock size={14} style={{ color: "var(--pw-hold)" }} />
         </div>
-        <div style={statStyle}>
+        <div>
           <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
             On Hold
           </p>
-          {loading ? <Skeleton className="mt-1 h-8 w-12" /> : (
-            <>
-              <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>{onHold}</p>
-              <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
-                {total > 0 ? Math.round((onHold / total) * 100) : 0}%
-              </p>
-            </>
-          )}
+          <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
+            {onHold}
+          </p>
+          <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
+            {total > 0 ? Math.round((onHold / total) * 100) : 0}%
+          </p>
         </div>
       </div>
 
+      {/* Escalated */}
       <div className="px-5 py-4 flex items-start gap-3">
-        <div className="mt-0.5 rounded-full p-1.5" style={{ background: "var(--pw-escalate-tint)" }}>
+        <div
+          className="mt-0.5 rounded-full p-1.5"
+          style={{ background: "var(--pw-escalate-tint)" }}
+        >
           <TriangleAlert size={14} style={{ color: "var(--pw-escalate)" }} />
         </div>
-        <div style={statStyle}>
+        <div>
           <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
             Escalated
           </p>
-          {loading ? <Skeleton className="mt-1 h-8 w-12" /> : (
-            <>
-              <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>{escalated}</p>
-              <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
-                {total > 0 ? Math.round((escalated / total) * 100) : 0}%
-              </p>
-            </>
-          )}
+          <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
+            {escalated}
+          </p>
+          <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
+            {total > 0 ? Math.round((escalated / total) * 100) : 0}%
+          </p>
         </div>
       </div>
     </div>
@@ -283,30 +286,24 @@ function StatCards({ items, loading }: { items: PaymentListItem[]; loading: bool
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-const QUEUE_KEY = "/api/payments?status=held,processing_failed&sort_by=confidence_score"
-
 export default function QueueDashboard() {
   const router = useRouter()
-  const { showToast } = useToast()
+  const { user } = useAuth()
 
-  const { data, error, isLoading, mutate } = useSWR<PaymentListResponse>(QUEUE_KEY)
-
-  const items: PaymentListItem[] = data?.data ?? []
-
+  const [payments, setPayments] = useState<PaymentRow[]>([])
+  const [loadingData, setLoadingData] = useState(true)
   const [scenarioFilter, setScenarioFilter] = useState<Set<ScenarioRoute>>(new Set())
   const [bandFilter, setBandFilter] = useState<Set<ConfidenceBand>>(new Set())
   const [methodFilter, setMethodFilter] = useState<Set<PaymentMethod>>(new Set())
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [sortKey, setSortKey] = useState<string>("confidence_desc")
-  const [reprocessing, setReprocessing] = useState(false)
 
   useEffect(() => {
-    if (!error) return
-    if (error instanceof ApiError) {
-      if (error.status === 403) showToast({ title: "Permission denied", type: "warning" })
-      else if (error.status >= 500) showToast({ title: "Something went wrong", type: "error" })
-    }
-  }, [error, showToast])
+    listPayments({ page_size: 200 })
+      .then(res => setPayments(res.payments))
+      .catch(console.error)
+      .finally(() => setLoadingData(false))
+  }, [])
 
   function toggle<T>(set: Set<T>, value: T): Set<T> {
     const next = new Set(set)
@@ -320,32 +317,13 @@ export default function QueueDashboard() {
     setMethodFilter(new Set())
   }
 
-  async function reprocessAll() {
-    const failed = items.filter(i => i.payment.status === "processing_failed")
-    if (failed.length === 0) return
-    setReprocessing(true)
-    try {
-      await Promise.all(
-        failed.map(i =>
-          apiFetch(`/api/payments/${i.payment.payment_id}/reprocess`, { method: "POST" })
-        )
-      )
-      showToast({ title: `${failed.length} payment${failed.length !== 1 ? "s" : ""} queued for reprocessing`, type: "success" })
-      mutate()
-    } catch {
-      showToast({ title: "Reprocess failed", type: "error" })
-    } finally {
-      setReprocessing(false)
-    }
-  }
-
   const hasFilters = scenarioFilter.size > 0 || bandFilter.size > 0 || methodFilter.size > 0
-  const failedCount = items.filter(i => i.payment.status === "processing_failed").length
-  const openCount = items.filter(i => i.payment.status !== "applied" && i.payment.status !== "returned").length
-  const closedCount = items.filter(i => i.payment.status === "applied" || i.payment.status === "returned").length
+  const failedCount = payments.filter(p => p.status === "processing_failed").length
+  const openCount = payments.filter(p => p.status !== "applied" && p.status !== "returned").length
+  const closedCount = payments.filter(p => p.status === "applied" || p.status === "returned").length
 
-  const rows = items
-    .map(item => ({ payment: item.payment, rec: item.recommendation, signals: item.signals }))
+  const rows = payments
+    .map(p => ({ payment: p, rec: p }))
     .sort((a, b) => {
       switch (sortKey) {
         case "confidence_desc": return (b.rec?.confidence_score ?? 0) - (a.rec?.confidence_score ?? 0)
@@ -361,10 +339,9 @@ export default function QueueDashboard() {
     })
 
   const filtered = rows.filter(({ payment, rec }) => {
-    if (!rec) return true
-    if (scenarioFilter.size > 0 && !scenarioFilter.has(rec.scenario_route)) return false
-    if (bandFilter.size > 0 && !bandFilter.has(getBand(rec.confidence_score))) return false
-    if (methodFilter.size > 0 && !methodFilter.has(payment.payment_method)) return false
+    if (scenarioFilter.size > 0 && rec.scenario_route && !scenarioFilter.has(rec.scenario_route as ScenarioRoute)) return false
+    if (bandFilter.size > 0 && rec.confidence_score != null && !bandFilter.has(getBand(rec.confidence_score))) return false
+    if (methodFilter.size > 0 && !methodFilter.has(payment.payment_method as PaymentMethod)) return false
     return true
   })
 
@@ -390,7 +367,8 @@ export default function QueueDashboard() {
           </div>
         </div>
 
-        <StatCards items={items} loading={isLoading} />
+        {/* Stat cards */}
+        <StatCards payments={payments} />
 
         {/* Processing-failed banner */}
         {failedCount > 0 && !bannerDismissed && (
@@ -407,12 +385,8 @@ export default function QueueDashboard() {
               <span>
                 {failedCount} payment{failedCount !== 1 ? "s" : ""} failed to process.
               </span>
-              <button
-                onClick={reprocessAll}
-                disabled={reprocessing}
-                className="font-semibold underline underline-offset-2 hover:no-underline disabled:opacity-60"
-              >
-                {reprocessing ? "Reprocessing…" : "Reprocess all"}
+              <button className="font-semibold underline underline-offset-2 hover:no-underline">
+                Reprocess all
               </button>
             </div>
             <button
@@ -433,15 +407,20 @@ export default function QueueDashboard() {
             style={{ borderColor: "var(--pw-border)" }}
           >
             <div className="flex gap-6">
+              {/* Open Cases tab (active) */}
               <button
                 className="flex items-center gap-2 py-3 text-sm font-medium border-b-2 -mb-px"
                 style={{ borderColor: "var(--pw-primary)", color: "var(--pw-primary)" }}
               >
                 Open Cases
-                <span className="pw-badge" style={{ background: "var(--pw-primary)", color: "#fff" }}>
+                <span
+                  className="pw-badge"
+                  style={{ background: "var(--pw-primary)", color: "#fff" }}
+                >
                   {openCount}
                 </span>
               </button>
+              {/* Closed Cases tab (inactive) */}
               <button
                 className="flex items-center gap-2 py-3 text-sm font-medium border-b-2 border-transparent"
                 style={{ color: "var(--pw-text-secondary)" }}
@@ -457,6 +436,7 @@ export default function QueueDashboard() {
             className="flex flex-wrap items-center gap-x-5 gap-y-2 px-5 py-3 border-b text-xs"
             style={{ borderColor: "var(--pw-border)", background: "var(--pw-surface-elevated)" }}
           >
+            {/* Scenario */}
             <div className="flex items-center gap-1.5">
               <span className="font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)", fontSize: 10 }}>
                 Scenario
@@ -473,6 +453,7 @@ export default function QueueDashboard() {
               ))}
             </div>
 
+            {/* Confidence */}
             <div className="flex items-center gap-1.5">
               <span className="font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)", fontSize: 10 }}>
                 Confidence
@@ -500,6 +481,7 @@ export default function QueueDashboard() {
               </FilterChip>
             </div>
 
+            {/* Method */}
             <div className="flex items-center gap-1.5">
               <span className="font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)", fontSize: 10 }}>
                 Method
@@ -516,6 +498,7 @@ export default function QueueDashboard() {
               ))}
             </div>
 
+            {/* Sort */}
             <div className="flex items-center gap-1.5 ml-auto">
               <span className="font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)", fontSize: 10 }}>
                 Sort
@@ -525,9 +508,14 @@ export default function QueueDashboard() {
                 value={sortKey}
                 onChange={e => setSortKey(e.target.value)}
                 style={{
-                  fontSize: 12, color: "var(--pw-text-primary)",
-                  background: "var(--pw-surface)", border: "1px solid var(--pw-border)",
-                  borderRadius: 6, padding: "2px 6px", cursor: "pointer", outline: "none",
+                  fontSize: 12,
+                  color: "var(--pw-text-primary)",
+                  background: "var(--pw-surface)",
+                  border: "1px solid var(--pw-border)",
+                  borderRadius: 6,
+                  padding: "2px 6px",
+                  cursor: "pointer",
+                  outline: "none",
                 }}
               >
                 <option value="confidence_desc">Confidence: High → Low</option>
@@ -552,125 +540,118 @@ export default function QueueDashboard() {
             )}
           </div>
 
-          {/* Loading skeletons */}
-          {isLoading && (
-            <div className="p-5 space-y-3">
-              {Array.from({ length: 6 }, (_: unknown, i: number) => (
-                <Skeleton key={i} style={{ height: 44, width: "100%" }} />
-              ))}
-            </div>
-          )}
-
-          {/* Error state */}
-          {error && !isLoading && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p style={{ color: "var(--pw-escalate)" }}>
-                {error instanceof ApiError && error.status === 404
-                  ? "No payments found."
-                  : "Failed to load payments."}
-              </p>
-              <Button variant="outline" size="sm" className="mt-3" onClick={() => mutate()}>
-                Retry
+          {/* Table / Empty state */}
+          {filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <p style={{ color: "var(--pw-text-secondary)" }}>No payments match your filters.</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={clearFilters}>
+                Clear filters
               </Button>
             </div>
-          )}
-
-          {/* Table / Empty state */}
-          {!isLoading && !error && (
-            filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <p style={{ color: "var(--pw-text-secondary)" }}>No payments match your filters.</p>
-                <Button variant="outline" size="sm" className="mt-3" onClick={clearFilters}>
-                  Clear filters
-                </Button>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow style={{ borderColor: "var(--pw-border)" }}>
-                    <TableHead className="w-[100px]" style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>ID</TableHead>
-                    <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>SENDER</TableHead>
-                    <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>AMOUNT</TableHead>
-                    <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>RECOMMENDATION</TableHead>
-                    <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>CONFIDENCE</TableHead>
-                    <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>FLAGS</TableHead>
-                    <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>AGE</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map(({ payment, rec, signals }) => {
-                    const flags = getFlags(payment, signals)
-                    return (
-                      <TableRow
-                        key={payment.payment_id}
-                        className="cursor-pointer"
-                        style={{ borderColor: "var(--pw-border)" }}
-                        onClick={() => router.push(`/payments/${payment.payment_id}`)}
-                      >
-                        <TableCell>
-                          <span
-                            className="text-xs font-medium"
-                            style={{ fontFamily: "var(--pw-font-mono)", color: "var(--pw-primary)" }}
-                          >
-                            {payment.payment_id}
-                          </span>
-                        </TableCell>
-                        <TableCell className="font-medium text-sm" style={{ color: "var(--pw-text-primary)" }}>
-                          {payment.sender_name}
-                        </TableCell>
-                        <TableCell
-                          className="text-sm font-medium"
-                          style={{ fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)" }}
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow style={{ borderColor: "var(--pw-border)" }}>
+                  <TableHead className="w-[100px]" style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>ID</TableHead>
+                  <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>SENDER</TableHead>
+                  <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>AMOUNT</TableHead>
+                  <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>RECOMMENDATION</TableHead>
+                  <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>CONFIDENCE</TableHead>
+                  <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>FLAGS</TableHead>
+                  <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>AGE</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map(({ payment }) => {
+                  const flags = getFlags(payment)
+                  return (
+                    <TableRow
+                      key={payment.payment_id}
+                      className="cursor-pointer"
+                      style={{ borderColor: "var(--pw-border)" }}
+                      onClick={() => router.push(`/payments/${payment.payment_id}`)}
+                    >
+                      {/* ID */}
+                      <TableCell>
+                        <span
+                          className="text-xs font-medium"
+                          style={{
+                            fontFamily: "var(--pw-font-mono)",
+                            color: "var(--pw-primary)",
+                          }}
                         >
-                          {formatUSD(payment.amount)}
-                        </TableCell>
-                        <TableCell>
-                          {rec ? (
-                            <RecBadge rec={rec.recommendation} />
-                          ) : (
-                            <span className="pw-badge pw-badge-neutral">FAILED</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {rec ? (
-                            <ConfidencePct score={rec.confidence_score} />
-                          ) : (
-                            <span style={{ color: "var(--pw-text-muted)" }}>—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {flags.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {flags.map(f => (
-                                <span key={f} className="text-xs font-medium" style={{ color: "var(--pw-hold)" }}>
-                                  {f}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span style={{ color: "var(--pw-text-muted)" }}>—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
-                          {formatAge(payment.created_timestamp)}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            )
+                          {payment.payment_id}
+                        </span>
+                      </TableCell>
+
+                      {/* Sender */}
+                      <TableCell className="font-medium text-sm" style={{ color: "var(--pw-text-primary)" }}>
+                        {payment.sender_name}
+                      </TableCell>
+
+                      {/* Amount */}
+                      <TableCell
+                        className="text-sm font-medium"
+                        style={{ fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)" }}
+                      >
+                        {formatUSD(payment.amount)}
+                      </TableCell>
+
+                      {/* Recommendation */}
+                      <TableCell>
+                        {payment.recommendation ? (
+                          <RecBadge rec={payment.recommendation as "apply" | "hold" | "escalate"} />
+                        ) : (
+                          <span className="pw-badge pw-badge-neutral">PENDING</span>
+                        )}
+                      </TableCell>
+
+                      {/* Confidence */}
+                      <TableCell>
+                        {payment.confidence_score != null ? (
+                          <ConfidencePct score={payment.confidence_score} />
+                        ) : (
+                          <span style={{ color: "var(--pw-text-muted)" }}>—</span>
+                        )}
+                      </TableCell>
+
+                      {/* Flags */}
+                      <TableCell>
+                        {flags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {flags.map(f => (
+                              <span
+                                key={f}
+                                className="text-xs font-medium"
+                                style={{ color: "var(--pw-hold)" }}
+                              >
+                                {f}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: "var(--pw-text-muted)" }}>—</span>
+                        )}
+                      </TableCell>
+
+                      {/* Age */}
+                      <TableCell className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
+                        {formatAge(payment.created_timestamp)}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
           )}
 
           {/* Table footer */}
-          {!isLoading && !error && (
-            <div
-              className="px-5 py-2.5 border-t text-xs"
-              style={{ borderColor: "var(--pw-border)", color: "var(--pw-text-muted)" }}
-            >
-              Showing {filtered.length} of {items.length} cases
-            </div>
-          )}
+          <div
+            className="px-5 py-2.5 border-t text-xs"
+            style={{ borderColor: "var(--pw-border)", color: "var(--pw-text-muted)" }}
+          >
+            {loadingData ? "Loading…" : `Showing ${filtered.length} of ${payments.length} cases`}
+          </div>
         </div>
       </div>
 
@@ -689,7 +670,7 @@ export default function QueueDashboard() {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
             Audit Active
           </div>
-          <span>User: Priya Venkataraman</span>
+          <span>User: {user?.name ?? "—"}</span>
         </div>
         <span style={{ color: "var(--pw-text-muted)" }}>
           Press <kbd className="rounded px-1 py-0.5 text-[10px]" style={{ background: "var(--pw-surface-elevated)" }}>?</kbd> for keyboard shortcuts
