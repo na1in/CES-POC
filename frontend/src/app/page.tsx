@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AlertTriangle, X, Search, Bell, Settings, CheckCircle2, Clock, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,10 +12,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { mockPayments, mockRecommendations, mockPaymentSignals } from "@/mocks/payments"
+import { listPayments, type PaymentRow } from "@/lib/api"
+import { useAuth } from "@/contexts/auth"
 import type { ScenarioRoute } from "@/types/recommendation"
-import type { PaymentMethod, Payment } from "@/types/payment"
-import type { PaymentSignals } from "@/types/signals"
+import type { PaymentMethod } from "@/types/payment"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -50,16 +50,9 @@ function getBand(score: number): ConfidenceBand {
   return "High"
 }
 
-function getFlags(payment: Payment, signals: PaymentSignals | undefined): string[] {
+function getFlags(payment: PaymentRow): string[] {
   const flags: string[] = []
-  if (!signals) return flags
-  if (signals.duplicate.is_duplicate_match) flags.push("Duplicate")
-  if (signals.amount.amount_variance_pct > 2) flags.push("Amount Variance")
-  if (signals.risk.risk_flag_types.length > 0) {
-    signals.risk.risk_flag_types.forEach(f =>
-      flags.push(f.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()))
-    )
-  }
+  if (payment.has_risk_flags) flags.push("Risk Flag")
   if (payment.sla_breached) flags.push("SLA Breach")
   return flags
 }
@@ -137,6 +130,15 @@ function ConfidencePct({ score }: { score: number }) {
 // ── Nav ───────────────────────────────────────────────────────────────────────
 
 function Nav() {
+  const { user, logout } = useAuth()
+  const router = useRouter()
+  const initials = user?.name.split(" ").map(w => w[0]).join("").slice(0, 2) ?? "?"
+
+  function handleLogout() {
+    logout()
+    router.push("/login")
+  }
+
   return (
     <nav
       className="flex items-center gap-3 px-5 border-b"
@@ -180,24 +182,26 @@ function Nav() {
       <Bell size={18} style={{ color: "var(--pw-text-secondary)" }} />
       <Settings size={18} style={{ color: "var(--pw-text-secondary)" }} />
 
-      {/* Avatar */}
-      <div
+      {/* Avatar + logout */}
+      <button
+        onClick={handleLogout}
+        title={`${user?.name} (${user?.role}) — click to sign out`}
         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
-        style={{ background: "var(--pw-primary)" }}
+        style={{ background: "var(--pw-primary)", border: "none", cursor: "pointer" }}
       >
-        PV
-      </div>
+        {initials}
+      </button>
     </nav>
   )
 }
 
 // ── Stat cards ────────────────────────────────────────────────────────────────
 
-function StatCards() {
-  const total = mockPayments.length
-  const onHold = mockPayments.filter(p => p.status === "held").length
-  const escalated = mockPayments.filter(p => p.status === "escalated" || p.status === "pending_sender_response").length
-  const applied = mockPayments.filter(p => p.status === "applied").length
+function StatCards({ payments }: { payments: PaymentRow[] }) {
+  const total = payments.length
+  const onHold = payments.filter(p => p.status === "held").length
+  const escalated = payments.filter(p => p.status === "escalated" || p.status === "pending_sender_response").length
+  const applied = payments.filter(p => p.status === "applied").length
 
   return (
     <div
@@ -284,12 +288,22 @@ function StatCards() {
 
 export default function QueueDashboard() {
   const router = useRouter()
+  const { user } = useAuth()
 
+  const [payments, setPayments] = useState<PaymentRow[]>([])
+  const [loadingData, setLoadingData] = useState(true)
   const [scenarioFilter, setScenarioFilter] = useState<Set<ScenarioRoute>>(new Set())
   const [bandFilter, setBandFilter] = useState<Set<ConfidenceBand>>(new Set())
   const [methodFilter, setMethodFilter] = useState<Set<PaymentMethod>>(new Set())
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [sortKey, setSortKey] = useState<string>("confidence_desc")
+
+  useEffect(() => {
+    listPayments({ page_size: 200 })
+      .then(res => setPayments(res.payments))
+      .catch(console.error)
+      .finally(() => setLoadingData(false))
+  }, [])
 
   function toggle<T>(set: Set<T>, value: T): Set<T> {
     const next = new Set(set)
@@ -304,12 +318,12 @@ export default function QueueDashboard() {
   }
 
   const hasFilters = scenarioFilter.size > 0 || bandFilter.size > 0 || methodFilter.size > 0
-  const failedCount = mockPayments.filter(p => p.status === "processing_failed").length
-  const openCount = mockPayments.filter(p => p.status !== "applied" && p.status !== "returned").length
-  const closedCount = mockPayments.filter(p => p.status === "applied" || p.status === "returned").length
+  const failedCount = payments.filter(p => p.status === "processing_failed").length
+  const openCount = payments.filter(p => p.status !== "applied" && p.status !== "returned").length
+  const closedCount = payments.filter(p => p.status === "applied" || p.status === "returned").length
 
-  const rows = mockPayments
-    .map(p => ({ payment: p, rec: mockRecommendations[p.payment_id] ?? null }))
+  const rows = payments
+    .map(p => ({ payment: p, rec: p }))
     .sort((a, b) => {
       switch (sortKey) {
         case "confidence_desc": return (b.rec?.confidence_score ?? 0) - (a.rec?.confidence_score ?? 0)
@@ -325,10 +339,9 @@ export default function QueueDashboard() {
     })
 
   const filtered = rows.filter(({ payment, rec }) => {
-    if (!rec) return true
-    if (scenarioFilter.size > 0 && !scenarioFilter.has(rec.scenario_route)) return false
-    if (bandFilter.size > 0 && !bandFilter.has(getBand(rec.confidence_score))) return false
-    if (methodFilter.size > 0 && !methodFilter.has(payment.payment_method)) return false
+    if (scenarioFilter.size > 0 && rec.scenario_route && !scenarioFilter.has(rec.scenario_route as ScenarioRoute)) return false
+    if (bandFilter.size > 0 && rec.confidence_score != null && !bandFilter.has(getBand(rec.confidence_score))) return false
+    if (methodFilter.size > 0 && !methodFilter.has(payment.payment_method as PaymentMethod)) return false
     return true
   })
 
@@ -355,7 +368,7 @@ export default function QueueDashboard() {
         </div>
 
         {/* Stat cards */}
-        <StatCards />
+        <StatCards payments={payments} />
 
         {/* Processing-failed banner */}
         {failedCount > 0 && !bannerDismissed && (
@@ -549,9 +562,8 @@ export default function QueueDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map(({ payment, rec }) => {
-                  const signals = mockPaymentSignals[payment.payment_id]
-                  const flags = getFlags(payment, signals)
+                {filtered.map(({ payment }) => {
+                  const flags = getFlags(payment)
                   return (
                     <TableRow
                       key={payment.payment_id}
@@ -587,17 +599,17 @@ export default function QueueDashboard() {
 
                       {/* Recommendation */}
                       <TableCell>
-                        {rec ? (
-                          <RecBadge rec={rec.recommendation} />
+                        {payment.recommendation ? (
+                          <RecBadge rec={payment.recommendation as "apply" | "hold" | "escalate"} />
                         ) : (
-                          <span className="pw-badge pw-badge-neutral">FAILED</span>
+                          <span className="pw-badge pw-badge-neutral">PENDING</span>
                         )}
                       </TableCell>
 
                       {/* Confidence */}
                       <TableCell>
-                        {rec ? (
-                          <ConfidencePct score={rec.confidence_score} />
+                        {payment.confidence_score != null ? (
+                          <ConfidencePct score={payment.confidence_score} />
                         ) : (
                           <span style={{ color: "var(--pw-text-muted)" }}>—</span>
                         )}
@@ -638,7 +650,7 @@ export default function QueueDashboard() {
             className="px-5 py-2.5 border-t text-xs"
             style={{ borderColor: "var(--pw-border)", color: "var(--pw-text-muted)" }}
           >
-            Showing {filtered.length} of {mockPayments.length} cases
+            {loadingData ? "Loading…" : `Showing ${filtered.length} of ${payments.length} cases`}
           </div>
         </div>
       </div>
@@ -658,8 +670,7 @@ export default function QueueDashboard() {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
             Audit Active
           </div>
-          <span>User: Priya Venkataraman</span>
-          <span>Last sync: 2 minutes ago</span>
+          <span>User: {user?.name ?? "—"}</span>
         </div>
         <span style={{ color: "var(--pw-text-muted)" }}>
           Press <kbd className="rounded px-1 py-0.5 text-[10px]" style={{ background: "var(--pw-surface-elevated)" }}>?</kbd> for keyboard shortcuts

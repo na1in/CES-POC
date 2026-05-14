@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Bell, Settings as SettingsIcon, Shield, ChevronDown } from "lucide-react"
-import { mockThresholds, mockUsers } from "@/mocks/thresholds"
-import type { UserRole } from "@/types/user"
+import { getThresholds, type Threshold } from "@/lib/api"
+import { useAuth } from "@/contexts/auth"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -18,11 +18,17 @@ function formatDate(iso: string): string {
 
 export default function SettingsPage() {
   const router = useRouter()
-  const [activeRole, setActiveRole] = useState<UserRole>("analyst")
+  const { user, logout } = useAuth()
+  const [thresholds, setThresholds] = useState<Threshold[]>([])
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
 
-  const currentUser = mockUsers.find(u => u.role === activeRole) ?? mockUsers[0]
-  const isAdmin = activeRole === "admin"
+  const isAdmin = user?.role === "admin"
+
+  useEffect(() => {
+    getThresholds()
+      .then(res => setThresholds(res.thresholds))
+      .catch(console.error)
+  }, [])
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--pw-bg)", display: "flex", flexDirection: "column" }}>
@@ -80,9 +86,9 @@ export default function SettingsPage() {
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "#fff", fontWeight: 700, fontSize: 10,
             }}>
-              {currentUser.name.split(" ").map(w => w[0]).join("").slice(0, 2)}
+              {user?.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) ?? "?"}
             </div>
-            {currentUser.name.split(" ")[0]}
+            {user?.name.split(" ")[0] ?? "User"}
             <ChevronDown size={12} />
           </button>
           {roleMenuOpen && (
@@ -92,23 +98,20 @@ export default function SettingsPage() {
               borderRadius: 8, boxShadow: "var(--pw-shadow-md)", zIndex: 60,
               minWidth: 180, overflow: "hidden",
             }}>
-              {mockUsers.map(u => (
-                <button
-                  key={u.user_id}
-                  onClick={() => { setActiveRole(u.role); setRoleMenuOpen(false) }}
-                  style={{
-                    display: "block", width: "100%", textAlign: "left",
-                    padding: "9px 14px", fontSize: 13, cursor: "pointer",
-                    background: u.role === activeRole ? "var(--pw-bg)" : "transparent",
-                    border: "none", color: "var(--pw-text-primary)",
-                  }}
-                >
-                  {u.name}
-                  <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>
-                    ({u.role})
-                  </span>
-                </button>
-              ))}
+              <button
+                onClick={() => { logout(); router.push("/login"); setRoleMenuOpen(false) }}
+                style={{
+                  display: "block", width: "100%", textAlign: "left",
+                  padding: "9px 14px", fontSize: 13, cursor: "pointer",
+                  background: "transparent",
+                  border: "none", color: "var(--pw-escalate)",
+                }}
+              >
+                Sign out
+                <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>
+                  ({user?.role})
+                </span>
+              </button>
             </div>
           )}
         </div>
@@ -184,11 +187,11 @@ export default function SettingsPage() {
               </tr>
             </thead>
             <tbody>
-              {mockThresholds.map((t, i) => (
+              {thresholds.map((t, i) => (
                 <tr
                   key={t.parameter_name}
                   style={{
-                    borderBottom: i < mockThresholds.length - 1 ? "1px solid var(--pw-border)" : "none",
+                    borderBottom: i < thresholds.length - 1 ? "1px solid var(--pw-border)" : "none",
                     background: "transparent",
                   }}
                 >
@@ -248,7 +251,7 @@ export default function SettingsPage() {
         </div>
 
         <p style={{ fontSize: 12, color: "var(--pw-text-muted)", marginTop: 14 }}>
-          {mockThresholds.length} thresholds · Changes require admin approval and are versioned in the audit log.
+          {thresholds.length} thresholds · Changes require admin approval and are versioned in the audit log.
         </p>
       </div>
 
@@ -260,8 +263,8 @@ export default function SettingsPage() {
         color: "var(--pw-text-muted)", position: "sticky", bottom: 0, zIndex: 40,
       }}>
         <span style={{ color: "var(--pw-apply)", fontWeight: 600 }}>● Audit Active</span>
-        <span>User: {currentUser.name}</span>
-        <span>Role: {currentUser.role}</span>
+        <span>User: {user?.name ?? "—"}</span>
+        <span>Role: {user?.role ?? "—"}</span>
         <span style={{ marginLeft: "auto" }}>
           Press{" "}
           <kbd style={{ background: "var(--pw-surface-elevated)", padding: "1px 5px", borderRadius: 3, fontFamily: "var(--pw-font-mono)" }}>?</kbd>

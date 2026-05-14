@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Bell, Settings as SettingsIcon, ChevronDown,
@@ -9,9 +9,8 @@ import {
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid,
 } from "recharts"
-import { mockAnalyticsDecisions } from "@/mocks/analytics"
-import { mockUsers } from "@/mocks/thresholds"
-import type { UserRole } from "@/types/user"
+import { getAnalyticsDecisions, type AnalyticsDecisions } from "@/lib/api"
+import { useAuth } from "@/contexts/auth"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -71,19 +70,32 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+const EMPTY_ANALYTICS: AnalyticsDecisions = {
+  summary: {
+    auto_applied: 0, applied_human_review: 0, applied_human_override: 0,
+    held_pending_review: 0, escalated_by_ai: 0, escalated_by_human: 0,
+    human_overrides: 0, returned: 0, total_processed: 0, override_rate_pct: 0,
+  },
+  by_scenario: [],
+  by_payment_method: [],
+  confidence_histogram: {},
+}
+
 export default function GovernancePage() {
   const router = useRouter()
-  const [activeRole, setActiveRole] = useState<UserRole>("director")
+  const { user, logout } = useAuth()
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
-  const [dateFrom, setDateFrom] = useState("2026-03-30")
-  const [dateTo, setDateTo] = useState("2026-04-29")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
+  const [analytics, setAnalytics] = useState<AnalyticsDecisions>(EMPTY_ANALYTICS)
 
-  const currentUser = mockUsers.find(u => u.role === activeRole) ?? mockUsers[0]
+  useEffect(() => {
+    getAnalyticsDecisions({ from_date: dateFrom || undefined, to_date: dateTo || undefined })
+      .then(setAnalytics)
+      .catch(console.error)
+  }, [dateFrom, dateTo])
 
-  // In a real app this would re-fetch; for the PoC we use mock data regardless of range
-  const data = useMemo(() => mockAnalyticsDecisions, [dateFrom, dateTo])
-
-  const { summary, by_payment_method, override_rate_trend, confidence_histogram, sla_adherence } = data
+  const { summary, by_payment_method, confidence_histogram } = analytics
 
   const inputStyle: React.CSSProperties = {
     border: "1px solid var(--pw-border)",
@@ -151,9 +163,9 @@ export default function GovernancePage() {
               display: "flex", alignItems: "center", justifyContent: "center",
               color: "#fff", fontWeight: 700, fontSize: 10,
             }}>
-              {currentUser.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}
+              {user?.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) ?? "?"}
             </div>
-            {currentUser.name.split(" ")[0]}
+            {user?.name.split(" ")[0] ?? "User"}
             <ChevronDown size={12} />
           </button>
           {roleMenuOpen && (
@@ -163,21 +175,18 @@ export default function GovernancePage() {
               borderRadius: 8, boxShadow: "var(--pw-shadow-md)", zIndex: 60,
               minWidth: 180, overflow: "hidden",
             }}>
-              {mockUsers.map((u: { user_id: string; role: UserRole; name: string }) => (
-                <button
-                  key={u.user_id}
-                  onClick={() => { setActiveRole(u.role); setRoleMenuOpen(false) }}
-                  style={{
-                    display: "block", width: "100%", textAlign: "left",
-                    padding: "9px 14px", fontSize: 13, cursor: "pointer",
-                    background: u.role === activeRole ? "var(--pw-bg)" : "transparent",
-                    border: "none", color: "var(--pw-text-primary)",
-                  }}
-                >
-                  {u.name}
-                  <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>({u.role})</span>
-                </button>
-              ))}
+              <button
+                onClick={() => { logout(); router.push("/login"); setRoleMenuOpen(false) }}
+                style={{
+                  display: "block", width: "100%", textAlign: "left",
+                  padding: "9px 14px", fontSize: 13, cursor: "pointer",
+                  background: "transparent",
+                  border: "none", color: "var(--pw-escalate)",
+                }}
+              >
+                Sign out
+                <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>({user?.role})</span>
+              </button>
             </div>
           )}
         </div>
@@ -226,7 +235,7 @@ export default function GovernancePage() {
           </div>
         </div>
         <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "4px 0 0" }}>
-          Performance metrics, SLA tracking & audit exports for {data.date_from} – {data.date_to}.
+          Performance metrics, SLA tracking & audit exports.
         </p>
       </div>
 
@@ -237,15 +246,15 @@ export default function GovernancePage() {
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
           <StatCard
             label="Auto-Applied by AI"
-            value={summary.auto_applied_by_ai}
-            sub={`${Math.round(summary.auto_applied_by_ai / summary.total_payments * 100)}% of total`}
+            value={summary.auto_applied}
+            sub={summary.total_processed > 0 ? `${Math.round(summary.auto_applied / summary.total_processed * 100)}% of total` : undefined}
             icon={<CheckCircle2 size={18} />}
             iconColor="var(--pw-apply)"
             iconBg="var(--pw-apply-tint)"
           />
           <StatCard
             label="Applied after Human Review"
-            value={summary.applied_after_human_review}
+            value={summary.applied_human_review}
             icon={<Users size={18} />}
             iconColor="var(--pw-apply)"
             iconBg="var(--pw-apply-tint)"
@@ -287,15 +296,15 @@ export default function GovernancePage() {
           <ChartCard title="Payment Method Breakdown">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={by_payment_method} barCategoryGap="30%">
-                <XAxis dataKey="method" tick={{ fontSize: 12, fill: "var(--pw-text-secondary)" }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="payment_method" tick={{ fontSize: 12, fill: "var(--pw-text-secondary)" }} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--pw-text-muted)" }} axisLine={false} tickLine={false} width={30} />
                 <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--pw-text-muted)" }} axisLine={false} tickLine={false} unit="%" width={36} />
                 <Tooltip
                   contentStyle={{ border: "1px solid var(--pw-border)", borderRadius: 8, fontSize: 12 }}
                   cursor={{ fill: "var(--pw-bg)" }}
                 />
-                <Bar yAxisId="left" dataKey="count" name="Count" fill="#7C4DFF" radius={[4, 4, 0, 0]} />
-                <Bar yAxisId="right" dataKey="auto_apply_rate_pct" name="Auto-apply rate %" fill="#10B981" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="left" dataKey="volume" name="Count" fill="#7C4DFF" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="right" dataKey="ai_autonomous" name="AI Autonomous" fill="#10B981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
             <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
@@ -317,16 +326,16 @@ export default function GovernancePage() {
               <p style={{
                 fontSize: 52, fontWeight: 800,
                 fontFamily: "var(--pw-font-display)",
-                color: sla_adherence.adherence_pct >= 90 ? "var(--pw-apply)" : "var(--pw-hold)",
+                color: "var(--pw-apply)",
                 margin: 0, lineHeight: 1,
               }}>
-                {sla_adherence.adherence_pct}%
+                —
               </p>
               <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "10px 0 0" }}>
                 Escalations resolved before SLA breach
               </p>
               <p style={{ fontSize: 12, color: "var(--pw-text-muted)", margin: "6px 0 0" }}>
-                {sla_adherence.resolved_before_breach} of {sla_adherence.total_escalations} cases
+                {summary.escalated_by_ai + summary.escalated_by_human} total escalations
               </p>
             </div>
           </div>
@@ -335,39 +344,20 @@ export default function GovernancePage() {
         {/* ── Charts row 2: Override rate trend + Confidence histogram ── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
-          <ChartCard title="Override Rate Trend">
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={override_rate_trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--pw-border)" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11, fill: "var(--pw-text-muted)" }}
-                  axisLine={false} tickLine={false}
-                  tickFormatter={d => d.slice(5)}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "var(--pw-text-muted)" }}
-                  axisLine={false} tickLine={false}
-                  unit="%" domain={[0, 15]} width={36}
-                />
-                <Tooltip
-                  contentStyle={{ border: "1px solid var(--pw-border)", borderRadius: 8, fontSize: 12 }}
-                  formatter={(v) => [`${v}%`, "Override rate"]}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="override_rate_pct"
-                  stroke="#7C4DFF"
-                  strokeWidth={2}
-                  dot={{ r: 4, fill: "#7C4DFF" }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+          <ChartCard title="Override Rate">
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 200 }}>
+              <p style={{ fontSize: 52, fontWeight: 800, fontFamily: "var(--pw-font-display)", color: "var(--pw-primary)", margin: 0 }}>
+                {summary.override_rate_pct}%
+              </p>
+              <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "10px 0 0" }}>
+                {summary.human_overrides} overrides of {summary.total_processed} total
+              </p>
+            </div>
           </ChartCard>
 
           <ChartCard title="Confidence Score Histogram">
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={confidence_histogram} barCategoryGap="20%">
+              <BarChart data={Object.entries(confidence_histogram).map(([bucket, count]) => ({ bucket, count }))} barCategoryGap="20%">
                 <XAxis dataKey="bucket" tick={{ fontSize: 11, fill: "var(--pw-text-secondary)" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: "var(--pw-text-muted)" }} axisLine={false} tickLine={false} width={30} />
                 <Tooltip
@@ -390,8 +380,8 @@ export default function GovernancePage() {
         color: "var(--pw-text-muted)", position: "sticky", bottom: 0, zIndex: 40,
       }}>
         <span style={{ color: "var(--pw-apply)", fontWeight: 600 }}>● Audit Active</span>
-        <span>User: {currentUser.name}</span>
-        <span>Role: {currentUser.role}</span>
+        <span>User: {user?.name ?? "—"}</span>
+        <span>Role: {user?.role ?? "—"}</span>
         <span style={{ marginLeft: "auto" }}>
           Press{" "}
           <kbd style={{ background: "var(--pw-surface-elevated)", padding: "1px 5px", borderRadius: 3, fontFamily: "var(--pw-font-mono)" }}>?</kbd>

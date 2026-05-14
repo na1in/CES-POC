@@ -1,15 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle2, Clock } from "lucide-react"
 import {
-  mockPayments,
-  mockPaymentSignals,
-  mockRecommendations,
-  mockAuditLogs,
-  mockAnnotations,
-} from "@/mocks/payments"
+  getPayment, approvePayment, rejectPayment, overridePayment, returnPayment, reprocessPayment,
+  type PaymentDetail,
+} from "@/lib/api"
+import { useAuth } from "@/contexts/auth"
 
 // ── Mock policy data (keyed by policy ID) ─────────────────────────────────────
 
@@ -142,25 +140,73 @@ export default function PaymentDetail() {
   const params = useParams()
   const rawId = params?.id
   const id = Array.isArray(rawId) ? rawId[0] : rawId
+  const { user, logout } = useAuth()
 
-  const payment = mockPayments.find(p => p.payment_id === id)
-  const signals = id ? mockPaymentSignals[id] : undefined
-  const rec = id ? mockRecommendations[id] : undefined
-  const logs = id ? (mockAuditLogs[id] ?? []) : []
-  const annotations = id ? (mockAnnotations[id] ?? []) : []
-
+  const [detail, setDetail] = useState<PaymentDetail | null>(null)
+  const [loading, setLoading] = useState(true)
   const [overrideOpen, setOverrideOpen] = useState(false)
   const [overrideReason, setOverrideReason] = useState("")
   const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!id) return
+    getPayment(id)
+      .then(setDetail)
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [id])
 
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(null), 3000)
   }
 
-  // ── Not found ──────────────────────────────────────────────────────────────
+  async function handleApprove() {
+    if (!id) return
+    await approvePayment(id)
+    showToast("Payment approved and applied")
+    getPayment(id).then(setDetail)
+  }
 
-  if (!payment) {
+  async function handleReject() {
+    if (!id) return
+    await rejectPayment(id)
+    showToast("Payment escalated for investigation")
+    getPayment(id).then(setDetail)
+  }
+
+  async function handleOverride(action: string) {
+    if (!id || !overrideReason.trim()) return
+    await overridePayment(id, action, overrideReason)
+    showToast(`Override applied: ${action}`)
+    setOverrideOpen(false)
+    setOverrideReason("")
+    getPayment(id).then(setDetail)
+  }
+
+  async function handleReturn() {
+    if (!id) return
+    await returnPayment(id)
+    showToast("Payment returned to sender")
+    getPayment(id).then(setDetail)
+  }
+
+  async function handleReprocess() {
+    if (!id) return
+    await reprocessPayment(id)
+    showToast("Reprocess request submitted")
+    getPayment(id).then(setDetail)
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--pw-bg)" }}>
+        <p style={{ fontSize: 14, color: "var(--pw-text-muted)" }}>Loading…</p>
+      </div>
+    )
+  }
+
+  if (!detail) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--pw-bg)" }}>
         <div style={{ textAlign: "center" }}>
@@ -176,7 +222,16 @@ export default function PaymentDetail() {
     )
   }
 
-  const policyId = payment.matched_policy_id
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payment = detail.payment as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const signals = detail.signals as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rec = detail.recommendation as any
+  const logs = detail.audit_trail
+  const annotations = detail.annotations
+
+  const policyId = payment.matched_policy_id as string | null
   const policy = policyId ? POLICY_INFO[policyId] : null
   const paymentHistory = policyId ? (PAYMENT_HISTORY[policyId] ?? []) : []
 
@@ -195,11 +250,11 @@ export default function PaymentDetail() {
     rec?.recommendation === "hold" ? "rgba(245,158,11,0.4)" :
     "rgba(239,68,68,0.4)"
 
-  const nameSimilarity = signals?.matching.name_similarity_score ?? 0
-  const variance = signals?.amount.amount_variance_pct ?? 0
-  const isDuplicate = signals?.duplicate.is_duplicate_match ?? false
-  const duplicateOf = signals?.duplicate.duplicate_payment_id
-  const usedLLM = signals?.matching.used_llm ?? false
+  const nameSimilarity = signals?.matching?.name_similarity_score ?? 0
+  const variance = signals?.amount?.amount_variance_pct ?? 0
+  const isDuplicate = signals?.duplicate?.is_duplicate_match ?? false
+  const duplicateOf = signals?.duplicate?.duplicate_payment_id
+  const usedLLM = signals?.matching?.used_llm ?? false
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--pw-bg)", display: "flex", flexDirection: "column" }}>
@@ -237,13 +292,17 @@ export default function PaymentDetail() {
         </div>
         <Bell size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
         <Settings size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
-        <div style={{
-          width: 28, height: 28, borderRadius: "50%", background: "var(--pw-primary)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          color: "#fff", fontWeight: 700, fontSize: 11,
-        }}>
-          PV
-        </div>
+        <button
+          onClick={() => { logout(); router.push("/login") }}
+          title={`${user?.name} — sign out`}
+          style={{
+            width: 28, height: 28, borderRadius: "50%", background: "var(--pw-primary)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontWeight: 700, fontSize: 11, border: "none", cursor: "pointer",
+          }}
+        >
+          {user?.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) ?? "?"}
+        </button>
       </nav>
 
       {/* Page header */}
@@ -385,7 +444,7 @@ export default function PaymentDetail() {
           {payment.status === "held" && rec && (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button
-                onClick={() => showToast(`Payment ${payment.payment_id} marked as approved`)}
+                onClick={handleApprove}
                 style={{
                   background: recColor, color: "#fff", border: "none",
                   borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13,
@@ -408,7 +467,7 @@ export default function PaymentDetail() {
                 Override Recommendation
               </button>
               <button
-                onClick={() => showToast(`Payment ${payment.payment_id} escalated`)}
+                onClick={handleReject}
                 style={{
                   background: "transparent", color: "var(--pw-escalate)",
                   border: "1px solid var(--pw-escalate)", borderRadius: 8,
@@ -433,7 +492,7 @@ export default function PaymentDetail() {
           {(payment.status === "escalated" || payment.status === "pending_sender_response") && (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button
-                onClick={() => showToast("Marked as returned to sender")}
+                onClick={handleReturn}
                 style={{
                   background: "var(--pw-text-primary)", color: "#fff", border: "none",
                   borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: "pointer",
@@ -457,7 +516,7 @@ export default function PaymentDetail() {
           {payment.status === "processing_failed" && (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button
-                onClick={() => showToast("Reprocess request submitted")}
+                onClick={handleReprocess}
                 style={{
                   background: "var(--pw-hold)", color: "#fff", border: "none",
                   borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: "pointer",
@@ -578,7 +637,7 @@ export default function PaymentDetail() {
                       </p>
                       {log.details && (
                         <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>
-                          {Object.entries(log.details as Record<string, unknown>)
+                          {Object.entries(log.details as unknown as Record<string, unknown>)
                             .map(([k, v]) => `${k}: ${v}`)
                             .join(", ")}
                         </p>
@@ -742,11 +801,7 @@ export default function PaymentDetail() {
               </button>
               <button
                 disabled={overrideReason.trim().length === 0}
-                onClick={() => {
-                  showToast("Override recorded")
-                  setOverrideOpen(false)
-                  setOverrideReason("")
-                }}
+                onClick={() => handleOverride(rec?.recommendation?.toUpperCase() ?? "ESCALATE")}
                 style={{
                   background: overrideReason.trim() ? "var(--pw-primary)" : "var(--pw-text-muted)",
                   color: "#fff", border: "none", borderRadius: 8,

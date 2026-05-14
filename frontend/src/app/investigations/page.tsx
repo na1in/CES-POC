@@ -1,13 +1,13 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Search, Bell, Settings, Clock, AlertTriangle, CheckCircle2, Search as SearchIcon } from "lucide-react"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
-import { mockPayments, mockPaymentSignals, mockRecommendations, mockAuditLogs } from "@/mocks/payments"
-import type { Payment } from "@/types/payment"
-import type { AuditLogEntry } from "@/types/user"
+import { listPayments, type PaymentRow } from "@/lib/api"
+import { useAuth } from "@/contexts/auth"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -44,32 +44,23 @@ function formatToday(): string {
 type RiskLevel = "high" | "medium" | "low"
 type InvestigationStatus = "sla_breached" | "pending_outreach" | "new"
 
-function getRiskLevel(paymentId: string): RiskLevel {
-  const signals = mockPaymentSignals[paymentId]
-  if (!signals) return "medium"
-  if (signals.risk.has_risk_flags) return "high"
-  return signals.risk.payment_method_risk_level
+function getRiskLevel(payment: PaymentRow): RiskLevel {
+  if (payment.has_risk_flags) return "high"
+  return "medium"
 }
 
-function getInvestigationStatus(payment: Payment, logs: AuditLogEntry[]): InvestigationStatus {
+function getInvestigationStatus(payment: PaymentRow): InvestigationStatus {
   if (payment.sla_breached) return "sla_breached"
   if (payment.status === "pending_sender_response") return "pending_outreach"
-  if (logs.some(l => l.action_type === "contact_logged")) return "pending_outreach"
   return "new"
 }
 
-function getEscalationEntry(logs: AuditLogEntry[]): AuditLogEntry | null {
-  return [...logs].reverse().find(l => l.action_type === "escalated") ?? null
-}
-
-function getReason(paymentId: string): string {
-  const signals = mockPaymentSignals[paymentId]
-  const rec = mockRecommendations[paymentId]
-  if (signals?.duplicate?.is_duplicate_match) return "Duplicate payment detected within 72h"
-  if (rec?.scenario_route === "scenario_4") return "No matching customer found"
-  if (rec?.scenario_route === "scenario_3") return "High amount variance — 20% overpayment"
-  if (rec?.scenario_route === "scenario_2") return "Customer match, no policy reference"
-  return rec?.reasoning[0]?.slice(0, 60) ?? "—"
+function getReason(payment: PaymentRow): string {
+  if (payment.scenario_route === "scenario_5") return "Duplicate payment detected within 72h"
+  if (payment.scenario_route === "scenario_4") return "No matching customer found"
+  if (payment.scenario_route === "scenario_3") return "High amount variance"
+  if (payment.scenario_route === "scenario_2") return "Customer match, no policy reference"
+  return "—"
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -109,7 +100,7 @@ function StatusBadge({ status }: { status: InvestigationStatus }) {
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
 
-function Nav() {
+function Nav({ user, logout, router }: { user: { name: string } | null; logout: () => void; router: ReturnType<typeof import("next/navigation").useRouter> }) {
   return (
     <nav
       className="flex items-center gap-3 px-5 border-b"
@@ -148,12 +139,14 @@ function Nav() {
       </div>
       <Bell size={18} style={{ color: "var(--pw-text-secondary)" }} />
       <Settings size={18} style={{ color: "var(--pw-text-secondary)" }} />
-      <div
+      <button
+        onClick={() => { logout(); router.push("/login") }}
+        title={`${user?.name} — sign out`}
         className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
-        style={{ background: "var(--pw-primary)" }}
+        style={{ background: "var(--pw-primary)", border: "none", cursor: "pointer" }}
       >
-        DO
-      </div>
+        {user?.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) ?? "?"}
+      </button>
     </nav>
   )
 }
@@ -162,38 +155,42 @@ function Nav() {
 
 export default function InvestigationQueue() {
   const router = useRouter()
+  const { user, logout } = useAuth()
 
-  const investigationPayments = mockPayments.filter(
-    p => p.status === "escalated" || p.status === "pending_sender_response"
-  )
+  const [payments, setPayments] = useState<PaymentRow[]>([])
 
-  const sortedRows = investigationPayments
-    .map(p => {
-      const logs = mockAuditLogs[p.payment_id] ?? []
-      const escalationEntry = getEscalationEntry(logs)
-      const riskLevel = getRiskLevel(p.payment_id)
-      const invStatus = getInvestigationStatus(p, logs)
-      const reason = getReason(p.payment_id)
-      return { payment: p, logs, escalationEntry, riskLevel, invStatus, reason }
-    })
+  useEffect(() => {
+    listPayments({ page_size: 200 })
+      .then(res => {
+        const inv = res.payments.filter(
+          p => p.status === "escalated" || p.status === "pending_sender_response"
+        )
+        setPayments(inv)
+      })
+      .catch(console.error)
+  }, [])
+
+  const sortedRows = payments
+    .map(p => ({
+      payment: p,
+      riskLevel: getRiskLevel(p),
+      invStatus: getInvestigationStatus(p),
+      reason: getReason(p),
+    }))
     .sort((a, b) => {
-      const aFlagged = mockPaymentSignals[a.payment.payment_id]?.risk.has_risk_flags ?? false
-      const bFlagged = mockPaymentSignals[b.payment.payment_id]?.risk.has_risk_flags ?? false
-      if (aFlagged !== bFlagged) return aFlagged ? -1 : 1
-      const aTime = a.escalationEntry ? new Date(a.escalationEntry.timestamp).getTime() : 0
-      const bTime = b.escalationEntry ? new Date(b.escalationEntry.timestamp).getTime() : 0
-      return aTime - bTime
+      if (a.riskLevel !== b.riskLevel) {
+        const order = { high: 0, medium: 1, low: 2 }
+        return order[a.riskLevel] - order[b.riskLevel]
+      }
+      return new Date(a.payment.created_timestamp).getTime() - new Date(b.payment.created_timestamp).getTime()
     })
 
-  const fraudFlaggedCount = investigationPayments.filter(
-    p => mockPaymentSignals[p.payment_id]?.risk.has_risk_flags
-  ).length
-
+  const fraudFlaggedCount = payments.filter(p => p.has_risk_flags).length
   const pendingOutreachCount = sortedRows.filter(r => r.invStatus === "pending_outreach").length
 
   return (
     <div className="min-h-screen" style={{ background: "var(--pw-bg)" }}>
-      <Nav />
+      <Nav user={user} logout={logout} router={router} />
 
       <div className="px-6 py-5 space-y-5 max-w-[1400px] mx-auto">
         {/* Page header */}
@@ -227,7 +224,7 @@ export default function InvestigationQueue() {
                 Open Investigations
               </p>
               <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-                {investigationPayments.length}
+                {payments.length}
               </p>
             </div>
           </div>
@@ -336,7 +333,7 @@ export default function InvestigationQueue() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedRows.map(({ payment, escalationEntry, riskLevel, invStatus, reason }) => (
+                {sortedRows.map(({ payment, riskLevel, invStatus, reason }) => (
                   <TableRow
                     key={payment.payment_id}
                     className="cursor-pointer"
@@ -385,23 +382,12 @@ export default function InvestigationQueue() {
 
                     {/* Escalated by */}
                     <TableCell>
-                      {escalationEntry ? (
-                        <div>
-                          <p className="text-sm font-medium" style={{ color: "var(--pw-text-primary)" }}>
-                            {escalationEntry.actor === "system" ? "AI System" : escalationEntry.actor}
-                          </p>
-                          <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
-                            {formatEscalationDate(escalationEntry.timestamp)}
-                          </p>
-                        </div>
-                      ) : (
-                        <span style={{ color: "var(--pw-text-muted)" }}>—</span>
-                      )}
+                      <span style={{ color: "var(--pw-text-muted)" }}>AI System</span>
                     </TableCell>
 
                     {/* Age */}
                     <TableCell className="text-sm font-medium" style={{ color: "var(--pw-text-secondary)" }}>
-                      {escalationEntry ? formatTimeSince(escalationEntry.timestamp) : "—"}
+                      {formatTimeSince(payment.created_timestamp)}
                     </TableCell>
 
                     {/* Status */}
@@ -459,7 +445,7 @@ export default function InvestigationQueue() {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
             Audit Active
           </div>
-          <span>User: Damien Okafor</span>
+          <span>User: {user?.name ?? "—"}</span>
           <span>Last sync: 2 minutes ago</span>
         </div>
         <span>
