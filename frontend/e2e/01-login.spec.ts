@@ -13,7 +13,7 @@ test.describe("Login", () => {
   test("analyst lands on queue dashboard", async ({ page }) => {
     await loginAs(page, ANALYST)
     await expect(page).toHaveURL("/")
-    await expect(page.getByRole("heading", { name: /payment queue/i })).toBeVisible()
+    await expect(page.getByRole("heading", { name: /payment operations queue/i })).toBeVisible()
   })
 
   test("investigator lands on investigation queue", async ({ page }) => {
@@ -33,9 +33,8 @@ test.describe("Login", () => {
 
   test("sign out returns to login page", async ({ page }) => {
     await loginAs(page, ANALYST)
-    // Open user menu and sign out
-    await page.getByRole("button", { name: /priya/i }).click()
-    await page.getByText(/sign out/i).click()
+    // Avatar button shows initials "PS"; clicking it directly signs out
+    await page.getByRole("button", { name: /PS/i }).click()
     await expect(page).toHaveURL("/login")
   })
 

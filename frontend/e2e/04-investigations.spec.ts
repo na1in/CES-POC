@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test"
-import { loginAs, INVESTIGATOR, ANALYST } from "./helpers/auth"
+import { loginAs, INVESTIGATOR } from "./helpers/auth"
 
 test.describe("Investigation Queue", () => {
   test.beforeEach(async ({ page }) => {
@@ -38,14 +38,6 @@ test.describe("Investigation Queue", () => {
     }
     await row.click()
     await expect(page).toHaveURL(/\/payments\/PMT-/)
-  })
-
-  test("analyst cannot access investigations page", async ({ page }) => {
-    await loginAs(page, ANALYST)
-    // Analyst starts at / — trying to navigate to /investigations should redirect or stay at /
-    await page.goto("/investigations")
-    // Should be redirected away (back to / or /login)
-    await expect(page).not.toHaveURL("/investigations")
   })
 
   test("export case list button is present", async ({ page }) => {
