@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 _client: openai.AsyncOpenAI | None = None
 
-_MODEL = "google/gemini-2.5-flash-preview"
+_MODEL = "google/gemini-2.5-flash"
 _OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 
 

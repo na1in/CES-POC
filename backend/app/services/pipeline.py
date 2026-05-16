@@ -205,9 +205,10 @@ async def _resolve_customer_and_policy(
             customer_id = best["customer_id"]
 
     if customer_id is None:
-        # No match — stub customer so the signal engine can still compute a near-zero similarity
+        # No match — empty name produces near-zero similarity so the router reaches Scenario 4.
+        # Using the sender's own name here would give 100% self-similarity and bypass Sc4 routing.
         stub = {
-            "customer_name": payment["sender_name"],
+            "customer_name": "",
             "status": "active",
             "outstanding_balance_cents": 0,
             "next_due_date": None,
