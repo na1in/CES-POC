@@ -36,8 +36,10 @@ def compute_timing(
 
     days_since_last = None
     if last_payment_date is not None:
-        delta = payment_date - last_payment_date
-        days_since_last = delta.days
+        # Normalize to date for subtraction — last_payment_date may arrive as date or datetime
+        pmt_d = payment_date.date() if isinstance(payment_date, datetime) else payment_date
+        lpd_d = last_payment_date.date() if isinstance(last_payment_date, datetime) else last_payment_date
+        days_since_last = (pmt_d - lpd_d).days
 
     return {
         "payment_timing_quality": timing_quality,

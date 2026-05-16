@@ -27,7 +27,7 @@ def _decide(
     name_score = float(signals.get("name_similarity_score", 0))
     is_third_party = signals.get("is_third_party_payment", False)
     third_party_rel = signals.get("third_party_relationship") or "unknown"
-    variance = abs(float(signals.get("amount_variance_pct", 0)))
+    variance = abs(float(signals.get("amount_variance_pct") or 0))
     has_policy = bool(context.get("policy_id"))
 
     # Third-party check first: valid policy + detected third-party pattern + reasonable amount
@@ -61,7 +61,7 @@ async def run(payment: dict, signals: dict, context: dict, thresholds: dict) -> 
         f"- Best customer match: {best_match_name} ({name_score:.0f}% similarity) — below 75% threshold\n"
         f"- Third-party indicator: {is_third_party} ({third_party_rel})\n"
         f"- Policy reference found: {bool(context.get('policy_id'))}\n"
-        f"- Amount variance: {signals.get('amount_variance_pct', 0):.1f}%\n"
+        f"- Amount variance: {signals.get('amount_variance_pct') or 0:.1f}%\n"
         f"- Payment method: {payment.get('payment_method', 'unknown')}"
     )
 

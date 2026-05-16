@@ -9,7 +9,7 @@ AI agent that processes unidentified/miscellaneous insurance payments and recomm
 - FastAPI (async)
 - PostgreSQL with SQLAlchemy (async) + asyncpg
 - Protobuf (proto3)
-- Claude API (`anthropic` SDK) for AI agent components
+- OpenRouter (OpenAI-compatible SDK) for AI agent components — model: `google/gemini-2.5-flash`
 - jellyfish (Jaro-Winkler, Levenshtein, Soundex for name matching)
 
 ## Rules
@@ -42,13 +42,13 @@ Always before making any changes, search the web for the newest chanes and only 
 - When updating decision logic, update in this order: protos → schema → scenario docs → architecture docs → reference docs
 
 ## Architecture (5-Stage Pipeline)
-1. **Ingest** (code + Claude API) — validate fields, parse free-text references to extract policy numbers/intent/period count, persist payment as RECEIVED
-2. **Compute Signals** (code + Claude Haiku for gray-zone names) — 19 signals in 3 dependency waves, snapshot to `payment_signals`
-3. **AI Agent** (deterministic router + Claude API reasoning) — Scenario 5 runs first (duplicate check), then route to 1-4. Produces structured recommendation JSON
+1. **Ingest** (code + Gemini 2.5 Flash via OpenRouter) — validate fields, parse free-text references to extract policy numbers/intent/period count, persist payment as RECEIVED
+2. **Compute Signals** (code + Gemini 2.5 Flash for gray-zone names) — 19 signals in 3 dependency waves, snapshot to `payment_signals`
+3. **AI Agent** (deterministic router + Gemini 2.5 Flash reasoning) — Scenario 5 runs first (duplicate check), then route to 1-4. Produces structured recommendation JSON
 4. **Persist** (code) — single DB transaction: save recommendation + update status + fill matched IDs + auto-apply ledger + audit log. Retry wrapper: 3 attempts with backoff
 5. **Human Approval Queue** (Next.js frontend) — analyst reviews HELD payments, approves (→ APPLIED, ledger updated) or rejects (→ ESCALATED)
 
-## 5 Scenarios (Routing is deterministic if/else, reasoning uses Claude API)
+## 5 Scenarios (Routing is deterministic if/else, reasoning uses Gemini 2.5 Flash via OpenRouter)
 1. **Strong Policy Match** — policy # provided, name ≥75%, variance ≤2%. Auto-apply requires: name >90%, no risk flags, active policy, low-risk payment method
 2. **Customer Match, No Policy** — customer match ≥90% (or <90% with 2+ supporting signals), no policy ref. Always requires human approval
 3. **High Amount Variance** — match found but variance >2%. Tiers: 2-15% HOLD, 15-50% check special cases (multi-period, multi-method, third-party → HOLD), >100% ESCALATE. Name must be ≥90%
@@ -57,7 +57,7 @@ Always before making any changes, search the web for the newest chanes and only 
 
 ## 19 Signals (5 categories, 3 computation waves)
 ### Category 1: Matching & Identification (4)
-- Name Similarity Score (0-100%, hybrid: traditional algorithms + Claude Haiku for gray zone 70-92%)
+- Name Similarity Score (0-100%, hybrid: traditional algorithms + Gemini 2.5 Flash for gray zone 70-92%)
 - Policy Match Confidence (0-100%)
 - Customer Match Confidence (0-100%)
 - Supporting Signals (3 booleans: account_match, amount_match, historical_match)
@@ -90,7 +90,7 @@ Always before making any changes, search the web for the newest chanes and only 
 - Traditional: Jaro-Winkler + Levenshtein + Soundex → deterministic_score
 - If score <70%: clear mismatch, no LLM call
 - If score >92%: clear match, no LLM call
-- If score 70-92% (gray zone): call Claude Haiku → final = max(deterministic, llm)
+- If score 70-92% (gray zone): call Gemini 2.5 Flash → final = max(deterministic, llm)
 - Gray zone boundaries configurable in `configuration_thresholds`
 - Estimated 15-20% of payments hit gray zone
 
@@ -116,7 +116,7 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 ## Retry strategy
 - Ingest always succeeds (payment saved as RECEIVED)
 - Processing pipeline retried up to 3 times with backoff (1s, 3s)
-- Retryable: DB timeouts, deadlocks, Claude API timeouts/rate limits
+- Retryable: DB timeouts, deadlocks, OpenRouter/LLM timeouts/rate limits
 - Not retryable: constraint violations, validation errors, unknown errors
 - After 3 failures: status → PROCESSING_FAILED, audit logged, visible in UI
 
@@ -194,7 +194,7 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 | `backend/app/services/signals/risk.py` | Risk flags, account status, balance snapshot, payment method risk |
 | `backend/app/services/signals/duplicate.py` | 72hr duplicate detection with $2 tolerance |
 | `backend/app/services/agent/router.py` | Deterministic scenario routing |
-| `backend/app/services/agent/reasoning.py` | Claude API structured prompts |
+| `backend/app/services/agent/reasoning.py` | Gemini 2.5 Flash structured prompts (via OpenRouter) |
 | `backend/app/services/agent/scenarios/sc1-5` | Per-scenario prompt, criteria, output parsing |
 | `backend/app/services/persist.py` | Single-transaction save; sets decision_attribution at closure |
 | `backend/app/services/pipeline.py` | End-to-end orchestrator with retry |
