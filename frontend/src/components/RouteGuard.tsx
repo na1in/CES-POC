@@ -17,7 +17,13 @@ export function RouteGuard({ children }: { children: React.ReactNode }) {
     if (!user && !isPublic) {
       router.replace("/login")
     } else if (user && pathname === "/login") {
-      router.replace("/")
+      const roleHome: Record<string, string> = {
+        analyst: "/",
+        investigator: "/investigations",
+        director: "/governance",
+        admin: "/admin",
+      }
+      router.replace(roleHome[user.role] ?? "/")
     }
   }, [user, loading, pathname, router])
 

@@ -20,10 +20,10 @@ test.describe("Payment Queue", () => {
   })
 
   test("shows table headers", async ({ page }) => {
-    await expect(page.getByText("SENDER")).toBeVisible()
-    await expect(page.getByText("AMOUNT")).toBeVisible()
-    await expect(page.getByText("RECOMMENDATION")).toBeVisible()
-    await expect(page.getByText("CONFIDENCE")).toBeVisible()
+    await expect(page.getByRole("columnheader", { name: "SENDER" })).toBeVisible()
+    await expect(page.getByRole("columnheader", { name: "AMOUNT" })).toBeVisible()
+    await expect(page.getByRole("columnheader", { name: "RECOMMENDATION" })).toBeVisible()
+    await expect(page.getByRole("columnheader", { name: "CONFIDENCE" })).toBeVisible()
   })
 
   test("sort dropdown changes order", async ({ page }) => {
@@ -47,10 +47,10 @@ test.describe("Payment Queue", () => {
   })
 
   test("clicking a payment row navigates to detail", async ({ page }) => {
-    // Wait for at least one row to appear
-    const firstRow = page.getByRole("row").nth(1)
-    await firstRow.waitFor({ timeout: 10000 })
-    await firstRow.click()
+    // Wait for a payment ID to appear in the table then click it
+    const paymentId = page.getByText(/^PMT-/).first()
+    await paymentId.waitFor({ timeout: 10000 })
+    await paymentId.click()
     await expect(page).toHaveURL(/\/payments\/PMT-/)
   })
 

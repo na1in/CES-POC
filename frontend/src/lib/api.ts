@@ -14,7 +14,7 @@ async function apiFetch<T = unknown>(
     ...(options.headers as Record<string, string>),
   }
   if (token) headers["Authorization"] = `Bearer ${token}`
-  if (options.body && typeof options.body === "string") {
+  if (options.body && typeof options.body === "string" && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json"
   }
 
