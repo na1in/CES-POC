@@ -10,6 +10,12 @@ import { Page } from "@playwright/test"
  *   USR-0004  Marcus Webb     Admin
  */
 export async function loginAs(page: Page, name: string) {
+  // Clear any existing session so RouteGuard doesn't bounce us from /login
+  await page.goto("/")
+  await page.evaluate(() => {
+    localStorage.removeItem("ces_token")
+    localStorage.removeItem("ces_user")
+  })
   await page.goto("/login")
   await page.getByText(name).click()
   // Wait for redirect away from /login

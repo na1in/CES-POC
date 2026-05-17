@@ -14,7 +14,7 @@ test.describe("Payment Detail", () => {
     await openFirstPayment(page)
     await expect(page.getByRole("heading", { name: /case pmt-/i })).toBeVisible()
     await expect(page.getByText("Payment Information")).toBeVisible()
-    await expect(page.getByText("SENDER NAME")).toBeVisible()
+    await expect(page.getByText("SENDER NAME", { exact: true })).toBeVisible()
     // Use exact match to avoid ambiguity with audit log entries that contain "amount"
     await expect(page.getByText("AMOUNT", { exact: true }).first()).toBeVisible()
     await expect(page.getByText("PAYMENT METHOD")).toBeVisible()
@@ -39,15 +39,13 @@ test.describe("Payment Detail", () => {
     await expect(page).toHaveURL("/")
   })
 
-  test("investigator can open a payment detail page", async ({ page }) => {
+  test("investigator sees Add Investigation Note on escalated payment", async ({ page }) => {
     await loginAs(page, INVESTIGATOR)
-    // Investigations page may be empty; navigate via the queue
-    await page.goto("/")
+    // PMT-ESC-001 is seeded as escalated — shows the investigation note button
     const paymentId = page.getByText(/^PMT-/).first()
     await paymentId.waitFor({ timeout: 10000 })
     await paymentId.click()
     await page.waitForURL(/\/payments\/PMT-/)
-    // Audit Trail is always present on any payment
-    await expect(page.getByText("Audit Trail")).toBeVisible()
+    await expect(page.getByRole("button", { name: /add investigation note/i })).toBeVisible()
   })
 })
