@@ -222,6 +222,26 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 | `proto/customer.proto` | Customer, RiskFlag, RiskFlagType |
 | `proto/policy.proto` | Policy, PaymentHistory |
 
+## Testing
+
+### Backend (`backend/tests/`)
+- ~378 pytest tests; run with `python -m pytest tests/ -v` from `backend/`
+- `conftest.py` has `--live-llm` flag: default mocks `parse_reference_fields` + `get_reasoning`; pass `--live-llm` for real OpenRouter calls
+- E2E tests use `rollback_only` fixtures — all mutations are rolled back after each test
+
+### Frontend (`frontend/e2e/`)
+- 38 Playwright tests across 6 spec files (01-login through 06-admin); chromium only, 1 worker
+- Run with `npx playwright test` from `frontend/` (backend on :8000 + Next.js on :3001 must be running)
+- All tests are read-only (navigation/visibility) — mutations stay in backend pytest suite
+- `helpers/auth.ts`: `loginAs()` clears localStorage before each login to prevent RouteGuard bounce
+- Key selector patterns: `getByText(/^PMT-/).first()` for row nav; `{ exact: true }` to avoid audit-log false matches; `page.locator('input[aria-label="..."]')` for `<input type="date">`
+- `PMT-ESC-001` is seeded as a pre-escalated payment to enable investigation workflow tests
+
+### Infrastructure (fixed 2026-05-16)
+- `backend/app/main.py`: `CORSMiddleware` for origins :3000/:3001/:3002 — required for browser API calls
+- `frontend/src/lib/api.ts`: Content-Type override only applies when not already set (guard: `&& !headers["Content-Type"]`)
+- `frontend/src/components/RouteGuard.tsx`: Login redirect uses `roleHome` map per role
+
 ## Implementation plan
 See `docs/Implementation_Plan.md` for the full phased plan with ticket breakdowns, parallel tracks, estimates, and risk mitigation. Team: 2 engineers + 1 designer, ~7 weeks.
 
