@@ -1,9 +1,9 @@
 # CES — Project State
 
-**Last updated:** 2026-05-11  
-**Current phase:** Phase 2 complete (backend) · Phase 3 starting  
+**Last updated:** 2026-05-16  
+**Current phase:** All phases complete except UI polish (CES-44)  
 **Repository:** https://github.com/na1in/CES-POC  
-**Branch:** `nalin-dev` (open PR #9 against main)  
+**Branch:** `nalin-dev`  
 **Team:** 2 Engineers (A & B) + 1 Designer
 
 ---
@@ -14,9 +14,10 @@
 |-------|--------|-------|
 | **Phase 0 — Foundation** | ✅ Complete | DB schema, protos, docs, scaffold, auth, seed data |
 | **Phase 1 — Core Pipeline + Frontend Shell** | ✅ Complete | Ingest → signals → snapshot (backend); Queue/Detail/Settings pages (frontend) |
-| **Phase 2 — AI Agent + Analyst/Investigator APIs** | ✅ Backend complete · 🔄 Frontend wire-up pending | All backend APIs live; Praneetha wiring frontend to real APIs |
-| **Phase 3 — Director/Admin + Governance/Analytics/Config APIs** | ⬜ Not started | Next up for Engineer A |
-| **Phase 4 — Integration & Polish** | ⬜ Not started | Week 10 |
+| **Phase 2 — AI Agent + Analyst/Investigator APIs** | ✅ Complete | All backend APIs + frontend wired to real APIs (CES-43) |
+| **Phase 3 — Director/Admin + Governance/Analytics/Config APIs** | ✅ Complete | All APIs live; all 10 frontend pages wired to real data |
+| **Phase 4 — Integration & Testing** | ✅ Complete | 378 backend tests + 38 Playwright browser tests |
+| **Phase 4 — UI Polish (CES-44)** | 🔄 In progress | Responsive layout, empty states, accessibility |
 
 ---
 
@@ -71,35 +72,36 @@
 - [x] `backend/app/services/sla.py` — `compute_due_date()`, `check_and_mark_breaches()`, asyncio background monitor (CES-27)
 - [x] 176 unit tests total; all passing without DB
 
-### Phase 2 — Frontend Wire-up (Engineer B) 🔄 In Progress
-- [x] Governance Dashboard `/governance` — Lorraine's metrics (CES-34/36) [built with mock data]
-- [x] Compliance Export `/governance/export` (CES-35) [built with mock data]
-- [x] Exception Dashboard `/governance/exceptions` (CES-36) [built with mock data]
-- [x] Admin Dashboard `/admin` (CES-37) [built with mock data]
-- [x] Override Analysis `/admin/overrides` (CES-38) [built with mock data]
-- [x] Configuration Management `/admin/config` (CES-39) [built with mock data]
-- [ ] Wire analyst/investigator pages to real APIs (replace mock data in Queue, Detail, Investigations, Settings)
+### Phase 2 + 3 — Frontend Wire-up (Engineer B) ✅
+- [x] Governance Dashboard `/governance` (CES-34/36)
+- [x] Compliance Export `/governance/export` (CES-35)
+- [x] Exception Dashboard `/governance/exceptions` (CES-36)
+- [x] Admin Dashboard `/admin` (CES-37)
+- [x] Override Analysis `/admin/overrides` (CES-38)
+- [x] Configuration Management `/admin/config` (CES-39)
+- [x] All pages wired to real APIs — mock data removed (CES-43)
+
+### Phase 4 — Testing ✅
+- [x] `backend/tests/test_e2e_scenarios.py` — 9 scenario E2E tests (CES-40)
+- [x] `backend/tests/test_e2e_actions.py` — analyst/investigator action flows (CES-41)
+- [x] `backend/tests/test_e2e_config.py` — config workflow + retry/failure (CES-42)
+- [x] `frontend/e2e/*.spec.ts` — 38 Playwright browser tests across all 6 spec files (CES-46)
+- [x] ~378 backend tests + 38 Playwright tests, all passing
+
+### Infrastructure fixes (shipped with CES-46)
+- [x] `backend/app/main.py` — Added `CORSMiddleware` (was missing; caused all browser API calls to fail)
+- [x] `frontend/src/lib/api.ts` — Fixed Content-Type override clobbering form logins
+- [x] `frontend/src/components/RouteGuard.tsx` — Role-specific redirect on login (`roleHome` map)
+- [x] `backend/scripts/seed.py` — Added `PMT-ESC-001` (escalated investigation seed case)
 
 ---
 
 ## What's NOT Built Yet
 
-### Phase 3 — Governance/Analytics/Config APIs (Engineer A)
-- [ ] `GET /api/analytics/decisions` — attribution counts, method breakdown, per-scenario breakdown, confidence histogram
-- [ ] `GET /api/analytics/overrides` — filterable by scenario, confidence band, date, reason category
-- [ ] `POST/GET /api/governance/reviews` — Lorraine period review log
-- [ ] `POST/GET /api/governance/anomalies` + `PATCH .../anomalies/{id}` — anomaly flag workflow
-- [ ] `GET /api/governance/export` — audit-ready report (date range + scope)
-- [ ] `POST /api/settings/change-requests` + full workflow (approve/reject/deploy/rollback)
-- [ ] `GET /api/settings/thresholds/history`
-
-### Phase 3 — Director/Admin Frontend Wire-up (Engineer B)
-- [ ] Wire Governance Dashboard, Exception Dashboard, Admin Dashboard, Override Analysis, Config Management to real APIs
-
-### Phase 4 — Integration & Polish
-- [ ] E2E tests for all 5 scenarios + analyst/investigator/config flows
-- [ ] Frontend integration testing across all 10 pages
-- [ ] UI polish, accessibility, empty/error states
+### CES-44 — UI Polish
+- [ ] Responsive layout (mobile/tablet breakpoints)
+- [ ] Meaningful empty states for all list pages
+- [ ] Accessibility audit (ARIA labels, keyboard nav, color contrast)
 
 ---
 
@@ -159,8 +161,15 @@ Test users (password not checked in PoC — use user_id as username):
 | USR-0003 | Lorraine Chen | director |
 | USR-0004 | Marcus Webb | admin |
 
-Run tests (no DB required for pure-helper tests):
+Run backend tests (Postgres required for E2E tests):
 ```bash
 cd backend && python -m pytest tests/ -v
-# 176 pass; 1 expected DB-integration error (needs Postgres running)
+# ~378 tests passing
+# Pass --live-llm to use real OpenRouter instead of mocks
+```
+
+Run frontend Playwright tests (backend + Next.js must be running on :8000 + :3001):
+```bash
+cd frontend && npx playwright test
+# 38 tests across 6 spec files, chromium only, sequential
 ```
