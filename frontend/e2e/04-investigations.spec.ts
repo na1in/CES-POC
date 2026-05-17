@@ -30,13 +30,10 @@ test.describe("Investigation Queue", () => {
   })
 
   test("clicking a case row navigates to payment detail", async ({ page }) => {
-    const row = page.getByRole("row").nth(1)
-    const hasRow = await row.isVisible().catch(() => false)
-    if (!hasRow) {
-      test.skip()
-      return
-    }
-    await row.click()
+    // PMT-ESC-001 is seeded as an escalated payment for this test
+    const paymentId = page.getByText(/^PMT-/).first()
+    await paymentId.waitFor({ timeout: 10000 })
+    await paymentId.click()
     await expect(page).toHaveURL(/\/payments\/PMT-/)
   })
 
