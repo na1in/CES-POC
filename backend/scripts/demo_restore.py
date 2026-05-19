@@ -95,8 +95,7 @@ async def reset_thresholds(db: AsyncSession) -> None:
     for name, value in DEFAULT_THRESHOLDS.items():
         await db.execute(text("""
             UPDATE configuration_thresholds
-            SET parameter_value = :value,
-                modified_date = now()
+            SET parameter_value = :value
             WHERE parameter_name = :name
         """), {"name": name, "value": value})
 
