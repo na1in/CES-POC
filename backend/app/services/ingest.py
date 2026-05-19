@@ -49,8 +49,9 @@ Return only valid JSON, no explanation."""
         response = await _get_client().chat.completions.create(
             model=_MODEL,
             max_tokens=256,
-            timeout=3.0,
+            timeout=10.0,
             messages=[{"role": "user", "content": prompt}],
+            extra_body={"thinking": {"type": "disabled"}},
         )
         text = response.choices[0].message.content.strip()
         if text.startswith("```"):
