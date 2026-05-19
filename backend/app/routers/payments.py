@@ -3,13 +3,14 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, StrictInt, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import AsyncSessionLocal, get_db
 from app.services.ingest import parse_reference_fields
+from app.services.pipeline import run_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -54,19 +55,33 @@ class IngestResponse(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _next_payment_id(db: AsyncSession) -> str:
-    result = await db.execute(text("SELECT MAX(payment_id) FROM payments"))
+    # Only consider numeric IDs (e.g. PMT-001) — skips seeded non-numeric ones like PMT-ESC-001
+    result = await db.execute(text("""
+        SELECT MAX(CAST(split_part(payment_id, '-', 2) AS INTEGER))
+        FROM payments
+        WHERE payment_id ~ '^PMT-[0-9]+$'
+    """))
     current_max = result.scalar_one_or_none()
-    if current_max is None:
-        next_num = 1
-    else:
-        next_num = int(current_max.split("-")[1]) + 1
+    next_num = (current_max or 0) + 1
     return f"PMT-{next_num:03d}"
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+async def _run_pipeline_bg(payment_id: str) -> None:
+    async with AsyncSessionLocal() as db:
+        try:
+            await run_pipeline(payment_id, db)
+        except Exception:
+            logger.exception("Background pipeline failed for %s", payment_id)
+
+
 @router.post("/ingest", status_code=status.HTTP_201_CREATED, response_model=IngestResponse)
-async def ingest_payment(body: IngestRequest, db: AsyncSession = Depends(get_db)):
+async def ingest_payment(
+    body: IngestRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
     # Parse free-text references with Claude Haiku (never raises)
     parsed = await parse_reference_fields(body.reference_field_1, body.reference_field_2)
 
@@ -113,6 +128,8 @@ async def ingest_payment(body: IngestRequest, db: AsyncSession = Depends(get_db)
 
     await db.commit()
     logger.info("Ingested %s — %s %s", payment_id, body.sender_name, body.amount)
+
+    background_tasks.add_task(_run_pipeline_bg, payment_id)
 
     return IngestResponse(payment_id=payment_id, status="received", created_timestamp=now)
 
