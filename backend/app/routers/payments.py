@@ -220,10 +220,16 @@ async def list_payments(
             ps.has_risk_flags      AS sig_has_risk_flags,
             ps.payment_method_risk_level AS sig_pm_risk,
             ps.name_similarity_score AS sig_name_sim,
-            ps.account_status      AS sig_account_status
+            ps.account_status      AS sig_account_status,
+            esc.actor              AS escalated_by
         FROM payments p
         LEFT JOIN payment_recommendations pr ON pr.payment_id = p.payment_id
         LEFT JOIN payment_signals ps ON ps.payment_id = p.payment_id
+        LEFT JOIN LATERAL (
+            SELECT actor FROM audit_log
+            WHERE payment_id = p.payment_id AND action_type = 'escalated'
+            ORDER BY timestamp DESC LIMIT 1
+        ) esc ON true
         {where_clause}
         ORDER BY {order_clause}
         LIMIT :page_size OFFSET :offset
@@ -236,7 +242,7 @@ async def list_payments(
             "payment_id", "amount", "sender_name", "sender_account", "beneficiary_name",
             "payment_method", "payment_date", "status", "reference_field_1", "reference_field_2",
             "matched_customer_id", "matched_policy_id", "investigation_due_date",
-            "sla_breached", "created_timestamp",
+            "sla_breached", "created_timestamp", "escalated_by",
         ]
         payment = {k: row[k] for k in payment_fields if k in row}
         recommendation = None
@@ -268,7 +274,7 @@ async def list_payments(
             }
         data.append({"payment": payment, "recommendation": recommendation, "signals": signals})
 
-    return {"data": data, "total": total, "page": page, "page_size": page_size}
+    return {"payments": data, "total": total, "page": page, "page_size": page_size}
 
 
 # ── GET /api/payments/{id} ────────────────────────────────────────────────────

@@ -70,22 +70,22 @@ async def delete_demo_payments(db: AsyncSession) -> int:
 
 
 async def reset_seed_escalated_payment(db: AsyncSession) -> None:
-    """Restore PMT-ESC-001 to its original escalated state."""
+    """Restore PMT-ESC-001 to its original held state (AI recommends escalate, awaiting Priya's action)."""
     # Remove any annotations/audit entries added during the demo
     await db.execute(text("""
         DELETE FROM case_annotations WHERE payment_id = 'PMT-ESC-001'
     """))
-    # Keep only the original 'escalated' audit entry
+    # Keep only the original recommendation_made audit entry
     await db.execute(text("""
         DELETE FROM audit_log
         WHERE payment_id = 'PMT-ESC-001'
-          AND action_type != 'escalated'
+          AND action_type != 'recommendation_made'
     """))
-    # Reset status from pending_sender_response back to escalated
+    # Reset status back to held (Priya must manually escalate)
     await db.execute(text("""
         UPDATE payments
-        SET status = 'escalated',
-            investigation_due_date = now() + interval '48 hours'
+        SET status = 'held',
+            investigation_due_date = NULL
         WHERE payment_id = 'PMT-ESC-001'
     """))
 
@@ -154,7 +154,7 @@ async def main() -> None:
         count = await delete_demo_payments(db)
         print(f"  Removed {count} demo payment(s)")
 
-        print("Resetting PMT-ESC-001 to original escalated state...")
+        print("Resetting PMT-ESC-001 to held state (AI recommends escalate, awaiting Priya)...")
         await reset_seed_escalated_payment(db)
 
         print("Resetting configuration thresholds to defaults...")

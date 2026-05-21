@@ -10,6 +10,7 @@ GET  /api/governance/export                 — structured audit-ready report
 """
 import json
 import logging
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -258,6 +259,12 @@ async def export_report(
             detail=f"scope must be one of {sorted(_EXPORT_SCOPES)}",
         )
 
+    try:
+        from_dt = date.fromisoformat(from_date)
+        to_dt = date.fromisoformat(to_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="from_date and to_date must be ISO dates (YYYY-MM-DD)")
+
     report: dict = {
         "generated_at": None,
         "period": {"from": from_date, "to": to_date},
@@ -265,7 +272,7 @@ async def export_report(
         "generated_by": current_user.user_id,
     }
 
-    params = {"from_date": from_date, "to_date": to_date}
+    params = {"from_date": from_dt, "to_date": to_dt}
 
     if scope in ("decisions", "all"):
         rows = await db.execute(text("""

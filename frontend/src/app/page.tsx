@@ -197,89 +197,78 @@ function Nav() {
 
 // ── Stat cards ────────────────────────────────────────────────────────────────
 
-function StatCards({ payments }: { payments: PaymentRow[] }) {
+type StatusFilter = "apply" | "hold" | "escalate" | null
+
+function StatCards({ payments, activeFilter, onFilter }: {
+  payments: PaymentRow[]
+  activeFilter: StatusFilter
+  onFilter: (f: StatusFilter) => void
+}) {
   const total = payments.length
-  const onHold = payments.filter(p => p.status === "held").length
-  const escalated = payments.filter(p => p.status === "escalated" || p.status === "pending_sender_response").length
-  const applied = payments.filter(p => p.status === "applied").length
+  const recApply = payments.filter(p => p.recommendation === "apply").length
+  const recHold = payments.filter(p => p.recommendation === "hold").length
+  const recEscalate = payments.filter(p => p.recommendation === "escalate").length
+  const openCount = payments.filter(p => p.status !== "applied" && p.status !== "returned").length
+
+  function tile(filter: StatusFilter, isActive: boolean, children: React.ReactNode) {
+    return (
+      <button
+        onClick={() => onFilter(isActive ? null : filter)}
+        className="px-5 py-4 text-left w-full transition-colors hover:opacity-80"
+        style={{ background: isActive ? "var(--pw-surface-elevated)" : "transparent", border: "none", cursor: "pointer" }}
+      >
+        {children}
+        {isActive && <span className="text-[10px] font-semibold mt-1 block" style={{ color: "var(--pw-primary)" }}>Filtered ✕</span>}
+      </button>
+    )
+  }
 
   return (
-    <div
-      className="pw-card grid grid-cols-4 divide-x"
-      style={{ borderColor: "var(--pw-border)" }}
-    >
-      {/* Cases total */}
+    <div className="pw-card grid grid-cols-4 divide-x" style={{ borderColor: "var(--pw-border)" }}>
+      {/* Cases Open — not filterable, just informational */}
       <div className="px-5 py-4">
-        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
-          Cases Open
-        </p>
-        <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-          {total - applied}
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>Cases Open</p>
+        <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>{openCount}</p>
       </div>
 
-      {/* Applied */}
-      <div className="px-5 py-4 flex items-start gap-3">
-        <div
-          className="mt-0.5 rounded-full p-1.5"
-          style={{ background: "var(--pw-apply-tint)" }}
-        >
-          <CheckCircle2 size={14} style={{ color: "var(--pw-apply)" }} />
+      {tile("apply", activeFilter === "apply", (
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-full p-1.5" style={{ background: "var(--pw-apply-tint)" }}>
+            <CheckCircle2 size={14} style={{ color: "var(--pw-apply)" }} />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>Rec: Apply</p>
+            <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>{recApply}</p>
+            <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>{total > 0 ? Math.round((recApply / total) * 100) : 0}%</p>
+          </div>
         </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
-            Auto-Applied
-          </p>
-          <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-            {applied}
-          </p>
-          <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
-            {total > 0 ? Math.round((applied / total) * 100) : 0}%
-          </p>
-        </div>
-      </div>
+      ))}
 
-      {/* On Hold */}
-      <div className="px-5 py-4 flex items-start gap-3">
-        <div
-          className="mt-0.5 rounded-full p-1.5"
-          style={{ background: "var(--pw-hold-tint)" }}
-        >
-          <Clock size={14} style={{ color: "var(--pw-hold)" }} />
+      {tile("hold", activeFilter === "hold", (
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-full p-1.5" style={{ background: "var(--pw-hold-tint)" }}>
+            <Clock size={14} style={{ color: "var(--pw-hold)" }} />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>Rec: Hold</p>
+            <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>{recHold}</p>
+            <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>{total > 0 ? Math.round((recHold / total) * 100) : 0}%</p>
+          </div>
         </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
-            On Hold
-          </p>
-          <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-            {onHold}
-          </p>
-          <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
-            {total > 0 ? Math.round((onHold / total) * 100) : 0}%
-          </p>
-        </div>
-      </div>
+      ))}
 
-      {/* Escalated */}
-      <div className="px-5 py-4 flex items-start gap-3">
-        <div
-          className="mt-0.5 rounded-full p-1.5"
-          style={{ background: "var(--pw-escalate-tint)" }}
-        >
-          <TriangleAlert size={14} style={{ color: "var(--pw-escalate)" }} />
+      {tile("escalate", activeFilter === "escalate", (
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-full p-1.5" style={{ background: "var(--pw-escalate-tint)" }}>
+            <TriangleAlert size={14} style={{ color: "var(--pw-escalate)" }} />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>Rec: Escalate</p>
+            <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>{recEscalate}</p>
+            <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>{total > 0 ? Math.round((recEscalate / total) * 100) : 0}%</p>
+          </div>
         </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)" }}>
-            Escalated
-          </p>
-          <p className="mt-1 text-3xl font-bold" style={{ color: "var(--pw-text-primary)" }}>
-            {escalated}
-          </p>
-          <p className="text-xs" style={{ color: "var(--pw-text-muted)" }}>
-            {total > 0 ? Math.round((escalated / total) * 100) : 0}%
-          </p>
-        </div>
-      </div>
+      ))}
     </div>
   )
 }
@@ -292,6 +281,8 @@ export default function QueueDashboard() {
 
   const [payments, setPayments] = useState<PaymentRow[]>([])
   const [loadingData, setLoadingData] = useState(true)
+  const [activeTab, setActiveTab] = useState<"open" | "closed">("open")
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(null)
   const [scenarioFilter, setScenarioFilter] = useState<Set<ScenarioRoute>>(new Set())
   const [bandFilter, setBandFilter] = useState<Set<ConfidenceBand>>(new Set())
   const [methodFilter, setMethodFilter] = useState<Set<PaymentMethod>>(new Set())
@@ -315,14 +306,24 @@ export default function QueueDashboard() {
     setScenarioFilter(new Set())
     setBandFilter(new Set())
     setMethodFilter(new Set())
+    setStatusFilter(null)
   }
 
-  const hasFilters = scenarioFilter.size > 0 || bandFilter.size > 0 || methodFilter.size > 0
+  const hasFilters = scenarioFilter.size > 0 || bandFilter.size > 0 || methodFilter.size > 0 || statusFilter !== null
   const failedCount = payments.filter(p => p.status === "processing_failed").length
   const openCount = payments.filter(p => p.status !== "applied" && p.status !== "returned").length
   const closedCount = payments.filter(p => p.status === "applied" || p.status === "returned").length
 
-  const rows = payments
+  const OPEN_STATUSES = new Set(["held", "processing_failed", "received", "processing"])
+  const CLOSED_STATUSES = new Set(["applied", "returned", "escalated", "pending_sender_response"])
+
+  const tabPayments = payments.filter(p => {
+    const inTab = activeTab === "open" ? OPEN_STATUSES.has(p.status) : CLOSED_STATUSES.has(p.status)
+    const inStatusFilter = statusFilter === null || p.recommendation === statusFilter
+    return inTab && inStatusFilter
+  })
+
+  const rows = tabPayments
     .map(p => ({ payment: p, rec: p }))
     .sort((a, b) => {
       switch (sortKey) {
@@ -368,7 +369,7 @@ export default function QueueDashboard() {
         </div>
 
         {/* Stat cards */}
-        <StatCards payments={payments} />
+        <StatCards payments={payments} activeFilter={statusFilter} onFilter={setStatusFilter} />
 
         {/* Processing-failed banner */}
         {failedCount > 0 && !bannerDismissed && (
@@ -407,26 +408,29 @@ export default function QueueDashboard() {
             style={{ borderColor: "var(--pw-border)" }}
           >
             <div className="flex gap-6">
-              {/* Open Cases tab (active) */}
               <button
+                onClick={() => setActiveTab("open")}
                 className="flex items-center gap-2 py-3 text-sm font-medium border-b-2 -mb-px"
-                style={{ borderColor: "var(--pw-primary)", color: "var(--pw-primary)" }}
+                style={activeTab === "open"
+                  ? { borderColor: "var(--pw-primary)", color: "var(--pw-primary)" }
+                  : { borderColor: "transparent", color: "var(--pw-text-secondary)" }}
               >
                 Open Cases
-                <span
-                  className="pw-badge"
-                  style={{ background: "var(--pw-primary)", color: "#fff" }}
-                >
+                <span className="pw-badge" style={activeTab === "open" ? { background: "var(--pw-primary)", color: "#fff" } : {}}>
                   {openCount}
                 </span>
               </button>
-              {/* Closed Cases tab (inactive) */}
               <button
-                className="flex items-center gap-2 py-3 text-sm font-medium border-b-2 border-transparent"
-                style={{ color: "var(--pw-text-secondary)" }}
+                onClick={() => setActiveTab("closed")}
+                className="flex items-center gap-2 py-3 text-sm font-medium border-b-2 -mb-px"
+                style={activeTab === "closed"
+                  ? { borderColor: "var(--pw-primary)", color: "var(--pw-primary)" }
+                  : { borderColor: "transparent", color: "var(--pw-text-secondary)" }}
               >
                 Closed Cases
-                <span className="pw-badge pw-badge-neutral">{closedCount}</span>
+                <span className="pw-badge" style={activeTab === "closed" ? { background: "var(--pw-primary)", color: "#fff" } : { background: "var(--pw-border)" }}>
+                  {closedCount}
+                </span>
               </button>
             </div>
           </div>

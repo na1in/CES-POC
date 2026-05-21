@@ -27,18 +27,10 @@ _SLA_HOURS = 72
 
 def _target_status(recommendation: str, requires_human_approval: bool) -> str:
     """
-    Maps recommendation + approval flag to a payment_status enum value.
-
-      APPLY  (no approval)  → 'applied'   (auto-applied immediately)
-      APPLY  (approval req) → 'held'       (analyst must confirm)
-      HOLD                  → 'held'
-      ESCALATE              → 'escalated'
+    Every payment lands in 'held' for Priya to review — no auto-apply.
+    Human approval is always required regardless of match quality.
     """
-    if recommendation == "APPLY" and not requires_human_approval:
-        return "applied"
-    if recommendation in ("APPLY", "HOLD"):
-        return "held"
-    return "escalated"
+    return "held"
 
 
 async def persist_recommendation(

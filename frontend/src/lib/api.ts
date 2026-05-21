@@ -27,6 +27,10 @@ async function apiFetch<T = unknown>(
   return res.json() as Promise<T>
 }
 
+export function fetcher<T = unknown>(path: string): Promise<T> {
+  return apiFetch<T>(path)
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 export interface LoginResponse {
@@ -76,6 +80,7 @@ export interface PaymentRow {
   requires_human_approval: boolean | null
   decision_attribution: string | null
   has_risk_flags: boolean | null
+  escalated_by: string | null
 }
 
 export interface PaymentsListResponse {
@@ -103,7 +108,20 @@ export function listPayments(params: PaymentListParams = {}): Promise<PaymentsLi
   if (params.page) qs.set("page", String(params.page))
   if (params.page_size) qs.set("page_size", String(params.page_size))
   const q = qs.toString()
-  return apiFetch<PaymentsListResponse>(`/api/payments${q ? `?${q}` : ""}`)
+  return apiFetch<{ payments: Array<{ payment: Record<string, unknown>; recommendation: Record<string, unknown> | null; signals: Record<string, unknown> | null }>; total: number; page: number; page_size: number }>(
+    `/api/payments${q ? `?${q}` : ""}`
+  ).then(res => ({
+    ...res,
+    payments: res.payments.map(item => ({
+      ...(item.payment as object),
+      recommendation: (item.recommendation?.recommendation as string) ?? null,
+      confidence_score: (item.recommendation?.confidence_score as number) ?? null,
+      scenario_route: (item.recommendation?.scenario_route as string) ?? null,
+      requires_human_approval: (item.recommendation?.requires_human_approval as boolean) ?? null,
+      decision_attribution: (item.recommendation?.decision_attribution as string) ?? null,
+      has_risk_flags: (item.signals?.risk as Record<string, unknown> | null)?.has_risk_flags as boolean ?? null,
+    })) as PaymentRow[],
+  }))
 }
 
 export function getPayment(id: string): Promise<PaymentDetail> {
@@ -114,7 +132,7 @@ export interface PaymentDetail {
   payment: Record<string, unknown>
   signals: Record<string, unknown> | null
   recommendation: Record<string, unknown> | null
-  audit_trail: AuditEntry[]
+  audit_logs: AuditEntry[]
   annotations: AnnotationEntry[]
   documents: DocumentEntry[]
 }
@@ -181,6 +199,10 @@ export function returnPayment(id: string, notes?: string): Promise<unknown> {
     method: "POST",
     body: JSON.stringify({ notes: notes ?? null }),
   })
+}
+
+export function markPendingOutreach(id: string): Promise<unknown> {
+  return apiFetch(`/api/payments/${id}/outreach`, { method: "POST" })
 }
 
 export function reprocessPayment(id: string): Promise<unknown> {

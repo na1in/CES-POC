@@ -104,17 +104,29 @@ def run() -> None:
     ok(f"{dup_id}  ←  SC5 duplicate of SC2 (Maria Rodriguez, same amount/method/date)")
 
     section("Waiting for pipeline to process all payments...")
-    info("Pipeline runs async — polling for 15s")
-    time.sleep(5)
+    # Poll until all payments leave RECEIVED/PROCESSING or timeout at 60s
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        time.sleep(3)
+        statuses = [
+            api("GET", f"/api/payments/{pid}", token).get("payment", {}).get("status", "processing")
+            for pid in ingested_ids
+        ]
+        if all(s not in ("received", "processing") for s in statuses):
+            info(f"All {len(ingested_ids)} payments processed")
+            break
+    else:
+        info("Timeout waiting for pipeline — some payments may still be processing")
 
     # Show final statuses
     section("Final payment statuses")
     for pid in ingested_ids:
         detail = api("GET", f"/api/payments/{pid}", token)
         status_val = detail.get("payment", {}).get("status", "unknown")
-        scenario = detail.get("recommendation", {}).get("scenario_route", "—")
-        rec = detail.get("recommendation", {}).get("recommendation", "—")
-        confidence = detail.get("recommendation", {}).get("confidence_score", "—")
+        recommendation = detail.get("recommendation") or {}
+        scenario = recommendation.get("scenario_route", "—")
+        rec = recommendation.get("recommendation", "—")
+        confidence = recommendation.get("confidence_score", "—")
         info(f"{pid}  status={status_val}  scenario={scenario}  rec={rec}  confidence={confidence}")
 
     print(f"\nPayment IDs ingested: {', '.join(ingested_ids)}")

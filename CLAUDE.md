@@ -45,11 +45,11 @@ Always before making any changes, search the web for the newest chanes and only 
 1. **Ingest** (code + Gemini 2.5 Flash via OpenRouter) — validate fields, parse free-text references to extract policy numbers/intent/period count, persist payment as RECEIVED
 2. **Compute Signals** (code + Gemini 2.5 Flash for gray-zone names) — 19 signals in 3 dependency waves, snapshot to `payment_signals`
 3. **AI Agent** (deterministic router + Gemini 2.5 Flash reasoning) — Scenario 5 runs first (duplicate check), then route to 1-4. Produces structured recommendation JSON
-4. **Persist** (code) — single DB transaction: save recommendation + update status + fill matched IDs + auto-apply ledger + audit log. Retry wrapper: 3 attempts with backoff
-5. **Human Approval Queue** (Next.js frontend) — analyst reviews HELD payments, approves (→ APPLIED, ledger updated) or rejects (→ ESCALATED)
+4. **Persist** (code) — single DB transaction: save recommendation + update status to HELD + fill matched IDs + audit log. Human approval is always required — no auto-apply. Retry wrapper: 3 attempts with backoff
+5. **Human Approval Queue** (Next.js frontend) — all payments land as HELD for Priya to review; she applies (→ APPLIED, ledger updated) or escalates (→ ESCALATED → Damien's queue)
 
 ## 5 Scenarios (Routing is deterministic if/else, reasoning uses Gemini 2.5 Flash via OpenRouter)
-1. **Strong Policy Match** — policy # provided, name ≥75%, variance ≤2%. Auto-apply requires: name >90%, no risk flags, active policy, low-risk payment method
+1. **Strong Policy Match** — policy # provided, name ≥75%, variance ≤2%. All matches land HELD for Priya; AI recommends APPLY when name >90%, no risk flags, active policy, low-risk method
 2. **Customer Match, No Policy** — customer match ≥90% (or <90% with 2+ supporting signals), no policy ref. Always requires human approval
 3. **High Amount Variance** — match found but variance >2%. Tiers: 2-15% HOLD, 15-50% check special cases (multi-period, multi-method, third-party → HOLD), >100% ESCALATE. Name must be ≥90%
 4. **No Matching Customer** — all matching failed. Check for third-party payment first (employer, family, escrow → HOLD if amount ≤15%), otherwise ESCALATE
@@ -123,9 +123,9 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 ## Frontend pages
 
 ### Analyst (Priya) + Investigator (Damien)
-1. **Queue Dashboard** (`/`) — open cases sorted by AI confidence score; columns: scenario, sender name, amount, **payment method**, AI recommendation, confidence band, age
-2. **Investigation Queue** (`/investigations`) — Damien only; escalated cases pre-sorted by risk level; shows risk indicator + time since escalation
-3. **Payment Detail** (`/payments/[id]`) — payment info (incl. payment method), signal bars with algorithm breakdown, AI reasoning panel, audit timeline, approve/reject/override/return buttons, annotation panel, document upload + list
+1. **Queue Dashboard** (`/`) — Open/Closed tabs; stat tiles show AI recommendation counts (Apply/Hold/Escalate) and are clickable filters; filter bar: scenario, confidence band, payment method; columns: ID, sender, amount, recommendation, confidence, flags, age
+2. **Investigation Queue** (`/investigations`) — Damien only; Open/Closed tabs; stat tiles (Open Investigations, Fraud Flagged, Pending Outreach, Cases Closed Today) are clickable filters; filter bar: risk level, status, sort; columns: ID, sender, amount, reason, risk, escalated by, age, status
+3. **Payment Detail** (`/payments/[id]`) — payment info, signal bars, AI reasoning panel, audit timeline, annotation panel, document upload + list. Analyst actions (held): Apply Payment / Escalate to Investigator (or Override & Apply when rec=escalate). Investigator actions (escalated/pending): Apply Payment (with mandatory note) / Awaiting Sender Response / Return to Sender / Add Investigation Note
 
 ### Director (Lorraine)
 4. **Governance Dashboard** (`/governance`) — metric cards: Auto-Applied by AI, Applied after Human Review, Held Pending Review, Escalated by AI, Escalated by Human, Human Overrides; payment method breakdown chart; override rate trend; SLA adherence; confidence score histogram; date range filter
@@ -150,6 +150,7 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 - `POST /api/payments/{id}/reject` — analyst rejects HELD → ESCALATED
 - `POST /api/payments/{id}/override` — override AI recommendation (mandatory reason field)
 - `POST /api/payments/{id}/return` — Damien marks payment as returned to sender
+- `POST /api/payments/{id}/outreach` — Damien marks escalated payment as awaiting sender response (→ PENDING_SENDER_RESPONSE)
 - `POST /api/payments/{id}/reprocess` — re-run pipeline for PROCESSING_FAILED
 
 ### Annotations

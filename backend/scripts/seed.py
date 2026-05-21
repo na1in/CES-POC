@@ -125,8 +125,8 @@ async def seed_payment_history(db: AsyncSession) -> None:
 
 async def seed_escalated_payment(db: AsyncSession) -> None:
     """
-    One pre-escalated Scenario 4 payment (unknown sender, no customer match).
-    Gives the investigations queue a case to display without needing the pipeline to run.
+    One pre-held Scenario 4 payment (unknown sender, no customer match).
+    AI recommends ESCALATE — Priya must manually escalate it to the investigator.
     """
     await db.execute(text("""
         INSERT INTO payments
@@ -134,8 +134,8 @@ async def seed_escalated_payment(db: AsyncSession) -> None:
              status, investigation_due_date)
         VALUES
             ('PMT-ESC-001', 75000, 'Unknown Corp LLC', 'Wire',
-             '2026-05-14 09:00:00+00'::timestamptz, 'escalated',
-             now() + interval '48 hours')
+             '2026-05-14 09:00:00+00'::timestamptz, 'held',
+             NULL)
         ON CONFLICT (payment_id) DO NOTHING
     """))
 
@@ -158,11 +158,11 @@ async def seed_escalated_payment(db: AsyncSession) -> None:
     await db.execute(text("""
         INSERT INTO audit_log
             (payment_id, action_type, actor, actor_user_id, details, timestamp)
-        SELECT 'PMT-ESC-001', 'escalated', 'system', NULL,
-               '{"reason": "No customer match — Scenario 4"}'::jsonb, now()
+        SELECT 'PMT-ESC-001', 'recommendation_made', 'system', NULL,
+               '{"recommendation": "ESCALATE", "scenario_route": "scenario_4"}'::jsonb, now()
         WHERE NOT EXISTS (
             SELECT 1 FROM audit_log
-            WHERE payment_id = 'PMT-ESC-001' AND action_type = 'escalated'
+            WHERE payment_id = 'PMT-ESC-001' AND action_type = 'recommendation_made'
         )
     """))
 

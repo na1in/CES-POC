@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle2, Clock } from "lucide-react"
 import {
-  getPayment, approvePayment, rejectPayment, overridePayment, returnPayment, reprocessPayment,
+  getPayment, approvePayment, rejectPayment, overridePayment, returnPayment, markPendingOutreach, reprocessPayment,
   type PaymentDetail,
 } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
@@ -146,6 +146,8 @@ export default function PaymentDetail() {
   const [loading, setLoading] = useState(true)
   const [overrideOpen, setOverrideOpen] = useState(false)
   const [overrideReason, setOverrideReason] = useState("")
+  const [applyNoteOpen, setApplyNoteOpen] = useState(false)
+  const [applyNote, setApplyNote] = useState("")
   const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
@@ -165,14 +167,14 @@ export default function PaymentDetail() {
     if (!id) return
     await approvePayment(id)
     showToast("Payment approved and applied")
-    getPayment(id).then(setDetail)
+    router.push("/")
   }
 
   async function handleReject() {
     if (!id) return
     await rejectPayment(id)
     showToast("Payment escalated for investigation")
-    getPayment(id).then(setDetail)
+    router.push("/")
   }
 
   async function handleOverride(action: string) {
@@ -181,14 +183,30 @@ export default function PaymentDetail() {
     showToast(`Override applied: ${action}`)
     setOverrideOpen(false)
     setOverrideReason("")
-    getPayment(id).then(setDetail)
+    router.push("/")
   }
 
   async function handleReturn() {
     if (!id) return
     await returnPayment(id)
     showToast("Payment returned to sender")
-    getPayment(id).then(setDetail)
+    router.push("/investigations")
+  }
+
+  async function handlePendingOutreach() {
+    if (!id) return
+    await markPendingOutreach(id)
+    showToast("Marked as awaiting sender response")
+    router.push("/investigations")
+  }
+
+  async function handleApplyWithNote() {
+    if (!id || !applyNote.trim()) return
+    await overridePayment(id, "APPLY", applyNote)
+    showToast("Payment applied with investigation note")
+    setApplyNoteOpen(false)
+    setApplyNote("")
+    router.push("/investigations")
   }
 
   async function handleReprocess() {
@@ -228,7 +246,7 @@ export default function PaymentDetail() {
   const signals = detail.signals as any
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rec = detail.recommendation as any
-  const logs = detail.audit_trail
+  const logs = detail.audit_logs
   const annotations = detail.annotations
 
   const policyId = payment.matched_policy_id as string | null
@@ -441,43 +459,61 @@ export default function PaymentDetail() {
           )}
 
           {/* Decision Actions */}
-          {payment.status === "held" && rec && (
+          {payment.status === "held" && rec && user?.role === "analyst" && (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button
-                onClick={handleApprove}
-                style={{
-                  background: recColor, color: "#fff", border: "none",
-                  borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13,
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                }}
-              >
-                {rec.recommendation === "apply"
-                  ? <CheckCircle2 size={14} />
-                  : <Clock size={14} />}
-                Accept {rec.recommendation.toUpperCase()}
-              </button>
-              <button
-                onClick={() => setOverrideOpen(true)}
-                style={{
-                  background: "var(--pw-text-primary)", color: "#fff", border: "none",
-                  borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
-                Override Recommendation
-              </button>
-              <button
-                onClick={handleReject}
-                style={{
-                  background: "transparent", color: "var(--pw-escalate)",
-                  border: "1px solid var(--pw-escalate)", borderRadius: 8,
-                  padding: "9px 20px", fontWeight: 600, fontSize: 13,
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                }}
-              >
-                <AlertTriangle size={14} />
-                Escalate
-              </button>
+              {rec.recommendation === "escalate" ? (
+                <>
+                  <button
+                    onClick={handleReject}
+                    style={{
+                      background: "var(--pw-escalate)", color: "#fff", border: "none",
+                      borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    <AlertTriangle size={14} />
+                    Escalate to Investigator
+                  </button>
+                  <button
+                    onClick={() => setOverrideOpen(true)}
+                    style={{
+                      background: "transparent", color: "var(--pw-apply)",
+                      border: "1px solid var(--pw-apply)", borderRadius: 8,
+                      padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    <CheckCircle2 size={14} />
+                    Override & Apply
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleApprove}
+                    style={{
+                      background: "var(--pw-apply)", color: "#fff", border: "none",
+                      borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    <CheckCircle2 size={14} />
+                    Apply Payment
+                  </button>
+                  <button
+                    onClick={handleReject}
+                    style={{
+                      background: "transparent", color: "var(--pw-escalate)",
+                      border: "1px solid var(--pw-escalate)", borderRadius: 8,
+                      padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    <AlertTriangle size={14} />
+                    Escalate to Investigator
+                  </button>
+                </>
+              )}
             </div>
           )}
 
@@ -489,13 +525,39 @@ export default function PaymentDetail() {
             </div>
           )}
 
-          {(payment.status === "escalated" || payment.status === "pending_sender_response") && (
+          {(payment.status === "escalated" || payment.status === "pending_sender_response") && user?.role === "investigator" && (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setApplyNoteOpen(true)}
+                style={{
+                  background: "var(--pw-apply)", color: "#fff", border: "none",
+                  borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                }}
+              >
+                <CheckCircle2 size={14} />
+                Apply Payment
+              </button>
+              {payment.status === "escalated" && (
+                <button
+                  onClick={handlePendingOutreach}
+                  style={{
+                    background: "transparent", color: "var(--pw-hold)",
+                    border: "1px solid var(--pw-hold)", borderRadius: 8,
+                    padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  <Clock size={14} />
+                  Awaiting Sender Response
+                </button>
+              )}
               <button
                 onClick={handleReturn}
                 style={{
-                  background: "var(--pw-text-primary)", color: "#fff", border: "none",
-                  borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                  background: "transparent", color: "var(--pw-text-primary)",
+                  border: "1px solid var(--pw-border)", borderRadius: 8,
+                  padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: "pointer",
                 }}
               >
                 Return to Sender
@@ -801,7 +863,7 @@ export default function PaymentDetail() {
               </button>
               <button
                 disabled={overrideReason.trim().length === 0}
-                onClick={() => handleOverride(rec?.recommendation?.toUpperCase() ?? "ESCALATE")}
+                onClick={() => handleOverride("APPLY")}
                 style={{
                   background: overrideReason.trim() ? "var(--pw-primary)" : "var(--pw-text-muted)",
                   color: "#fff", border: "none", borderRadius: 8,
@@ -810,6 +872,68 @@ export default function PaymentDetail() {
                 }}
               >
                 Submit Override
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Apply with Note modal (investigator) */}
+      {applyNoteOpen && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 50,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={() => setApplyNoteOpen(false)}
+        >
+          <div
+            style={{
+              background: "var(--pw-surface)", borderRadius: 12, padding: 24, width: 440, maxWidth: "90vw",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--pw-text-primary)" }}>
+              Apply Payment
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--pw-text-secondary)" }}>
+              Add an investigation note explaining why this payment is being applied.
+            </p>
+            <textarea
+              autoFocus
+              rows={4}
+              aria-label="Investigation note"
+              value={applyNote}
+              onChange={e => setApplyNote(e.target.value)}
+              placeholder="Enter investigation findings and reason for applying…"
+              style={{
+                width: "100%", borderRadius: 8, border: "1px solid var(--pw-border)",
+                padding: "10px 12px", fontSize: 13, background: "var(--pw-bg)",
+                color: "var(--pw-text-primary)", resize: "vertical", boxSizing: "border-box",
+              }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+              <button
+                style={{
+                  background: "none", border: "1px solid var(--pw-border)", borderRadius: 8,
+                  padding: "8px 18px", fontSize: 13, cursor: "pointer",
+                }}
+                onClick={() => { setApplyNoteOpen(false); setApplyNote("") }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={applyNote.trim().length === 0}
+                onClick={handleApplyWithNote}
+                style={{
+                  background: applyNote.trim() ? "var(--pw-apply)" : "var(--pw-text-muted)",
+                  color: "#fff", border: "none", borderRadius: 8,
+                  padding: "8px 18px", fontSize: 13, fontWeight: 600,
+                  cursor: applyNote.trim() ? "pointer" : "not-allowed",
+                }}
+              >
+                Apply Payment
               </button>
             </div>
           </div>
