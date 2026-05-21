@@ -37,9 +37,9 @@ async def test_name_clear_match_skips_llm():
 
 async def test_name_gray_zone_calls_llm():
     mock_response = MagicMock()
-    mock_response.content = [MagicMock(text='{"score": 88, "reasoning": "Rob is short for Robert"}')]
+    mock_response.choices[0].message.content = '{"score": 88, "reasoning": "Rob is short for Robert"}'
     with patch("app.services.signals.matching._get_client") as mock_client:
-        mock_client.return_value.messages.create = AsyncMock(return_value=mock_response)
+        mock_client.return_value.chat.completions.create = AsyncMock(return_value=mock_response)
         result = await compute_name_similarity("Rob Johnson", "Robert Johnson")
     assert result["used_llm"] is True
     assert result["llm_score"] == 88.0
@@ -57,9 +57,9 @@ async def test_name_gray_zone_llm_timeout_falls_back_to_deterministic():
 
 async def test_name_final_score_is_max_of_deterministic_and_llm():
     mock_response = MagicMock()
-    mock_response.content = [MagicMock(text='{"score": 95, "reasoning": "same person"}')]
+    mock_response.choices[0].message.content = '{"score": 95, "reasoning": "same person"}'
     with patch("app.services.signals.matching._get_client") as mock_client:
-        mock_client.return_value.messages.create = AsyncMock(return_value=mock_response)
+        mock_client.return_value.chat.completions.create = AsyncMock(return_value=mock_response)
         result = await compute_name_similarity("Rob Johnson", "Robert Johnson")
     assert result["name_similarity_score"] == max(result["deterministic_score"], 95.0)
 

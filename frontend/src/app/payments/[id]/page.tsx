@@ -1,15 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
-import useSWR from "swr"
 import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle2, Clock } from "lucide-react"
-import { Skeleton } from "@/components/ui/skeleton"
-import { apiFetch, ApiError } from "@/lib/api"
-import { useToast } from "@/contexts/ToastContext"
-import type { PaymentDetailResponse } from "@/types/api"
+import {
+  getPayment, approvePayment, rejectPayment, overridePayment, returnPayment, markPendingOutreach, reprocessPayment,
+  type PaymentDetail,
+} from "@/lib/api"
+import { useAuth } from "@/contexts/auth"
 
-// ── Mock policy sidebar data (keyed by policy ID) ─────────────────────────────
+// ── Mock policy data (keyed by policy ID) ─────────────────────────────────────
 
 const POLICY_INFO: Record<string, {
   holder: string
@@ -18,18 +18,61 @@ const POLICY_INFO: Record<string, {
   next_due: string
   balance_cents: number
 }> = {
-  "POL-88341": { holder: "Riverside Medical Group",            type: "Commercial Health Insurance", premium: "$2,450 Monthly",  next_due: "2026-05-18", balance_cents: 0      },
-  "POL-55209": { holder: "Jonathan Hartwell Associates LLC",   type: "Professional Liability",      premium: "$1,187 Monthly",  next_due: "2026-05-17", balance_cents: 0      },
-  "POL-44100": { holder: "Blue Pines Construction Inc.",       type: "General Liability",           premium: "$5,000 Monthly",  next_due: "2026-05-15", balance_cents: 500000 },
-  "POL-10291": { holder: "Summit Risk & Advisory Group",       type: "Commercial Property",         premium: "$10,000 Monthly", next_due: "2026-05-10", balance_cents: 1000000},
-  "POL-67003": { holder: "Lakeview Dental Partners",           type: "Business Owners Policy",      premium: "$950 Monthly",    next_due: "2026-05-13", balance_cents: 5100   },
+  "POL-88341": {
+    holder: "Riverside Medical Group",
+    type: "Commercial Health Insurance",
+    premium: "$2,450 Monthly",
+    next_due: "2026-05-18",
+    balance_cents: 0,
+  },
+  "POL-55209": {
+    holder: "Jonathan Hartwell Associates LLC",
+    type: "Professional Liability",
+    premium: "$1,187 Monthly",
+    next_due: "2026-05-17",
+    balance_cents: 0,
+  },
+  "POL-44100": {
+    holder: "Blue Pines Construction Inc.",
+    type: "General Liability",
+    premium: "$5,000 Monthly",
+    next_due: "2026-05-15",
+    balance_cents: 500000,
+  },
+  "POL-10291": {
+    holder: "Summit Risk & Advisory Group",
+    type: "Commercial Property",
+    premium: "$10,000 Monthly",
+    next_due: "2026-05-10",
+    balance_cents: 1000000,
+  },
+  "POL-67003": {
+    holder: "Lakeview Dental Partners",
+    type: "Business Owners Policy",
+    premium: "$950 Monthly",
+    next_due: "2026-05-13",
+    balance_cents: 5100,
+  },
 }
 
 const PAYMENT_HISTORY: Record<string, Array<{ date: string; desc: string; amount: number }>> = {
-  "POL-88341": [{ date: "2026-03-18", desc: "ACH — Premium", amount: 245000 }, { date: "2026-02-18", desc: "ACH — Premium", amount: 245000 }, { date: "2026-01-18", desc: "ACH — Premium", amount: 245000 }],
-  "POL-55209": [{ date: "2026-03-17", desc: "Check — Premium", amount: 118750 }, { date: "2026-02-17", desc: "Check — Premium", amount: 118750 }],
-  "POL-44100": [{ date: "2026-03-15", desc: "ACH — Premium", amount: 500000 }, { date: "2026-02-15", desc: "ACH — Premium", amount: 500000 }],
-  "POL-10291": [{ date: "2026-03-10", desc: "Wire — Premium", amount: 1000000 }, { date: "2026-02-10", desc: "Wire — Premium", amount: 1000000 }],
+  "POL-88341": [
+    { date: "2026-03-18", desc: "ACH — Premium", amount: 245000 },
+    { date: "2026-02-18", desc: "ACH — Premium", amount: 245000 },
+    { date: "2026-01-18", desc: "ACH — Premium", amount: 245000 },
+  ],
+  "POL-55209": [
+    { date: "2026-03-17", desc: "Check — Premium", amount: 118750 },
+    { date: "2026-02-17", desc: "Check — Premium", amount: 118750 },
+  ],
+  "POL-44100": [
+    { date: "2026-03-15", desc: "ACH — Premium", amount: 500000 },
+    { date: "2026-02-15", desc: "ACH — Premium", amount: 500000 },
+  ],
+  "POL-10291": [
+    { date: "2026-03-10", desc: "Wire — Premium", amount: 1000000 },
+    { date: "2026-02-10", desc: "Wire — Premium", amount: 1000000 },
+  ],
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -40,18 +83,35 @@ function formatUSD(cents: number): string {
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString("en-US", {
-    year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true,
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
   })
 }
 
 function formatAuditTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  })
 }
 
 const ACTION_LABELS: Record<string, string> = {
-  received: "Case Created", signals_computed: "Analysis Complete", recommendation_made: "Recommendation Made",
-  held: "Payment Held", applied: "Payment Applied", escalated: "Escalated", sla_breached: "SLA Breached",
-  contact_logged: "Contact Logged", annotated: "Note Added", approved: "Approved",
+  received: "Case Created",
+  signals_computed: "Analysis Complete",
+  recommendation_made: "Recommendation Made",
+  held: "Payment Held",
+  applied: "Payment Applied",
+  escalated: "Escalated",
+  sla_breached: "SLA Breached",
+  contact_logged: "Contact Logged",
+  annotated: "Note Added",
+  approved: "Approved",
 }
 
 function auditActor(actor: string, actionType: string): string {
@@ -78,49 +138,97 @@ function statusLabel(status: string): string {
 export default function PaymentDetail() {
   const router = useRouter()
   const params = useParams()
-  const { showToast } = useToast()
   const rawId = params?.id
   const id = Array.isArray(rawId) ? rawId[0] : rawId
+  const { user, logout } = useAuth()
 
-  const { data, error, isLoading, mutate } = useSWR<PaymentDetailResponse>(
-    id ? `/api/payments/${id}` : null
-  )
-
+  const [detail, setDetail] = useState<PaymentDetail | null>(null)
+  const [loading, setLoading] = useState(true)
   const [overrideOpen, setOverrideOpen] = useState(false)
   const [overrideReason, setOverrideReason] = useState("")
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [applyNoteOpen, setApplyNoteOpen] = useState(false)
+  const [applyNote, setApplyNote] = useState("")
+  const [toast, setToast] = useState<string | null>(null)
 
-  async function callAction(endpoint: string, body?: Record<string, unknown>, successMsg = "Action completed") {
-    setActionLoading(endpoint)
-    try {
-      await apiFetch(`/api/payments/${id}/${endpoint}`, {
-        method: "POST",
-        ...(body ? { body: JSON.stringify(body) } : {}),
-      })
-      showToast({ title: successMsg, type: "success" })
-      mutate()
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.status === 403) showToast({ title: "Permission denied", type: "warning" })
-        else showToast({ title: "Something went wrong", type: "error" })
-      } else {
-        showToast({ title: "Something went wrong", type: "error" })
-      }
-    } finally {
-      setActionLoading(null)
-    }
+  useEffect(() => {
+    if (!id) return
+    getPayment(id)
+      .then(setDetail)
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [id])
+
+  function showToast(msg: string) {
+    setToast(msg)
+    setTimeout(() => setToast(null), 3000)
   }
 
-  // ── Not found / Error ─────────────────────────────────────────────────────
+  async function handleApprove() {
+    if (!id) return
+    await approvePayment(id)
+    showToast("Payment approved and applied")
+    router.push("/")
+  }
 
-  if (error && !isLoading) {
-    const isNotFound = error instanceof ApiError && error.status === 404
+  async function handleReject() {
+    if (!id) return
+    await rejectPayment(id)
+    showToast("Payment escalated for investigation")
+    router.push("/")
+  }
+
+  async function handleOverride(action: string) {
+    if (!id || !overrideReason.trim()) return
+    await overridePayment(id, action, overrideReason)
+    showToast(`Override applied: ${action}`)
+    setOverrideOpen(false)
+    setOverrideReason("")
+    router.push("/")
+  }
+
+  async function handleReturn() {
+    if (!id) return
+    await returnPayment(id)
+    showToast("Payment returned to sender")
+    router.push("/investigations")
+  }
+
+  async function handlePendingOutreach() {
+    if (!id) return
+    await markPendingOutreach(id)
+    showToast("Marked as awaiting sender response")
+    router.push("/investigations")
+  }
+
+  async function handleApplyWithNote() {
+    if (!id || !applyNote.trim()) return
+    await overridePayment(id, "APPLY", applyNote)
+    showToast("Payment applied with investigation note")
+    setApplyNoteOpen(false)
+    setApplyNote("")
+    router.push("/investigations")
+  }
+
+  async function handleReprocess() {
+    if (!id) return
+    await reprocessPayment(id)
+    showToast("Reprocess request submitted")
+    getPayment(id).then(setDetail)
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--pw-bg)" }}>
+        <p style={{ fontSize: 14, color: "var(--pw-text-muted)" }}>Loading…</p>
+      </div>
+    )
+  }
+
+  if (!detail) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "var(--pw-bg)" }}>
         <div style={{ textAlign: "center" }}>
-          <p style={{ fontSize: 18, color: "var(--pw-text-secondary)", marginBottom: 12 }}>
-            {isNotFound ? "Payment not found" : "Failed to load payment"}
-          </p>
+          <p style={{ fontSize: 18, color: "var(--pw-text-secondary)", marginBottom: 12 }}>Payment not found</p>
           <button
             onClick={() => router.push("/")}
             style={{ color: "var(--pw-primary)", fontSize: 14, background: "none", border: "none", cursor: "pointer" }}
@@ -132,13 +240,16 @@ export default function PaymentDetail() {
     )
   }
 
-  const payment = data?.payment
-  const signals = data?.signals
-  const rec = data?.recommendation
-  const logs = data?.audit_logs ?? []
-  const annotations = data?.annotations ?? []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payment = detail.payment as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const signals = detail.signals as any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rec = detail.recommendation as any
+  const logs = detail.audit_logs
+  const annotations = detail.annotations
 
-  const policyId = payment?.matched_policy_id ?? null
+  const policyId = payment.matched_policy_id as string | null
   const policy = policyId ? POLICY_INFO[policyId] : null
   const paymentHistory = policyId ? (PAYMENT_HISTORY[policyId] ?? []) : []
 
@@ -157,35 +268,59 @@ export default function PaymentDetail() {
     rec?.recommendation === "hold" ? "rgba(245,158,11,0.4)" :
     "rgba(239,68,68,0.4)"
 
-  const nameSimilarity = signals?.matching.name_similarity_score ?? 0
-  const variance = signals?.amount.amount_variance_pct ?? 0
-  const isDuplicate = signals?.duplicate.is_duplicate_match ?? false
-  const duplicateOf = signals?.duplicate.duplicate_payment_id
-  const usedLLM = signals?.matching.used_llm ?? false
+  const nameSimilarity = signals?.matching?.name_similarity_score ?? 0
+  const variance = signals?.amount?.amount_variance_pct ?? 0
+  const isDuplicate = signals?.duplicate?.is_duplicate_match ?? false
+  const duplicateOf = signals?.duplicate?.duplicate_payment_id
+  const usedLLM = signals?.matching?.used_llm ?? false
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--pw-bg)", display: "flex", flexDirection: "column" }}>
       {/* Nav */}
       <nav style={{
-        height: "var(--pw-nav-height)", background: "var(--pw-surface)",
-        borderBottom: "1px solid var(--pw-border)", display: "flex",
-        alignItems: "center", padding: "0 20px", gap: 12, position: "sticky", top: 0, zIndex: 50,
+        height: "var(--pw-nav-height)",
+        background: "var(--pw-surface)",
+        borderBottom: "1px solid var(--pw-border)",
+        display: "flex",
+        alignItems: "center",
+        padding: "0 20px",
+        gap: 12,
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: "auto" }}>
-          <div style={{ width: 28, height: 28, background: "var(--pw-primary)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{
+            width: 28, height: 28, background: "var(--pw-primary)", borderRadius: 6,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
             <span style={{ color: "#fff", fontWeight: 700, fontSize: 13, fontFamily: "var(--pw-font-display)" }}>P</span>
           </div>
-          <span style={{ fontWeight: 700, fontSize: 15, fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)" }}>PayWise</span>
+          <span style={{ fontWeight: 700, fontSize: 15, fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)" }}>
+            PayWise
+          </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--pw-bg)", border: "1px solid var(--pw-border)", borderRadius: 8, padding: "5px 10px", width: 200 }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6,
+          background: "var(--pw-bg)", border: "1px solid var(--pw-border)",
+          borderRadius: 8, padding: "5px 10px", width: 200,
+        }}>
           <span style={{ fontSize: 12, color: "var(--pw-text-muted)", flex: 1 }}>Search…</span>
           <span style={{ fontSize: 10, color: "var(--pw-text-muted)", background: "var(--pw-border)", padding: "1px 4px", borderRadius: 3 }}>⌘K</span>
         </div>
         <Bell size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
         <Settings size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
-        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--pw-primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 11 }}>
-          PV
-        </div>
+        <button
+          onClick={() => { logout(); router.push("/login") }}
+          title={`${user?.name} — sign out`}
+          style={{
+            width: 28, height: 28, borderRadius: "50%", background: "var(--pw-primary)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontWeight: 700, fontSize: 11, border: "none", cursor: "pointer",
+          }}
+        >
+          {user?.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) ?? "?"}
+        </button>
       </nav>
 
       {/* Page header */}
@@ -193,49 +328,62 @@ export default function PaymentDetail() {
         <button
           onClick={() => router.back()}
           aria-label="Go back"
-          style={{ display: "flex", alignItems: "center", gap: 5, color: "var(--pw-text-secondary)", fontSize: 13, background: "none", border: "none", cursor: "pointer", marginBottom: 6, padding: 0 }}
+          style={{
+            display: "flex", alignItems: "center", gap: 5,
+            color: "var(--pw-text-secondary)", fontSize: 13,
+            background: "none", border: "none", cursor: "pointer", marginBottom: 6, padding: 0,
+          }}
         >
           <ArrowLeft size={14} />
           Back
         </button>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {isLoading ? (
-            <Skeleton style={{ height: 28, width: 160 }} />
-          ) : (
-            <>
-              <h1 style={{ fontSize: 22, fontWeight: 700, fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)", margin: 0 }}>
-                Case {payment?.payment_id}
-              </h1>
-              {payment?.sla_breached && <span className="pw-badge pw-badge-escalate">SLA Breached</span>}
-            </>
+          <h1 style={{
+            fontSize: 22, fontWeight: 700, fontFamily: "var(--pw-font-display)",
+            color: "var(--pw-text-primary)", margin: 0,
+          }}>
+            Case {payment.payment_id}
+          </h1>
+          {payment.sla_breached && (
+            <span className="pw-badge pw-badge-escalate">SLA Breached</span>
           )}
         </div>
-        {isLoading ? (
-          <Skeleton style={{ height: 14, width: 220, marginTop: 4 }} />
-        ) : (
-          <p style={{ fontSize: 12, color: "var(--pw-text-muted)", margin: "3px 0 0" }}>
-            Payment received {payment ? formatDateTime(payment.created_timestamp) : ""}
-          </p>
-        )}
+        <p style={{ fontSize: 12, color: "var(--pw-text-muted)", margin: "3px 0 0" }}>
+          Payment received {formatDateTime(payment.created_timestamp)}
+        </p>
       </div>
 
       {/* Body — two-column */}
-      <div style={{ display: "flex", gap: 20, flex: 1, padding: "20px 24px", maxWidth: 1200, width: "100%", boxSizing: "border-box" }}>
+      <div style={{
+        display: "flex",
+        gap: 20,
+        flex: 1,
+        padding: "20px 24px",
+        maxWidth: 1200,
+        width: "100%",
+        boxSizing: "border-box",
+      }}>
         {/* Left column */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
 
           {/* AI Recommendation banner */}
-          {isLoading ? (
-            <div style={{ borderRadius: 12, padding: "16px 20px", background: "var(--pw-surface-elevated)" }}>
-              <Skeleton style={{ height: 20, width: 260, marginBottom: 8 }} />
-              <Skeleton className="h-3 w-full rounded" style={{ marginBottom: 6 }} />
-              <Skeleton className="h-3 w-3/4 rounded" />
-            </div>
-          ) : rec && (
-            <div style={{ background: recTint, border: `1px solid ${recBorder}`, borderRadius: 12, padding: "16px 20px" }}>
+          {rec && (
+            <div style={{
+              background: recTint,
+              border: `1px solid ${recBorder}`,
+              borderRadius: 12,
+              padding: "16px 20px",
+            }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <div style={{ width: 24, height: 24, borderRadius: "50%", background: recColor, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  {rec.recommendation === "apply" ? <CheckCircle2 size={13} color="#fff" /> : rec.recommendation === "hold" ? <Clock size={13} color="#fff" /> : <AlertTriangle size={13} color="#fff" />}
+                <div style={{
+                  width: 24, height: 24, borderRadius: "50%", background: recColor,
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>
+                  {rec.recommendation === "apply"
+                    ? <CheckCircle2 size={13} color="#fff" />
+                    : rec.recommendation === "hold"
+                    ? <Clock size={13} color="#fff" />
+                    : <AlertTriangle size={13} color="#fff" />}
                 </div>
                 <span style={{ fontWeight: 700, fontSize: 15, color: recColor, fontFamily: "var(--pw-font-display)" }}>
                   AI Recommendation: {rec.recommendation.toUpperCase()}
@@ -245,39 +393,62 @@ export default function PaymentDetail() {
                 Confidence Score: {rec.confidence_score}%
               </p>
 
+              {/* First reasoning line */}
               <div style={{ margin: "0 0 14px" }}>
-                <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px" }}>REASONING</p>
-                <p style={{ fontSize: 13, color: "var(--pw-text-primary)", margin: 0 }}>{rec.reasoning[0]}</p>
+                <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px" }}>
+                  REASONING
+                </p>
+                <p style={{ fontSize: 13, color: "var(--pw-text-primary)", margin: 0 }}>
+                  {rec.reasoning[0]}
+                </p>
               </div>
 
+              {/* Signal mini-grid */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <div style={{ background: "rgba(255,255,255,0.65)", borderRadius: 8, padding: "10px 12px" }}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px" }}>BEST NAME MATCH</p>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px" }}>
+                    BEST NAME MATCH
+                  </p>
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--pw-text-primary)", margin: 0 }}>
-                    {payment?.beneficiary_name ?? payment?.sender_name}
+                    {payment.beneficiary_name ?? payment.sender_name}
                     {signals?.risk.account_status === "inactive" ? " (INACTIVE)" : ""}
                   </p>
                 </div>
                 <div style={{ background: "rgba(255,255,255,0.65)", borderRadius: 8, padding: "10px 12px" }}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px" }}>SIMILARITY SCORE</p>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--pw-text-primary)", margin: 0 }}>{nameSimilarity}%{usedLLM ? " (LLM)" : ""}</p>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px" }}>
+                    SIMILARITY SCORE
+                  </p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "var(--pw-text-primary)", margin: 0 }}>
+                    {nameSimilarity}%{usedLLM ? " (LLM)" : ""}
+                  </p>
                 </div>
                 <div style={{ background: "rgba(255,255,255,0.65)", borderRadius: 8, padding: "10px 12px" }}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px" }}>AMOUNT CORRELATION</p>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px" }}>
+                    AMOUNT CORRELATION
+                  </p>
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--pw-text-primary)", margin: 0 }}>
                     {variance === 0 ? "On target" : `${variance > 0 ? "+" : ""}${variance}% variance`}
                   </p>
                 </div>
                 <div style={{ background: "rgba(255,255,255,0.65)", borderRadius: 8, padding: "10px 12px" }}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px" }}>DUPLICATE CHECK</p>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 4px" }}>
+                    DUPLICATE CHECK
+                  </p>
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--pw-text-primary)", margin: 0 }}>
                     {isDuplicate && duplicateOf ? `Duplicate of ${duplicateOf}` : "No duplicates"}
                   </p>
                 </div>
               </div>
 
+              {/* Manual review required */}
               {rec.requires_human_approval && (
-                <div style={{ marginTop: 12, background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.35)", borderRadius: 6, padding: "7px 12px", display: "flex", alignItems: "center", gap: 7 }}>
+                <div style={{
+                  marginTop: 12,
+                  background: "rgba(245,158,11,0.10)",
+                  border: "1px solid rgba(245,158,11,0.35)",
+                  borderRadius: 6, padding: "7px 12px",
+                  display: "flex", alignItems: "center", gap: 7,
+                }}>
                   <AlertTriangle size={12} color="var(--pw-hold)" style={{ flexShrink: 0 }} />
                   <span style={{ fontSize: 12, color: "#92400e" }}>
                     Manual Review Required: {rec.approval_reason ?? "Confidence < 90% or risk flags detected"}
@@ -288,180 +459,238 @@ export default function PaymentDetail() {
           )}
 
           {/* Decision Actions */}
-          {isLoading ? (
-            <div style={{ display: "flex", gap: 10 }}>
-              <Skeleton style={{ height: 38, width: 140 }} />
-              <Skeleton style={{ height: 38, width: 180 }} />
-              <Skeleton style={{ height: 38, width: 110 }} />
-            </div>
-          ) : (
-            <>
-              {payment?.status === "held" && rec && (
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {payment.status === "held" && rec && user?.role === "analyst" && (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {rec.recommendation === "escalate" ? (
+                <>
                   <button
-                    disabled={actionLoading !== null}
-                    onClick={() => callAction("approve", undefined, `Payment ${payment.payment_id} approved`)}
-                    style={{ background: recColor, color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: actionLoading ? "not-allowed" : "pointer", opacity: actionLoading ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}
-                  >
-                    {rec.recommendation === "apply" ? <CheckCircle2 size={14} /> : <Clock size={14} />}
-                    {actionLoading === "approve" ? "Applying…" : `Accept ${rec.recommendation.toUpperCase()}`}
-                  </button>
-                  <button
-                    disabled={actionLoading !== null}
-                    onClick={() => setOverrideOpen(true)}
-                    style={{ background: "var(--pw-text-primary)", color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: actionLoading ? "not-allowed" : "pointer", opacity: actionLoading ? 0.7 : 1 }}
-                  >
-                    Override Recommendation
-                  </button>
-                  <button
-                    disabled={actionLoading !== null}
-                    onClick={() => callAction("reject", undefined, `Payment ${payment.payment_id} escalated`)}
-                    style={{ background: "transparent", color: "var(--pw-escalate)", border: "1px solid var(--pw-escalate)", borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: actionLoading ? "not-allowed" : "pointer", opacity: actionLoading ? 0.7 : 1, display: "flex", alignItems: "center", gap: 6 }}
+                    onClick={handleReject}
+                    style={{
+                      background: "var(--pw-escalate)", color: "#fff", border: "none",
+                      borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    }}
                   >
                     <AlertTriangle size={14} />
-                    {actionLoading === "reject" ? "Escalating…" : "Escalate"}
-                  </button>
-                </div>
-              )}
-
-              {payment?.status === "applied" && (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span className="pw-badge pw-badge-apply" style={{ padding: "6px 14px", fontSize: 12 }}>
-                    ✓ Applied — No action required
-                  </span>
-                </div>
-              )}
-
-              {(payment?.status === "escalated" || payment?.status === "pending_sender_response") && (
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button
-                    disabled={actionLoading !== null}
-                    onClick={() => callAction("return", undefined, "Marked as returned to sender")}
-                    style={{ background: "var(--pw-text-primary)", color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: actionLoading ? "not-allowed" : "pointer", opacity: actionLoading ? 0.7 : 1 }}
-                  >
-                    {actionLoading === "return" ? "Returning…" : "Return to Sender"}
+                    Escalate to Investigator
                   </button>
                   <button
-                    disabled={actionLoading !== null}
                     onClick={() => setOverrideOpen(true)}
-                    style={{ background: "transparent", color: "var(--pw-primary)", border: "1px solid var(--pw-primary)", borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: actionLoading ? "not-allowed" : "pointer", opacity: actionLoading ? 0.7 : 1 }}
+                    style={{
+                      background: "transparent", color: "var(--pw-apply)",
+                      border: "1px solid var(--pw-apply)", borderRadius: 8,
+                      padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    }}
                   >
-                    Add Investigation Note
+                    <CheckCircle2 size={14} />
+                    Override & Apply
                   </button>
-                </div>
-              )}
-
-              {payment?.status === "processing_failed" && (
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                </>
+              ) : (
+                <>
                   <button
-                    disabled={actionLoading !== null}
-                    onClick={() => callAction("reprocess", undefined, "Reprocess request submitted")}
-                    style={{ background: "var(--pw-hold)", color: "#fff", border: "none", borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: actionLoading ? "not-allowed" : "pointer", opacity: actionLoading ? 0.7 : 1 }}
+                    onClick={handleApprove}
+                    style={{
+                      background: "var(--pw-apply)", color: "#fff", border: "none",
+                      borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    }}
                   >
-                    {actionLoading === "reprocess" ? "Submitting…" : "Reprocess Payment"}
+                    <CheckCircle2 size={14} />
+                    Apply Payment
                   </button>
-                </div>
+                  <button
+                    onClick={handleReject}
+                    style={{
+                      background: "transparent", color: "var(--pw-escalate)",
+                      border: "1px solid var(--pw-escalate)", borderRadius: 8,
+                      padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    <AlertTriangle size={14} />
+                    Escalate to Investigator
+                  </button>
+                </>
               )}
-            </>
+            </div>
+          )}
+
+          {payment.status === "applied" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="pw-badge pw-badge-apply" style={{ padding: "6px 14px", fontSize: 12 }}>
+                ✓ Applied — No action required
+              </span>
+            </div>
+          )}
+
+          {(payment.status === "escalated" || payment.status === "pending_sender_response") && user?.role === "investigator" && (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setApplyNoteOpen(true)}
+                style={{
+                  background: "var(--pw-apply)", color: "#fff", border: "none",
+                  borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                }}
+              >
+                <CheckCircle2 size={14} />
+                Apply Payment
+              </button>
+              {payment.status === "escalated" && (
+                <button
+                  onClick={handlePendingOutreach}
+                  style={{
+                    background: "transparent", color: "var(--pw-hold)",
+                    border: "1px solid var(--pw-hold)", borderRadius: 8,
+                    padding: "9px 20px", fontWeight: 600, fontSize: 13,
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  <Clock size={14} />
+                  Awaiting Sender Response
+                </button>
+              )}
+              <button
+                onClick={handleReturn}
+                style={{
+                  background: "transparent", color: "var(--pw-text-primary)",
+                  border: "1px solid var(--pw-border)", borderRadius: 8,
+                  padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                }}
+              >
+                Return to Sender
+              </button>
+              <button
+                onClick={() => setOverrideOpen(true)}
+                style={{
+                  background: "transparent", color: "var(--pw-primary)",
+                  border: "1px solid var(--pw-primary)", borderRadius: 8,
+                  padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                }}
+              >
+                Add Investigation Note
+              </button>
+            </div>
+          )}
+
+          {payment.status === "processing_failed" && (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button
+                onClick={handleReprocess}
+                style={{
+                  background: "var(--pw-hold)", color: "#fff", border: "none",
+                  borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                }}
+              >
+                Reprocess Payment
+              </button>
+            </div>
           )}
 
           {/* Payment Information */}
           <div className="pw-card" style={{ padding: 20 }}>
-            <h2 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px", color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)" }}>
+            <h2 style={{
+              fontSize: 15, fontWeight: 700, margin: "0 0 16px",
+              color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)",
+            }}>
               Payment Information
             </h2>
-            {isLoading ? (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 24px" }}>
-                {Array.from({ length: 6 }, (_: unknown, i: number) => (
-                  <div key={i}>
-                    <Skeleton style={{ height: 10, width: 80, marginBottom: 6 }} />
-                    <Skeleton className="h-3 w-full rounded" />
-                  </div>
-                ))}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 24px" }}>
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>SENDER NAME</p>
+                <p style={{ fontSize: 14, fontWeight: 500, color: "var(--pw-text-primary)", margin: 0 }}>{payment.sender_name}</p>
               </div>
-            ) : payment && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px 24px" }}>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>SENDER NAME</p>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: "var(--pw-text-primary)", margin: 0 }}>{payment.sender_name}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>AMOUNT</p>
-                  <p style={{ fontSize: 22, fontWeight: 700, color: "var(--pw-text-primary)", margin: 0, fontFamily: "var(--pw-font-mono)" }}>{formatUSD(payment.amount)}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>PAYMENT DATE</p>
-                  <p style={{ fontSize: 14, color: "var(--pw-text-primary)", margin: 0 }}>{payment.payment_date.slice(0, 10)}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>PAYMENT METHOD</p>
-                  <p style={{ fontSize: 14, color: "var(--pw-text-primary)", margin: 0 }}>{payment.payment_method}</p>
-                </div>
-                {(payment.reference_field_1 || payment.reference_field_2) && (
-                  <div style={{ gridColumn: "1 / -1" }}>
-                    <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>REFERENCE</p>
-                    <p style={{ fontSize: 14, fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)", margin: 0 }}>
-                      {[payment.reference_field_1, payment.reference_field_2].filter(Boolean).join(" / ")}
-                    </p>
-                  </div>
-                )}
-                {payment.sender_account && (
-                  <div>
-                    <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>ACCOUNT</p>
-                    <p style={{ fontSize: 14, fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)", margin: 0 }}>{payment.sender_account}</p>
-                  </div>
-                )}
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>AMOUNT</p>
+                <p style={{ fontSize: 22, fontWeight: 700, color: "var(--pw-text-primary)", margin: 0, fontFamily: "var(--pw-font-mono)" }}>
+                  {formatUSD(payment.amount)}
+                </p>
               </div>
-            )}
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>PAYMENT DATE</p>
+                <p style={{ fontSize: 14, color: "var(--pw-text-primary)", margin: 0 }}>{payment.payment_date.slice(0, 10)}</p>
+              </div>
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>PAYMENT METHOD</p>
+                <p style={{ fontSize: 14, color: "var(--pw-text-primary)", margin: 0 }}>{payment.payment_method}</p>
+              </div>
+              {(payment.reference_field_1 || payment.reference_field_2) && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>REFERENCE</p>
+                  <p style={{ fontSize: 14, fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)", margin: 0 }}>
+                    {[payment.reference_field_1, payment.reference_field_2].filter(Boolean).join(" / ")}
+                  </p>
+                </div>
+              )}
+              {payment.sender_account && (
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>ACCOUNT</p>
+                  <p style={{ fontSize: 14, fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)", margin: 0 }}>{payment.sender_account}</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Payment History */}
-          {!isLoading && paymentHistory.length > 0 && (
+          {paymentHistory.length > 0 && (
             <div className="pw-card" style={{ padding: 20 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 14px", color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)" }}>
+              <h2 style={{
+                fontSize: 15, fontWeight: 700, margin: "0 0 14px",
+                color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)",
+              }}>
                 Payment History
               </h2>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {paymentHistory.map((h, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: i < paymentHistory.length - 1 ? "1px solid var(--pw-border)" : "none" }}>
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "9px 0",
+                      borderBottom: i < paymentHistory.length - 1 ? "1px solid var(--pw-border)" : "none",
+                    }}
+                  >
                     <div>
                       <p style={{ fontSize: 13, fontWeight: 500, color: "var(--pw-text-primary)", margin: 0 }}>{h.date}</p>
                       <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: "2px 0 0" }}>{h.desc}</p>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)" }}>{formatUSD(h.amount)}</span>
+                      <span style={{ fontSize: 14, fontWeight: 600, fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)" }}>
+                        {formatUSD(h.amount)}
+                      </span>
                       <span className="pw-badge pw-badge-apply">Applied</span>
                     </div>
                   </div>
                 ))}
               </div>
+              <p style={{ fontSize: 12, color: "var(--pw-text-muted)", margin: "10px 0 0" }}>Regular payment history</p>
             </div>
           )}
 
           {/* Audit Trail */}
-          {isLoading ? (
+          {logs.length > 0 && (
             <div className="pw-card" style={{ padding: 20 }}>
-              <Skeleton style={{ height: 16, width: 100, marginBottom: 16 }} />
-              {Array.from({ length: 4 }, (_: unknown, i: number) => (
-                <div key={i} style={{ marginBottom: 12 }}>
-                  <Skeleton className="h-3 w-full rounded" style={{ marginBottom: 4 }} />
-                  <Skeleton style={{ height: 10, width: "60%" }} />
-                </div>
-              ))}
-            </div>
-          ) : logs.length > 0 && (
-            <div className="pw-card" style={{ padding: 20 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 16px", color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)" }}>
+              <h2 style={{
+                fontSize: 15, fontWeight: 700, margin: "0 0 16px",
+                color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)",
+              }}>
                 Audit Trail
               </h2>
               <div>
                 {logs.map((log, i) => (
                   <div key={log.log_id} style={{ display: "flex", gap: 12, paddingBottom: i < logs.length - 1 ? 16 : 0 }}>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                      <div style={{ width: 10, height: 10, borderRadius: "50%", flexShrink: 0, marginTop: 3, background: log.action_type === "sla_breached" ? "var(--pw-escalate)" : "var(--pw-primary)" }} />
-                      {i < logs.length - 1 && <div style={{ width: 1, flex: 1, background: "var(--pw-border)", marginTop: 3 }} />}
+                      <div style={{
+                        width: 10, height: 10, borderRadius: "50%", flexShrink: 0, marginTop: 3,
+                        background: log.action_type === "sla_breached" ? "var(--pw-escalate)" : "var(--pw-primary)",
+                      }} />
+                      {i < logs.length - 1 && (
+                        <div style={{ width: 1, flex: 1, background: "var(--pw-border)", marginTop: 3 }} />
+                      )}
                     </div>
-                    <div>
+                    <div style={{ paddingBottom: i < logs.length - 1 ? 0 : 0 }}>
                       <p style={{ fontSize: 11, color: "var(--pw-text-muted)", margin: "0 0 2px" }}>
                         {new Date(log.timestamp).toLocaleDateString()} {formatAuditTime(log.timestamp)} — {auditActor(log.actor, log.action_type)}
                       </p>
@@ -470,7 +699,9 @@ export default function PaymentDetail() {
                       </p>
                       {log.details && (
                         <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>
-                          {Object.entries(log.details as Record<string, unknown>).map(([k, v]) => `${k}: ${v}`).join(", ")}
+                          {Object.entries(log.details as unknown as Record<string, unknown>)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(", ")}
                         </p>
                       )}
                     </div>
@@ -481,9 +712,12 @@ export default function PaymentDetail() {
           )}
 
           {/* Case Notes */}
-          {!isLoading && annotations.length > 0 && (
+          {annotations.length > 0 && (
             <div className="pw-card" style={{ padding: 20 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 14px", color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)" }}>
+              <h2 style={{
+                fontSize: 15, fontWeight: 700, margin: "0 0 14px",
+                color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)",
+              }}>
                 Case Notes
               </h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -504,16 +738,14 @@ export default function PaymentDetail() {
         <div style={{ width: 240, flexShrink: 0, display: "flex", flexDirection: "column", gap: 14 }}>
           {/* Matched Policy */}
           <div className="pw-card" style={{ padding: 20 }}>
-            <h2 style={{ fontSize: 11, fontWeight: 700, margin: "0 0 16px", color: "var(--pw-text-muted)", fontFamily: "var(--pw-font-display)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <h2 style={{
+              fontSize: 11, fontWeight: 700, margin: "0 0 16px",
+              color: "var(--pw-text-muted)", fontFamily: "var(--pw-font-display)",
+              textTransform: "uppercase", letterSpacing: "0.05em",
+            }}>
               Matched Policy
             </h2>
-            {isLoading ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {Array.from({ length: 4 }, (_: unknown, i: number) => (
-                  <Skeleton key={i} className="h-3 w-full rounded" />
-                ))}
-              </div>
-            ) : policy && policyId ? (
+            {policy && policyId ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>POLICY NUMBER</p>
@@ -541,7 +773,10 @@ export default function PaymentDetail() {
                 </div>
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>CURRENT BALANCE</p>
-                  <p style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--pw-font-mono)", margin: 0, color: policy.balance_cents > 0 ? "var(--pw-escalate)" : "var(--pw-text-primary)" }}>
+                  <p style={{
+                    fontSize: 15, fontWeight: 700, fontFamily: "var(--pw-font-mono)", margin: 0,
+                    color: policy.balance_cents > 0 ? "var(--pw-escalate)" : "var(--pw-text-primary)",
+                  }}>
                     {formatUSD(policy.balance_cents)}
                   </p>
                 </div>
@@ -553,34 +788,28 @@ export default function PaymentDetail() {
 
           {/* Case metadata */}
           <div className="pw-card" style={{ padding: "16px 20px" }}>
-            {isLoading ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {Array.from({ length: 4 }, (_: unknown, i: number) => (
-                  <Skeleton key={i} className="h-3 w-full rounded" />
-                ))}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>CASE ID</p>
+                <p style={{ fontSize: 13, fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)", margin: 0 }}>{payment.payment_id}</p>
               </div>
-            ) : payment && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>CASE ID</p>
-                  <p style={{ fontSize: 13, fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-primary)", margin: 0 }}>{payment.payment_id}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>OPENED</p>
-                  <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>{formatDateTime(payment.created_timestamp)}</p>
-                </div>
-                <div>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>STATUS</p>
-                  <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>{statusLabel(payment.status)}</p>
-                </div>
-                {rec && (
-                  <div>
-                    <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>SCENARIO</p>
-                    <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>{rec.scenario_route.replace("_", " ")}</p>
-                  </div>
-                )}
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>OPENED</p>
+                <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>{formatDateTime(payment.created_timestamp)}</p>
               </div>
-            )}
+              <div>
+                <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 3px" }}>STATUS</p>
+                <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>{statusLabel(payment.status)}</p>
+              </div>
+              {rec && (
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>SCENARIO</p>
+                  <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>
+                    {rec.scenario_route.replace("_", " ")}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -588,16 +817,24 @@ export default function PaymentDetail() {
       {/* Override modal */}
       {overrideOpen && (
         <div
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
           onClick={() => setOverrideOpen(false)}
         >
           <div
             role="dialog"
             aria-label="Override Recommendation"
-            style={{ background: "var(--pw-surface)", borderRadius: 12, padding: 24, width: 420, boxShadow: "0 20px 40px rgba(0,0,0,0.15)" }}
+            style={{
+              background: "var(--pw-surface)", borderRadius: 12, padding: 24, width: 420,
+              boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+            }}
             onClick={e => e.stopPropagation()}
           >
-            <h2 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 8px", fontFamily: "var(--pw-font-display)" }}>Override Recommendation</h2>
+            <h2 style={{ fontSize: 17, fontWeight: 700, margin: "0 0 8px", fontFamily: "var(--pw-font-display)" }}>
+              Override Recommendation
+            </h2>
             <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "0 0 16px" }}>
               Provide a reason for overriding the AI recommendation. This will be logged in the audit trail.
             </p>
@@ -607,32 +844,114 @@ export default function PaymentDetail() {
               onChange={e => setOverrideReason(e.target.value)}
               placeholder="Enter reason for override…"
               rows={4}
-              style={{ width: "100%", border: "1px solid var(--pw-border)", borderRadius: 8, padding: "10px 12px", fontSize: 13, resize: "vertical", boxSizing: "border-box", fontFamily: "var(--pw-font-sans)", outline: "none" }}
+              style={{
+                width: "100%", border: "1px solid var(--pw-border)", borderRadius: 8,
+                padding: "10px 12px", fontSize: 13, resize: "vertical",
+                boxSizing: "border-box", fontFamily: "var(--pw-font-sans)",
+                outline: "none",
+              }}
             />
             <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
               <button
                 onClick={() => { setOverrideOpen(false); setOverrideReason("") }}
-                style={{ background: "none", border: "1px solid var(--pw-border)", borderRadius: 8, padding: "8px 18px", fontSize: 13, cursor: "pointer" }}
+                style={{
+                  background: "none", border: "1px solid var(--pw-border)", borderRadius: 8,
+                  padding: "8px 18px", fontSize: 13, cursor: "pointer",
+                }}
               >
                 Cancel
               </button>
               <button
-                disabled={overrideReason.trim().length === 0 || actionLoading !== null}
-                onClick={async () => {
-                  setOverrideOpen(false)
-                  await callAction("override", { reason: overrideReason }, "Override recorded")
-                  setOverrideReason("")
-                }}
+                disabled={overrideReason.trim().length === 0}
+                onClick={() => handleOverride("APPLY")}
                 style={{
-                  background: overrideReason.trim() && !actionLoading ? "var(--pw-primary)" : "var(--pw-text-muted)",
-                  color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600,
-                  cursor: overrideReason.trim() && !actionLoading ? "pointer" : "not-allowed",
+                  background: overrideReason.trim() ? "var(--pw-primary)" : "var(--pw-text-muted)",
+                  color: "#fff", border: "none", borderRadius: 8,
+                  padding: "8px 18px", fontSize: 13, fontWeight: 600,
+                  cursor: overrideReason.trim() ? "pointer" : "not-allowed",
                 }}
               >
                 Submit Override
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Apply with Note modal (investigator) */}
+      {applyNoteOpen && (
+        <div
+          style={{
+            position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 50,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={() => setApplyNoteOpen(false)}
+        >
+          <div
+            style={{
+              background: "var(--pw-surface)", borderRadius: 12, padding: 24, width: 440, maxWidth: "90vw",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--pw-text-primary)" }}>
+              Apply Payment
+            </h3>
+            <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--pw-text-secondary)" }}>
+              Add an investigation note explaining why this payment is being applied.
+            </p>
+            <textarea
+              autoFocus
+              rows={4}
+              aria-label="Investigation note"
+              value={applyNote}
+              onChange={e => setApplyNote(e.target.value)}
+              placeholder="Enter investigation findings and reason for applying…"
+              style={{
+                width: "100%", borderRadius: 8, border: "1px solid var(--pw-border)",
+                padding: "10px 12px", fontSize: 13, background: "var(--pw-bg)",
+                color: "var(--pw-text-primary)", resize: "vertical", boxSizing: "border-box",
+              }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+              <button
+                style={{
+                  background: "none", border: "1px solid var(--pw-border)", borderRadius: 8,
+                  padding: "8px 18px", fontSize: 13, cursor: "pointer",
+                }}
+                onClick={() => { setApplyNoteOpen(false); setApplyNote("") }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={applyNote.trim().length === 0}
+                onClick={handleApplyWithNote}
+                style={{
+                  background: applyNote.trim() ? "var(--pw-apply)" : "var(--pw-text-muted)",
+                  color: "#fff", border: "none", borderRadius: 8,
+                  padding: "8px 18px", fontSize: 13, fontWeight: 600,
+                  cursor: applyNote.trim() ? "pointer" : "not-allowed",
+                }}
+              >
+                Apply Payment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div
+          role="status"
+          style={{
+            position: "fixed", bottom: 48, right: 24,
+            background: "var(--pw-text-primary)", color: "#fff",
+            padding: "10px 20px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+            zIndex: 200, boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+          }}
+        >
+          {toast}
         </div>
       )}
 
@@ -645,6 +964,7 @@ export default function PaymentDetail() {
       }}>
         <span style={{ color: "var(--pw-apply)", fontWeight: 600 }}>● Audit Active</span>
         <span>User: Priya Venkataraman</span>
+        <span>Last sync: 2 minutes ago</span>
         <span style={{ marginLeft: "auto" }}>
           Press{" "}
           <kbd style={{ background: "var(--pw-surface-elevated)", padding: "1px 5px", borderRadius: 3, fontFamily: "var(--pw-font-mono)" }}>?</kbd>

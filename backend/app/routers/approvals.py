@@ -19,13 +19,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import CurrentUser, require_analyst, require_analyst_or_investigator, require_investigator
 from app.database import get_db
 from app.services.pipeline import run_pipeline
-from app.services.persist import _SLA_HOURS, _target_status
+from app.services.persist import _SLA_HOURS
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/payments", tags=["approvals"])
 
 _OVERRIDE_ACTIONS = {"APPLY", "HOLD", "ESCALATE"}
+_OVERRIDE_STATUS_MAP = {"APPLY": "applied", "HOLD": "held", "ESCALATE": "escalated"}
 _APPROVABLE_STATUSES = {"held"}
 _REJECTABLE_STATUSES = {"held"}
 _RETURNABLE_STATUSES = {"escalated", "pending_sender_response"}
@@ -225,7 +226,7 @@ async def override_payment(
     payment = await _load_payment(payment_id, db)
     _assert_status(payment, _OVERRIDABLE_STATUSES, "override")
 
-    new_status = _target_status(body.override_action, requires_human_approval=False)
+    new_status = _OVERRIDE_STATUS_MAP[body.override_action]
     policy_id = payment.get("matched_policy_id")
     due_date = None
 
@@ -292,6 +293,34 @@ async def return_payment(
     await db.commit()
     logger.info("%s marked %s as returned", current_user.user_id, payment_id)
     return {"payment_id": payment_id, "status": "returned"}
+
+
+# ── POST /outreach ────────────────────────────────────────────────────────────
+
+@router.post("/{payment_id}/outreach")
+async def mark_pending_outreach(
+    payment_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: CurrentUser = Depends(require_investigator),
+):
+    """Damien marks an escalated payment as awaiting sender response."""
+    payment = await _load_payment(payment_id, db)
+    _assert_status(payment, {"escalated"}, "outreach")
+
+    due_date = datetime.now(timezone.utc) + timedelta(hours=_SLA_HOURS)
+
+    await db.execute(text("""
+        UPDATE payments
+        SET status = 'pending_sender_response', investigation_due_date = :due_date
+        WHERE payment_id = :id
+    """), {"id": payment_id, "due_date": due_date})
+
+    await _write_audit(payment_id, "escalated", current_user.name, current_user.user_id,
+                       {"action": "marked_pending_outreach", "sla_due": due_date.isoformat()}, db)
+
+    await db.commit()
+    logger.info("%s marked %s as pending_sender_response", current_user.user_id, payment_id)
+    return {"payment_id": payment_id, "status": "pending_sender_response"}
 
 
 # ── POST /reprocess ───────────────────────────────────────────────────────────

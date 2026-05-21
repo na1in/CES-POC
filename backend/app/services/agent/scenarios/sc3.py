@@ -38,7 +38,7 @@ def _variance_tier(variance_pct: float) -> int:
 def _decide(signals: dict, thresholds: dict) -> tuple[str, float, bool, str | None, str]:
     """Returns (recommendation, confidence, requires_approval, approval_reason, decision_path)."""
     name_score = float(signals.get("name_similarity_score", 0))
-    variance = abs(float(signals.get("amount_variance_pct", 0)))
+    variance = abs(float(signals.get("amount_variance_pct") or 0))
     is_multi_period = signals.get("is_multi_period", False)
     is_multi_method = signals.get("is_multi_method", False)
     is_third_party = signals.get("is_third_party_payment", False)
@@ -112,7 +112,7 @@ async def run(payment: dict, signals: dict, context: dict, thresholds: dict) -> 
     policy_number = context.get("policy_number", "unknown")
     customer_name = context.get("customer_name", "unknown")
     name_score = signals.get("name_similarity_score", 0)
-    variance = signals.get("amount_variance_pct", 0)
+    variance = signals.get("amount_variance_pct") or 0
 
     context_summary = (
         f"- Sender: {payment.get('sender_name')} vs policyholder: {customer_name} (similarity: {name_score:.0f}%)\n"

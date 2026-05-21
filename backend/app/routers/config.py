@@ -394,12 +394,13 @@ async def rollback_change_request(
 
     param = change["parameter_name"]
 
-    # Find the previous value (the history entry that was closed when this was deployed)
+    # Find the previous value (the history entry that was closed when this was deployed).
+    # Use IS DISTINCT FROM so NULL change_request_id entries are included — plain != excludes NULLs.
     prev_row = await db.execute(text("""
         SELECT parameter_value, version_id
         FROM configuration_threshold_history
         WHERE parameter_name = :param
-          AND change_request_id != :change_id
+          AND change_request_id IS DISTINCT FROM :change_id
         ORDER BY effective_from DESC
         LIMIT 1
     """), {"param": param, "change_id": change_id})

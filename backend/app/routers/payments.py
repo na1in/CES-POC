@@ -3,13 +3,14 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, StrictInt, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import AsyncSessionLocal, get_db
 from app.services.ingest import parse_reference_fields
+from app.services.pipeline import run_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -54,19 +55,33 @@ class IngestResponse(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _next_payment_id(db: AsyncSession) -> str:
-    result = await db.execute(text("SELECT MAX(payment_id) FROM payments"))
+    # Only consider numeric IDs (e.g. PMT-001) — skips seeded non-numeric ones like PMT-ESC-001
+    result = await db.execute(text("""
+        SELECT MAX(CAST(split_part(payment_id, '-', 2) AS INTEGER))
+        FROM payments
+        WHERE payment_id ~ '^PMT-[0-9]+$'
+    """))
     current_max = result.scalar_one_or_none()
-    if current_max is None:
-        next_num = 1
-    else:
-        next_num = int(current_max.split("-")[1]) + 1
+    next_num = (current_max or 0) + 1
     return f"PMT-{next_num:03d}"
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+async def _run_pipeline_bg(payment_id: str) -> None:
+    async with AsyncSessionLocal() as db:
+        try:
+            await run_pipeline(payment_id, db)
+        except Exception:
+            logger.exception("Background pipeline failed for %s", payment_id)
+
+
 @router.post("/ingest", status_code=status.HTTP_201_CREATED, response_model=IngestResponse)
-async def ingest_payment(body: IngestRequest, db: AsyncSession = Depends(get_db)):
+async def ingest_payment(
+    body: IngestRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
     # Parse free-text references with Claude Haiku (never raises)
     parsed = await parse_reference_fields(body.reference_field_1, body.reference_field_2)
 
@@ -113,6 +128,8 @@ async def ingest_payment(body: IngestRequest, db: AsyncSession = Depends(get_db)
 
     await db.commit()
     logger.info("Ingested %s — %s %s", payment_id, body.sender_name, body.amount)
+
+    background_tasks.add_task(_run_pipeline_bg, payment_id)
 
     return IngestResponse(payment_id=payment_id, status="received", created_timestamp=now)
 
@@ -203,10 +220,16 @@ async def list_payments(
             ps.has_risk_flags      AS sig_has_risk_flags,
             ps.payment_method_risk_level AS sig_pm_risk,
             ps.name_similarity_score AS sig_name_sim,
-            ps.account_status      AS sig_account_status
+            ps.account_status      AS sig_account_status,
+            esc.actor              AS escalated_by
         FROM payments p
         LEFT JOIN payment_recommendations pr ON pr.payment_id = p.payment_id
         LEFT JOIN payment_signals ps ON ps.payment_id = p.payment_id
+        LEFT JOIN LATERAL (
+            SELECT actor FROM audit_log
+            WHERE payment_id = p.payment_id AND action_type = 'escalated'
+            ORDER BY timestamp DESC LIMIT 1
+        ) esc ON true
         {where_clause}
         ORDER BY {order_clause}
         LIMIT :page_size OFFSET :offset
@@ -219,7 +242,7 @@ async def list_payments(
             "payment_id", "amount", "sender_name", "sender_account", "beneficiary_name",
             "payment_method", "payment_date", "status", "reference_field_1", "reference_field_2",
             "matched_customer_id", "matched_policy_id", "investigation_due_date",
-            "sla_breached", "created_timestamp",
+            "sla_breached", "created_timestamp", "escalated_by",
         ]
         payment = {k: row[k] for k in payment_fields if k in row}
         recommendation = None
@@ -251,7 +274,7 @@ async def list_payments(
             }
         data.append({"payment": payment, "recommendation": recommendation, "signals": signals})
 
-    return {"data": data, "total": total, "page": page, "page_size": page_size}
+    return {"payments": data, "total": total, "page": page, "page_size": page_size}
 
 
 # ── GET /api/payments/{id} ────────────────────────────────────────────────────
