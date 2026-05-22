@@ -85,8 +85,12 @@ export default function GovernancePage() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  const today = new Date()
+  const fiveDaysAgo = new Date(today)
+  fiveDaysAgo.setDate(today.getDate() - 5)
+  const fmt = (d: Date) => d.toISOString().slice(0, 10)
+  const [dateFrom, setDateFrom] = useState(fmt(fiveDaysAgo))
+  const [dateTo, setDateTo] = useState(fmt(today))
   const [analytics, setAnalytics] = useState<AnalyticsDecisions>(EMPTY_ANALYTICS)
 
   useEffect(() => {
@@ -240,18 +244,10 @@ export default function GovernancePage() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, padding: "24px", maxWidth: 1280, width: "100%", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, padding: "24px", width: "100%", boxSizing: "border-box" }}>
 
         {/* ── Metric cards ── */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-          <StatCard
-            label="Auto-Applied by AI"
-            value={summary.auto_applied}
-            sub={summary.total_processed > 0 ? `${Math.round(summary.auto_applied / summary.total_processed * 100)}% of total` : undefined}
-            icon={<CheckCircle2 size={18} />}
-            iconColor="var(--pw-apply)"
-            iconBg="var(--pw-apply-tint)"
-          />
           <StatCard
             label="Applied after Human Review"
             value={summary.applied_human_review}
@@ -298,23 +294,13 @@ export default function GovernancePage() {
               <BarChart data={by_payment_method} barCategoryGap="30%">
                 <XAxis dataKey="payment_method" tick={{ fontSize: 12, fill: "var(--pw-text-secondary)" }} axisLine={false} tickLine={false} />
                 <YAxis yAxisId="left" tick={{ fontSize: 11, fill: "var(--pw-text-muted)" }} axisLine={false} tickLine={false} width={30} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11, fill: "var(--pw-text-muted)" }} axisLine={false} tickLine={false} unit="%" width={36} />
                 <Tooltip
                   contentStyle={{ border: "1px solid var(--pw-border)", borderRadius: 8, fontSize: 12 }}
                   cursor={{ fill: "var(--pw-bg)" }}
                 />
                 <Bar yAxisId="left" dataKey="volume" name="Count" fill="#7C4DFF" radius={[4, 4, 0, 0]} />
-                <Bar yAxisId="right" dataKey="ai_autonomous" name="AI Autonomous" fill="#10B981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--pw-text-muted)" }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: "#7C4DFF", display: "inline-block" }} /> Count
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--pw-text-muted)" }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: "#10B981", display: "inline-block" }} /> Auto-apply rate %
-              </span>
-            </div>
           </ChartCard>
 
           {/* SLA adherence card */}
