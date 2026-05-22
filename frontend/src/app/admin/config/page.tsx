@@ -277,7 +277,7 @@ export default function ConfigManagementPage() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, padding: "24px", maxWidth: 1280, width: "100%", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, padding: "24px", width: "100%", boxSizing: "border-box" }}>
 
         {/* ── Section 1: Current Thresholds ── */}
         <SectionCard title="Current Thresholds" icon={<SlidersHorizontal size={16} />}>

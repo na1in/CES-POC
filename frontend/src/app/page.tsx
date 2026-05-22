@@ -384,7 +384,7 @@ export default function QueueDashboard() {
     <div className="min-h-screen" style={{ background: "var(--pw-bg)" }}>
       <Nav />
 
-      <div className="px-6 py-5 space-y-5 max-w-[1400px] mx-auto">
+      <div className="px-6 py-5 space-y-5">
         {/* Page header */}
         <div className="flex items-start justify-between">
           <div>

@@ -219,7 +219,7 @@ export default function ExceptionDashboardPage() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, padding: "24px", maxWidth: 1120, width: "100%", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, padding: "24px", width: "100%", boxSizing: "border-box" }}>
 
         {/* ── Section 1: SLA Breached Cases ── */}
         <SectionCard title="SLA Breached Cases" count={slaPayments.length} icon={<AlertTriangle size={16} />} accentColor="var(--pw-escalate)">

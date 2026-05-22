@@ -134,7 +134,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, padding: "24px", maxWidth: 960, width: "100%", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, padding: "24px", width: "100%", boxSizing: "border-box" }}>
 
         {/* Non-admin notice */}
         {!isAdmin && (

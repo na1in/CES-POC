@@ -392,7 +392,6 @@ export default function PaymentDetail() {
         gap: 20,
         flex: 1,
         padding: "20px 24px",
-        maxWidth: 1200,
         width: "100%",
         boxSizing: "border-box",
       }}>

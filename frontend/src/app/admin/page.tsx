@@ -244,7 +244,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, padding: "24px", maxWidth: 1280, width: "100%", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, padding: "24px", width: "100%", boxSizing: "border-box" }}>
 
         {/* Summary tiles */}
         <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
