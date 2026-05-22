@@ -38,22 +38,25 @@ def run() -> None:
     else:
         info(f"Found {len(held)} HELD payment(s)")
 
+    def pid(p: dict) -> str:
+        return p.get("payment_id") or p.get("payment", {}).get("payment_id", "")
+
     # Approve the first HELD payment
-    approve_id = held[0]["payment_id"]
+    approve_id = pid(held[0])
     api("POST", f"/api/payments/{approve_id}/approve",
         analyst_token, json={"notes": "Reviewed and verified — applying to policy."})
     ok(f"Approved {approve_id} → APPLIED")
 
     # Reject the second HELD payment (if available)
     if len(held) >= 2:
-        reject_id = held[1]["payment_id"]
+        reject_id = pid(held[1])
         api("POST", f"/api/payments/{reject_id}/reject",
             analyst_token, json={"notes": "Risk flags present — escalating for investigation."})
         ok(f"Rejected {reject_id} → ESCALATED")
 
     # Override a third HELD payment (if available)
     if len(held) >= 3:
-        override_id = held[2]["payment_id"]
+        override_id = pid(held[2])
         api("POST", f"/api/payments/{override_id}/override",
             analyst_token,
             json={

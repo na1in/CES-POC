@@ -167,6 +167,79 @@ async def seed_escalated_payment(db: AsyncSession) -> None:
     """))
 
 
+async def seed_historical_payments(db: AsyncSession) -> None:
+    """
+    Pre-resolved payments representing the last 30 days of activity.
+    These populate the Governance and Admin dashboards without requiring
+    demo_actions.py to run. They are preserved by demo_restore.py.
+    """
+    await db.execute(text("""
+        INSERT INTO payments
+            (payment_id, amount, sender_name, sender_account, payment_method,
+             payment_date, status, matched_customer_id, matched_policy_id)
+        VALUES
+            -- Applied after human review (scenario 1 — strong policy match)
+            ('PMT-H-001', 150000, 'Robert Johnson',  'ACC-10001', 'ACH',
+             now() - interval '4 days', 'applied', 'CUST-0001', 'POL-00001'),
+            ('PMT-H-002', 120000, 'Maria Rodriguez', 'ACC-10002', 'Credit Card',
+             now() - interval '3 days', 'applied', 'CUST-0002', 'POL-00003'),
+            ('PMT-H-003', 200000, 'David Chen',      'ACC-10003', 'ACH',
+             now() - interval '3 days', 'applied', 'CUST-0003', 'POL-00004'),
+            ('PMT-H-004', 150000, 'Robert Johnson',  'ACC-10001', 'ACH',
+             now() - interval '2 days', 'applied', 'CUST-0001', 'POL-00001'),
+            -- Applied via human override (analyst overrode hold rec)
+            ('PMT-H-005', 162000, 'Maria Rodriguez', 'ACC-10002', 'Check',
+             now() - interval '2 days', 'applied', 'CUST-0002', 'POL-00003'),
+            ('PMT-H-006', 210000, 'David Chen',      'ACC-10003', 'Wire',
+             now() - interval '1 day',  'applied', 'CUST-0003', 'POL-00004'),
+            -- Escalated by human (Priya escalated to Damien)
+            ('PMT-H-007', 75000,  'Unknown Sender',  NULL,        'Wire',
+             now() - interval '4 days', 'escalated', NULL, NULL),
+            ('PMT-H-008', 300000, 'Acme Corp LLC',   NULL,        'Wire',
+             now() - interval '1 day',  'escalated', NULL, NULL),
+            -- Returned to sender (Damien resolved)
+            ('PMT-H-009', 90000,  'Duplicate Payer', 'ACC-10001', 'ACH',
+             now() - interval '3 days', 'returned', 'CUST-0001', NULL)
+        ON CONFLICT (payment_id) DO NOTHING
+    """))
+
+    await db.execute(text("""
+        INSERT INTO payment_recommendations
+            (payment_id, recommendation, confidence_score, scenario_route,
+             decision_path, requires_human_approval, reasoning, suggested_action,
+             decision_attribution)
+        VALUES
+            ('PMT-H-001', 'apply',    95.0, 'scenario_1', 'Strong policy match → APPLY',
+             true, ARRAY['Name match 97%', 'Amount within 1% tolerance', 'Policy active'],
+             'Apply to POL-00001', 'human_confirmed'),
+            ('PMT-H-002', 'apply',    88.0, 'scenario_2', 'Customer match, no policy ref → APPLY',
+             true, ARRAY['Customer match 94%', 'Account verified', 'Historical pattern matches'],
+             'Apply to customer account', 'human_confirmed'),
+            ('PMT-H-003', 'apply',    91.0, 'scenario_1', 'Strong policy match → APPLY',
+             true, ARRAY['Name match 99%', 'Amount exact', 'Active policy'],
+             'Apply to POL-00004', 'human_confirmed'),
+            ('PMT-H-004', 'apply',    96.0, 'scenario_1', 'Strong policy match → APPLY',
+             true, ARRAY['Name match 100%', 'Amount within tolerance', 'Low risk method'],
+             'Apply to POL-00001', 'human_confirmed'),
+            ('PMT-H-005', 'hold',     72.0, 'scenario_3', 'Amount variance 8% → HOLD',
+             true, ARRAY['Name match 91%', 'Amount 8% over expected premium', 'Manual review needed'],
+             'Hold for analyst review', 'human_override'),
+            ('PMT-H-006', 'hold',     65.0, 'scenario_3', 'Amount variance 5% → HOLD',
+             true, ARRAY['Name match 95%', 'Amount 5% over expected', 'Quarterly adjustment possible'],
+             'Hold for analyst review', 'human_override'),
+            ('PMT-H-007', 'escalate', 12.0, 'scenario_4', 'No customer match → ESCALATE',
+             true, ARRAY['Sender name unknown', 'No policy reference', 'No account match'],
+             'Route to investigator', 'human_confirmed'),
+            ('PMT-H-008', 'escalate', 8.0,  'scenario_4', 'No customer match → ESCALATE',
+             true, ARRAY['Corporate sender unrecognized', 'Amount does not match any policy'],
+             'Route to investigator', 'human_confirmed'),
+            ('PMT-H-009', 'escalate', 0.0,  'scenario_5', 'Duplicate detected, $0 balance → ESCALATE',
+             true, ARRAY['Exact duplicate of prior payment', 'Policy balance is $0'],
+             'Return to sender', 'human_confirmed')
+        ON CONFLICT (payment_id) DO NOTHING
+    """))
+
+
 async def seed_configuration_thresholds(db: AsyncSession) -> None:
     await db.execute(text("""
         INSERT INTO configuration_thresholds (parameter_name, parameter_value, description) VALUES
@@ -198,6 +271,9 @@ async def main() -> None:
 
         print("Seeding escalated payment for investigation tests...")
         await seed_escalated_payment(db)
+
+        print("Seeding historical payments for governance dashboard...")
+        await seed_historical_payments(db)
 
         print("Seeding configuration thresholds...")
         await seed_configuration_thresholds(db)

@@ -26,7 +26,11 @@ engine = create_async_engine(settings.DATABASE_URL)
 Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 # Seed payments that must not be deleted
-SEED_PAYMENT_IDS = {"PMT-ESC-001"}
+SEED_PAYMENT_IDS = {
+    "PMT-ESC-001",
+    "PMT-H-001", "PMT-H-002", "PMT-H-003", "PMT-H-004",
+    "PMT-H-005", "PMT-H-006", "PMT-H-007", "PMT-H-008", "PMT-H-009",
+}
 
 # Default threshold values (matches seed.py)
 DEFAULT_THRESHOLDS = {
