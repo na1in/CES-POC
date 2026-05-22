@@ -97,11 +97,11 @@ Always before making any changes, search the web for the newest chanes and only 
 ## Configuration thresholds (stored in DB, never hardcoded)
 | Parameter | Default | Used For |
 |-----------|---------|----------|
-| `name_match_auto_apply` | 90% | Scenario 1 auto-apply boundary |
+| `name_match_auto_apply` | 90% | Min name similarity for AI to recommend APPLY (human approval always required) |
 | `name_match_hold` | 75% | Hold vs escalate boundary |
 | `name_gray_zone_lower` | 70% | Below = skip LLM |
 | `name_gray_zone_upper` | 92% | Above = skip LLM |
-| `amount_tolerance_auto` | 2% | Auto-approve variance |
+| `amount_tolerance_auto` | 2% | Max variance % for AI to recommend APPLY |
 | `duplicate_window_hours` | 72 | Duplicate detection window |
 | `duplicate_amount_tolerance_cents` | 200 | $2 max diff for duplicate match |
 | `multi_period_tolerance` | 5% | Multi-period payment detection |
@@ -128,7 +128,7 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 3. **Payment Detail** (`/payments/[id]`) — payment info, signal bars, AI reasoning panel, audit timeline, annotation panel, document upload + list. Analyst actions (held): Apply Payment / Escalate to Investigator (or Override & Apply when rec=escalate). Investigator actions (escalated/pending): Apply Payment (with mandatory note) / Awaiting Sender Response / Return to Sender / Add Investigation Note
 
 ### Director (Lorraine)
-4. **Governance Dashboard** (`/governance`) — metric cards: Auto-Applied by AI, Applied after Human Review, Held Pending Review, Escalated by AI, Escalated by Human, Human Overrides; payment method breakdown chart; override rate trend; SLA adherence; confidence score histogram; date range filter
+4. **Governance Dashboard** (`/governance`) — metric cards: Applied after Human Review, Held Pending Review, Escalated by AI, Escalated by Human, Human Overrides; payment method breakdown chart; override rate trend; SLA adherence; confidence score histogram; date range filter (defaults to last 5 days)
 5. **Compliance Export** (`/governance/export`) — date range selector, export scope, download structured report
 6. **Exception Dashboard** (`/governance/exceptions`) — SLA-breached cases, anomaly flags, config change requests pending approval
 
@@ -237,6 +237,7 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 - `helpers/auth.ts`: `loginAs()` clears localStorage before each login to prevent RouteGuard bounce
 - Key selector patterns: `getByText(/^PMT-/).first()` for row nav; `{ exact: true }` to avoid audit-log false matches; `page.locator('input[aria-label="..."]')` for `<input type="date">`
 - `PMT-ESC-001` is seeded as a pre-escalated payment to enable investigation workflow tests
+- `PMT-H-001`..`PMT-H-009` are seeded historical payments (applied/returned/escalated with correct `decision_attribution`) to populate the Governance Dashboard with meaningful data; protected from `demo_restore.py` cleanup via `SEED_PAYMENT_IDS`
 
 ### Infrastructure (fixed 2026-05-16)
 - `backend/app/main.py`: `CORSMiddleware` for origins :3000/:3001/:3002 — required for browser API calls
