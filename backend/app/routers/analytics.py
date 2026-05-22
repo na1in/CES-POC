@@ -52,15 +52,17 @@ async def get_decisions(
     Decision attribution breakdown. Optional date range and payment method filter.
     Powers Lorraine's Governance Dashboard and Marcus's Admin Dashboard.
     """
+    from datetime import date as _date
     conditions = []
     params: dict = {}
 
     if from_date:
         conditions.append("p.payment_date >= :from_date")
-        params["from_date"] = from_date
+        params["from_date"] = _date.fromisoformat(from_date)
     if to_date:
-        conditions.append("p.payment_date <= :to_date")
-        params["to_date"] = to_date
+        from datetime import timedelta
+        conditions.append("p.payment_date < :to_date")
+        params["to_date"] = _date.fromisoformat(to_date) + timedelta(days=1)
     if payment_method:
         conditions.append("p.payment_method = :payment_method")
         params["payment_method"] = payment_method
@@ -169,6 +171,7 @@ async def get_overrides(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Override detail list. Filterable by scenario, confidence band, and date range."""
+    from datetime import date as _date
     conditions = ["pr.decision_attribution = 'human_override'"]
     params: dict = {}
 
@@ -177,10 +180,11 @@ async def get_overrides(
         params["scenario"] = scenario
     if from_date:
         conditions.append("p.payment_date >= :from_date")
-        params["from_date"] = from_date
+        params["from_date"] = _date.fromisoformat(from_date)
     if to_date:
-        conditions.append("p.payment_date <= :to_date")
-        params["to_date"] = to_date
+        from datetime import timedelta
+        conditions.append("p.payment_date < :to_date")
+        params["to_date"] = _date.fromisoformat(to_date) + timedelta(days=1)
     if confidence_band:
         parts = confidence_band.split("-")
         if len(parts) == 2:
