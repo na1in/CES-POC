@@ -483,7 +483,7 @@ export default function PaymentDetail() {
                 }}>
                   <AlertTriangle size={12} color="var(--pw-hold)" style={{ flexShrink: 0 }} />
                   <span style={{ fontSize: 12, color: "#92400e" }}>
-                    Manual Review Required: {rec.approval_reason ?? "Confidence < 90% or risk flags detected"}
+                    Operator Review Required: {rec.approval_reason ?? "Confidence < 90% or risk flags detected"}
                   </span>
                 </div>
               )}

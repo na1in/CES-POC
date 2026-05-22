@@ -249,7 +249,7 @@ export default function GovernancePage() {
         {/* ── Metric cards ── */}
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
           <StatCard
-            label="Applied after Human Review"
+            label="Applied after Operator Review"
             value={summary.applied_human_review}
             icon={<Users size={18} />}
             iconColor="var(--pw-apply)"
@@ -270,14 +270,14 @@ export default function GovernancePage() {
             iconBg="var(--pw-escalate-tint)"
           />
           <StatCard
-            label="Escalated by Human"
+            label="Escalated by Operator"
             value={summary.escalated_by_human}
             icon={<AlertTriangle size={18} />}
             iconColor="var(--pw-escalate)"
             iconBg="var(--pw-escalate-tint)"
           />
           <StatCard
-            label="Human Overrides"
+            label="Operator Overrides"
             value={summary.human_overrides}
             sub={`${summary.override_rate_pct}% override rate`}
             icon={<TrendingUp size={18} />}

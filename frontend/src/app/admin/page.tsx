@@ -28,8 +28,8 @@ type TabKey = (typeof TABS)[number]["key"]
 
 const PIE_COLORS: Record<string, string> = {
   "AI Autonomous":   "#10B981",
-  "Human Confirmed": "#7C4DFF",
-  "Human Override":  "#F59E0B",
+  "Operator Confirmed": "#7C4DFF",
+  "Operator Override":  "#F59E0B",
 }
 
 const DECISION_COLORS: Record<string, string> = {
@@ -121,13 +121,13 @@ export default function AdminDashboardPage() {
   const pieData = activeTab === "all"
     ? [
         { label: "AI Autonomous",   value: data?.summary.auto_applied ?? 0 },
-        { label: "Human Confirmed", value: data?.summary.applied_human_review ?? 0 },
-        { label: "Human Override",  value: data?.summary.human_overrides ?? 0 },
+        { label: "Operator Confirmed", value: data?.summary.applied_human_review ?? 0 },
+        { label: "Operator Override",  value: data?.summary.human_overrides ?? 0 },
       ].filter(d => d.value > 0)
     : [
         { label: "AI Autonomous",   value: activeScenario?.ai_autonomous ?? 0 },
-        { label: "Human Confirmed", value: activeScenario?.human_confirmed ?? 0 },
-        { label: "Human Override",  value: activeScenario?.human_override ?? 0 },
+        { label: "Operator Confirmed", value: activeScenario?.human_confirmed ?? 0 },
+        { label: "Operator Override",  value: activeScenario?.human_override ?? 0 },
       ].filter(d => d.value > 0)
 
   // Decision outcome bar data
