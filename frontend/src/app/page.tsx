@@ -58,11 +58,11 @@ function getFlags(payment: PaymentRow): string[] {
 }
 
 const SCENARIO_LABEL: Record<ScenarioRoute, string> = {
-  scenario_1: "Sc1",
-  scenario_2: "Sc2",
-  scenario_3: "Sc3",
-  scenario_4: "Sc4",
-  scenario_5: "Sc5",
+  scenario_1: "Policy Match",
+  scenario_2: "Cust. Match",
+  scenario_3: "High Variance",
+  scenario_4: "No Match",
+  scenario_5: "Duplicate",
 }
 
 const ALL_SCENARIOS: ScenarioRoute[] = [
@@ -204,11 +204,13 @@ function StatCards({ payments, activeFilter, onFilter }: {
   activeFilter: StatusFilter
   onFilter: (f: StatusFilter) => void
 }) {
-  const total = payments.length
-  const recApply = payments.filter(p => p.recommendation === "apply").length
-  const recHold = payments.filter(p => p.recommendation === "hold").length
-  const recEscalate = payments.filter(p => p.recommendation === "escalate").length
-  const openCount = payments.filter(p => p.status !== "applied" && p.status !== "returned").length
+  const OPEN = new Set(["held", "processing_failed", "received", "processing"])
+  const openPayments = payments.filter(p => OPEN.has(p.status))
+  const total = openPayments.length
+  const recApply = openPayments.filter(p => p.recommendation === "apply").length
+  const recHold = openPayments.filter(p => p.recommendation === "hold").length
+  const recEscalate = openPayments.filter(p => p.recommendation === "escalate").length
+  const openCount = openPayments.length
 
   function tile(filter: StatusFilter, isActive: boolean, children: React.ReactNode) {
     return (
@@ -311,11 +313,12 @@ export default function QueueDashboard() {
 
   const hasFilters = scenarioFilter.size > 0 || bandFilter.size > 0 || methodFilter.size > 0 || statusFilter !== null
   const failedCount = payments.filter(p => p.status === "processing_failed").length
-  const openCount = payments.filter(p => p.status !== "applied" && p.status !== "returned").length
-  const closedCount = payments.filter(p => p.status === "applied" || p.status === "returned").length
 
   const OPEN_STATUSES = new Set(["held", "processing_failed", "received", "processing"])
   const CLOSED_STATUSES = new Set(["applied", "returned", "escalated", "pending_sender_response"])
+
+  const openCount = payments.filter(p => OPEN_STATUSES.has(p.status)).length
+  const closedCount = payments.filter(p => CLOSED_STATUSES.has(p.status)).length
 
   const tabPayments = payments.filter(p => {
     const inTab = activeTab === "open" ? OPEN_STATUSES.has(p.status) : CLOSED_STATUSES.has(p.status)
@@ -654,7 +657,7 @@ export default function QueueDashboard() {
             className="px-5 py-2.5 border-t text-xs"
             style={{ borderColor: "var(--pw-border)", color: "var(--pw-text-muted)" }}
           >
-            {loadingData ? "Loading…" : `Showing ${filtered.length} of ${payments.length} cases`}
+            {loadingData ? "Loading…" : `Showing ${filtered.length} of ${tabPayments.length} cases`}
           </div>
         </div>
       </div>

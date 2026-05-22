@@ -11,10 +11,10 @@
 | Field | Value |
 |-------|-------|
 | **Repo** | https://github.com/na1in/CES-POC |
-| **Current week** | Week 5 |
-| **Active phase** | Phase 2 backend complete → Phase 3 starting |
-| **Last updated** | 2026-05-11 |
-| **Open PR** | #9 — CES-17–31 (Phase 2 complete) against `main` |
+| **Current week** | Week 7 |
+| **Active phase** | All phases complete — PoC fully functional |
+| **Last updated** | 2026-05-21 |
+| **Open PR** | None |
 
 ## Team
 
@@ -32,9 +32,9 @@
 |-------|-------|-------|--------|
 | **Phase 0 — Foundation** | 1 | DB, protos, FastAPI skeleton, frontend scaffold | ✅ Done |
 | **Phase 1 — Core Pipeline + Frontend Shell** | 2–4 | Ingest → signals, analyst/investigator pages | ✅ Done |
-| **Phase 2 — AI Agent + Analyst APIs** | 5–7 | Scenarios 1–5, approve/reject/override, annotations, documents, SLA | ✅ Backend done · 🔄 Frontend wire-up in progress |
-| **Phase 3 — Director/Admin + Governance APIs** | 8–9 | Analytics/Governance/Config APIs + wire Director/Admin pages | ⬜ Not Started |
-| **Phase 4 — Integration & Polish** | 10 | E2E tests, role-gating, UI polish | ⬜ Not Started |
+| **Phase 2 — AI Agent + Analyst APIs** | 5–7 | Scenarios 1–5, approve/reject/override, annotations, documents, SLA | ✅ Done |
+| **Phase 3 — Director/Admin + Governance APIs** | 8–9 | Analytics/Governance/Config APIs + wire Director/Admin pages | ✅ Done |
+| **Phase 4 — Integration & Polish** | 10 | E2E tests, role-gating, UI polish | ✅ Done |
 
 ---
 
@@ -107,11 +107,12 @@
 | **CES-30** Documents — upload (multipart, 20MB, MIME allowlist), list, stream, soft delete + `storage.py` | 2d | ✅ | 9 tests |
 | **CES-31** PENDING_SENDER_RESPONSE flow — contact_record → pending_sender_response status transition | 1d | ✅ | Covered by annotation tests |
 
-### Track B: Frontend Wire-up (Engineer B) 🔄 In Progress
+### Track B: Frontend Wire-up (Engineer B) ✅ Complete
 
 | Ticket | Est | Status | Notes |
 |--------|-----|--------|-------|
-| **CES-32** Wire analyst/investigator pages to real APIs — Queue, Detail, Investigations, Settings | 2d | 🔄 | Replace mock data; add loading/error/empty states |
+| **CES-32** Wire analyst/investigator pages to real APIs — Queue, Detail, Investigations, Settings | 2d | ✅ | All 10 pages wired to real APIs (completed via CES-43) |
+| **CES-43** Full frontend wire-up — all pages, role-gating, loading/error states | 3d | ✅ | Real APIs across all roles; RouteGuard + auth context |
 
 ### Track B: Director/Admin Pages (Engineer B) ✅ Built (with mock data)
 
@@ -126,44 +127,39 @@
 
 ---
 
-## Phase 3 — Governance/Analytics/Config APIs ⬜ Not Started
+## Phase 3 — Governance/Analytics/Config APIs ✅ Complete
 
 ### Track A: APIs (Engineer A)
 
 | Ticket | Est | Status | Notes |
 |--------|-----|--------|-------|
-| `GET /api/analytics/decisions` — attribution counts, method breakdown, per-scenario, confidence histogram | 2d | ⬜ | Powers Lorraine + Marcus dashboards |
-| `GET /api/analytics/overrides` — filterable by scenario, confidence band, date, reason | 1d | ⬜ | |
-| `POST/GET /api/governance/reviews` | 1d | ⬜ | Lorraine period review log |
-| `POST/GET /api/governance/anomalies` + `PATCH .../anomalies/{id}` | 1d | ⬜ | Anomaly flag workflow |
-| `GET /api/governance/export` — audit-ready report | 1d | ⬜ | |
-| Config change-request workflow — propose → approve → reject → deploy → rollback + history | 3d | ⬜ | Atomic threshold swap, ThresholdVersion row |
+| `GET /api/analytics/decisions` — attribution counts, method breakdown, per-scenario, confidence histogram | 2d | ✅ | `routers/analytics.py` |
+| `GET /api/analytics/overrides` — filterable by scenario, confidence band, date, reason | 1d | ✅ | |
+| `POST/GET /api/governance/reviews` | 1d | ✅ | `routers/governance.py` |
+| `POST/GET /api/governance/anomalies` + `PATCH .../anomalies/{id}` | 1d | ✅ | |
+| `GET /api/governance/export` — audit-ready report | 1d | ✅ | |
+| Config change-request workflow — propose → approve → reject → deploy → rollback + history | 3d | ✅ | `routers/config.py`; atomic threshold swap + ThresholdVersion row |
+| `POST /api/payments/{id}/outreach` — escalated → PENDING_SENDER_RESPONSE | 1d | ✅ | `routers/approvals.py`; SLA timer starts |
 
 ### Track B: Director/Admin Wire-up (Engineer B)
 
 | Ticket | Est | Status | Notes |
 |--------|-----|--------|-------|
-| Wire Governance Dashboard + Export + Exceptions to real APIs | 2d | ⬜ | Depends on Phase 3 APIs |
-| Wire Admin Dashboard + Override Analysis + Config Management to real APIs | 2d | ⬜ | |
+| Wire Governance Dashboard + Export + Exceptions to real APIs | 2d | ✅ | Done via CES-43 |
+| Wire Admin Dashboard + Override Analysis + Config Management to real APIs | 2d | ✅ | Done via CES-43 |
 
 ---
 
-## Phase 4 — Integration & Polish ⬜ Not Started
+## Phase 4 — Integration & Polish ✅ Complete
 
-| Ticket | Owner | Status |
-|--------|-------|--------|
-| E2E test: Scenario 1 — auto-apply + hold | Eng A | ⬜ |
-| E2E test: Scenario 2 — single policy, ambiguous multi-policy | Eng A | ⬜ |
-| E2E test: Scenario 3 — variance tiers + special cases | Eng A | ⬜ |
-| E2E test: Scenario 4 — no match + third-party hold | Eng A | ⬜ |
-| E2E test: Scenario 5 — exact dup, $2 tolerance, outside window | Eng A | ⬜ |
-| E2E test: Analyst flows — approve, reject, override, reprocess | Eng A | ⬜ |
-| E2E test: Investigator flows — return, contact → PENDING_SENDER_RESPONSE, SLA breach | Eng A | ⬜ |
-| E2E test: Config workflow — propose → approve → deploy → verify → rollback | Eng A | ⬜ |
-| E2E test: Retry + failure — simulate DB/Claude timeouts, PROCESSING_FAILED, reprocess | Eng A | ⬜ |
-| Frontend integration — real APIs across all 10 pages, error/empty/loading states, role-gating | Eng B | ⬜ |
-| Analytics accuracy — verify attribution counts, override rate %, histogram | Eng B | ⬜ |
-| UI polish — responsive layout, empty states, error toasts, accessibility | Designer + Eng B | ⬜ |
+| Ticket | Owner | Status | Notes |
+|--------|-------|--------|-------|
+| **CES-40** E2E scenario tests — all 5 scenarios, ingest → decision | Eng A | ✅ | 351 passing |
+| **CES-41** E2E action flow tests — analyst approve/reject/override, investigator flows | Eng A | ✅ | Included in 351 |
+| **CES-42** E2E config workflow + pipeline retry/failure tests | Eng A | ✅ | 378 pytest tests total |
+| **CES-46** Playwright browser automation suite — 38 tests across 6 spec files | Eng A | ✅ | Chromium; read-only nav/visibility tests |
+| Frontend integration — real APIs across all 10 pages, role-gating | Eng B | ✅ | Done via CES-43 |
+| UI polish — empty states, error toasts, role-gated actions | Eng B | ✅ | |
 
 ---
 
@@ -186,7 +182,8 @@
 | DB operations | Always in transactions |
 | Postgres enums | lowercase snake_case |
 | Thresholds | Stored in DB, never hardcoded |
-| Name matching | Hybrid: deterministic + Haiku for 70–92% gray zone; full breakdown stored |
+| Name matching | Hybrid: deterministic + Gemini 2.5 Flash (via OpenRouter) for 70–92% gray zone; full breakdown stored |
+| Auto-apply | Removed — all payments land HELD for analyst regardless of match quality; human approval always required |
 | Override reason | Mandatory — form blocks submit without it |
 | Document storage | Local FS for PoC (`UPLOAD_DIR`), S3-compatible interface |
 | Decision attribution | Set at case closure in `persist.py` |
@@ -203,10 +200,8 @@
 git clone https://github.com/na1in/CES-POC
 cd CES-POC
 cp backend/.env.example backend/.env
-# Add ANTHROPIC_API_KEY to backend/.env
-make setup        # installs deps + starts Docker Postgres + migrates + seeds
-make dev          # FastAPI on :8000
-make dev-frontend # Next.js on :3000 (separate terminal)
+# Add OPENROUTER_API_KEY to backend/.env
+docker compose up -d  # starts all 3 services (frontend :3000, backend :8000, db :5432)
 ```
 
 Test users (password not checked in PoC — use user_id as username):
@@ -220,6 +215,6 @@ Test users (password not checked in PoC — use user_id as username):
 
 Tests:
 ```bash
-cd backend && python -m pytest tests/ -v
-# 176 pass; 1 expected DB error (needs Postgres)
+cd backend && python -m pytest tests/ -v          # 378 pytest tests
+cd frontend && npx playwright test                 # 38 Playwright E2E tests (backend + frontend must be running)
 ```

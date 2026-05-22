@@ -21,7 +21,7 @@ This document defines the decision logic for the AI Agent to handle unidentified
 
 | Parameter | Value | Purpose |
 |-----------|-------|---------|
-| **Name Match - Auto Apply** | >90% | Minimum similarity for automated application |
+| **Name Match - Auto Apply** | >90% | Minimum similarity for AI to recommend APPLY (human approval always required) |
 | **Name Match - Hold/Review** | 75-90% | Range requiring manual approval |
 | **Name Match - Escalate** | <75% | Below this = no match found |
 | **Amount Tolerance** | ±2% | Acceptable variance - auto-approve |
@@ -29,7 +29,7 @@ This document defines the decision logic for the AI Agent to handle unidentified
 | **Amount Variance - Escalate** | >15% | Route to investigation (unless special case) |
 | **Duplicate Detection Window** | 72 hours | Time window for duplicate checking |
 | **Duplicate Amount Tolerance** | $2.00 (200 cents) | Covers bank fees, rounding, surcharges |
-| **Payment Method Risk - Low** | ACH, Card | Required for auto-apply |
+| **Payment Method Risk - Low** | ACH, Card | Required for AI to recommend APPLY |
 | **Payment Method Risk - Medium** | Check, Wire | Proceeds normally but noted |
 | **Payment Method Risk - High** | Unknown | Forces HOLD in Scenario 1 |
 
@@ -46,7 +46,7 @@ IF Name_Similarity > 90%
    AND Risk_Flags = None
    AND Policy_Status = Active
    AND Payment_Method_Risk = Low
-THEN → APPLY (no approval needed)
+THEN → HOLD (AI recommends APPLY; human approval always required)
 
 IF Name_Similarity 75-90%
    AND Amount_Variance ≤ 2%
