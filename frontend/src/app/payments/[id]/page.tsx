@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle2, Clock, ChevronDown } from "lucide-react"
 import {
-  getPayment, approvePayment, rejectPayment, overridePayment, returnPayment, markPendingOutreach, reprocessPayment,
+  getPayment, approvePayment, rejectPayment, overridePayment, returnPayment, reprocessPayment,
   type PaymentDetail,
 } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
@@ -148,6 +148,9 @@ export default function PaymentDetail() {
   const [overrideReason, setOverrideReason] = useState("")
   const [applyNoteOpen, setApplyNoteOpen] = useState(false)
   const [applyNote, setApplyNote] = useState("")
+  const [contactedOpen, setContactedOpen] = useState(false)
+  const [contactedPolicy, setContactedPolicy] = useState("")
+  const [contactedNote, setContactedNote] = useState("")
   const [toast, setToast] = useState<string | null>(null)
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
 
@@ -187,19 +190,6 @@ export default function PaymentDetail() {
     router.push("/")
   }
 
-  async function handleReturn() {
-    if (!id) return
-    await returnPayment(id)
-    showToast("Payment returned to sender")
-    router.push("/investigations")
-  }
-
-  async function handlePendingOutreach() {
-    if (!id) return
-    await markPendingOutreach(id)
-    showToast("Marked as awaiting sender response")
-    router.push("/investigations")
-  }
 
   async function handleApplyWithNote() {
     if (!id || !applyNote.trim()) return
@@ -207,6 +197,26 @@ export default function PaymentDetail() {
     showToast("Payment applied with investigation note")
     setApplyNoteOpen(false)
     setApplyNote("")
+    router.push("/investigations")
+  }
+
+  async function handleContactedSender(action: "apply" | "return") {
+    if (!id) return
+    const note = [
+      "Sender was contacted.",
+      contactedPolicy.trim() ? `Policy number provided: ${contactedPolicy.trim()}.` : "No policy number provided.",
+      contactedNote.trim(),
+    ].filter(Boolean).join(" ")
+    if (action === "apply") {
+      await overridePayment(id, "APPLY", note)
+      showToast("Payment applied")
+    } else {
+      await returnPayment(id)
+      showToast("Payment returned to sender")
+    }
+    setContactedOpen(false)
+    setContactedPolicy("")
+    setContactedNote("")
     router.push("/investigations")
   }
 
@@ -560,49 +570,15 @@ export default function PaymentDetail() {
           {(payment.status === "escalated" || payment.status === "pending_sender_response") && user?.role === "investigator" && (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button
-                onClick={() => setApplyNoteOpen(true)}
+                onClick={() => { setContactedOpen(true); setContactedPolicy(""); setContactedNote("") }}
                 style={{
-                  background: "var(--pw-apply)", color: "#fff", border: "none",
+                  background: "var(--pw-primary)", color: "#fff", border: "none",
                   borderRadius: 8, padding: "9px 20px", fontWeight: 600, fontSize: 13,
                   cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
                 }}
               >
                 <CheckCircle2 size={14} />
-                Apply Payment
-              </button>
-              {payment.status === "escalated" && (
-                <button
-                  onClick={handlePendingOutreach}
-                  style={{
-                    background: "transparent", color: "var(--pw-hold)",
-                    border: "1px solid var(--pw-hold)", borderRadius: 8,
-                    padding: "9px 20px", fontWeight: 600, fontSize: 13,
-                    cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                  }}
-                >
-                  <Clock size={14} />
-                  Awaiting Sender Response
-                </button>
-              )}
-              <button
-                onClick={handleReturn}
-                style={{
-                  background: "transparent", color: "var(--pw-text-primary)",
-                  border: "1px solid var(--pw-border)", borderRadius: 8,
-                  padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: "pointer",
-                }}
-              >
-                Return to Sender
-              </button>
-              <button
-                onClick={() => setOverrideOpen(true)}
-                style={{
-                  background: "transparent", color: "var(--pw-primary)",
-                  border: "1px solid var(--pw-primary)", borderRadius: 8,
-                  padding: "9px 20px", fontWeight: 600, fontSize: 13, cursor: "pointer",
-                }}
-              >
-                Add Investigation Note
+                Contacted Sender
               </button>
             </div>
           )}
@@ -967,6 +943,81 @@ export default function PaymentDetail() {
               >
                 Apply Payment
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contacted Sender modal */}
+      {contactedOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setContactedOpen(false)}
+        >
+          <div
+            style={{ background: "var(--pw-surface)", borderRadius: 12, padding: 24, width: 480, maxWidth: "90vw", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 style={{ margin: "0 0 4px", fontSize: 16, fontWeight: 700, color: "var(--pw-text-primary)" }}>
+              Sender Contact Outcome
+            </h3>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--pw-text-secondary)" }}>
+              Record the outcome of the sender contact. Enter a policy number if one was provided, then choose to apply or return the payment.
+            </p>
+
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--pw-text-secondary)", marginBottom: 6 }}>
+              Policy Number <span style={{ fontWeight: 400, color: "var(--pw-text-muted)" }}>(if provided by sender)</span>
+            </label>
+            <input
+              autoFocus
+              type="text"
+              value={contactedPolicy}
+              onChange={e => setContactedPolicy(e.target.value)}
+              placeholder="e.g. POL-00123"
+              style={{
+                width: "100%", borderRadius: 8, border: "1px solid var(--pw-border)",
+                padding: "9px 12px", fontSize: 13, background: "var(--pw-bg)",
+                color: "var(--pw-text-primary)", boxSizing: "border-box", marginBottom: 16,
+              }}
+            />
+
+            <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--pw-text-secondary)", marginBottom: 6 }}>
+              Notes <span style={{ fontWeight: 400, color: "var(--pw-text-muted)" }}>(optional)</span>
+            </label>
+            <textarea
+              rows={3}
+              value={contactedNote}
+              onChange={e => setContactedNote(e.target.value)}
+              placeholder="Additional context from the conversation…"
+              style={{
+                width: "100%", borderRadius: 8, border: "1px solid var(--pw-border)",
+                padding: "9px 12px", fontSize: 13, background: "var(--pw-bg)",
+                color: "var(--pw-text-primary)", resize: "vertical", boxSizing: "border-box",
+              }}
+            />
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginTop: 16 }}>
+              <button
+                onClick={() => { setContactedOpen(false); setContactedPolicy(""); setContactedNote("") }}
+                style={{ background: "none", border: "1px solid var(--pw-border)", borderRadius: 8, padding: "8px 18px", fontSize: 13, cursor: "pointer", color: "var(--pw-text-secondary)" }}
+              >
+                Cancel
+              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => handleContactedSender("return")}
+                  style={{ background: "none", color: "var(--pw-escalate)", border: "1px solid var(--pw-escalate)", borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                >
+                  Return to Sender
+                </button>
+                <button
+                  onClick={() => handleContactedSender("apply")}
+                  disabled={!contactedPolicy.trim()}
+                  style={{ background: contactedPolicy.trim() ? "var(--pw-apply)" : "var(--pw-border)", color: contactedPolicy.trim() ? "#fff" : "var(--pw-text-muted)", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 600, cursor: contactedPolicy.trim() ? "pointer" : "not-allowed" }}
+                >
+                  Apply Payment
+                </button>
+              </div>
             </div>
           </div>
         </div>

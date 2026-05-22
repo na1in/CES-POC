@@ -596,7 +596,7 @@ export default function QueueDashboard() {
                   <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>RECOMMENDATION</TableHead>
                   <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>CONFIDENCE</TableHead>
                   <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>FLAGS</TableHead>
-                  <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>AGE</TableHead>
+                  <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>TIME IN QUEUE</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

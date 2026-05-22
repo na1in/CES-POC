@@ -124,18 +124,18 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 
 ### Analyst (Priya) + Investigator (Damien)
 1. **Queue Dashboard** (`/`) — Open/Closed tabs; stat tiles show AI recommendation counts (Apply/Hold/Escalate) and are clickable filters; filter bar: scenario, confidence band, payment method; columns: ID, sender, amount, recommendation, confidence, flags, age
-2. **Investigation Queue** (`/investigations`) — Damien only; Open/Closed tabs; stat tiles (Open Investigations, Fraud Flagged, Pending Outreach, Cases Closed Today) are clickable filters; filter bar: risk level, status, sort; columns: ID, sender, amount, reason, risk, escalated by, age, status
+2. **Investigation Queue** (`/investigations`) — Damien only; Open/Closed tabs; stat tiles (Open Investigations, Fraud Flagged, Pending Outreach, Cases Closed Today) are clickable filters; filter bar: risk level, status, sort; columns: ID, sender, amount, reason, risk, escalated by, age, status; "View SLA Report" button opens a modal with live stats (open cases, SLA breached, pending outreach, risk breakdown, breached case list)
 3. **Payment Detail** (`/payments/[id]`) — payment info, signal bars, AI reasoning panel, audit timeline, annotation panel, document upload + list. Analyst actions (held): Apply Payment / Escalate to Investigator (or Override & Apply when rec=escalate). Investigator actions (escalated/pending): Apply Payment (with mandatory note) / Awaiting Sender Response / Return to Sender / Add Investigation Note
 
 ### Director (Lorraine)
-4. **Governance Dashboard** (`/governance`) — metric cards: Applied after Human Review, Held Pending Review, Escalated by AI, Escalated by Human, Human Overrides; payment method breakdown chart; override rate trend; SLA adherence; confidence score histogram; date range filter (defaults to last 5 days)
+4. **Governance Dashboard** (`/governance`) — metric cards: Applied after Human Review, Held Pending Review, Escalated by AI, Escalated by Human, Human Overrides; payment method breakdown chart; override rate trend; SLA adherence; confidence score histogram; date range filter (defaults to last 5 days); "Exception Dashboard" button in header navigates to `/governance/exceptions`
 5. **Compliance Export** (`/governance/export`) — date range selector, export scope, download structured report
 6. **Exception Dashboard** (`/governance/exceptions`) — SLA-breached cases, anomaly flags, config change requests pending approval
 
 ### Admin (Marcus)
 7. **Admin Dashboard** (`/admin`) — per-scenario analytics: case volume trend, decision distribution, override rate by confidence band, confidence histogram
 8. **Override Analysis** (`/admin/overrides`) — filterable by scenario, confidence band, date range, override reason category
-9. **Configuration Management** (`/admin/config`) — current thresholds, change request form, version history, staging simulation, deploy/rollback controls
+9. **Configuration Management** (`/admin/config`) — current thresholds, change request form, version history, staging simulation, deploy/rollback controls; Approve/Reject buttons only visible to director role (Marcus sees Deploy for approved, Rollback for deployed)
 
 ### Shared
 10. **Settings** (`/settings`) — threshold viewer (read-only for non-admin; change request flow for admin)
@@ -170,7 +170,7 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 - `POST /api/settings/change-requests/{id}/approve` — Lorraine approves
 - `POST /api/settings/change-requests/{id}/reject` — Lorraine rejects (mandatory comment)
 - `POST /api/settings/change-requests/{id}/deploy` — Marcus deploys approved change
-- `POST /api/settings/change-requests/{id}/rollback` — emergency rollback (requires Lorraine approval)
+- `POST /api/settings/change-requests/{id}/rollback` — emergency rollback (director OR admin)
 - `GET /api/settings/thresholds/history` — full version history for all parameters
 
 ### Analytics
@@ -243,6 +243,18 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 - `backend/app/main.py`: `CORSMiddleware` for origins :3000/:3001/:3002 — required for browser API calls
 - `frontend/src/lib/api.ts`: Content-Type override only applies when not already set (guard: `&& !headers["Content-Type"]`)
 - `frontend/src/components/RouteGuard.tsx`: Login redirect uses `roleHome` map per role
+
+### Bug fixes (2026-05-22)
+- `backend/app/auth.py`: Added `require_director_or_admin` — rollback was director-only but spec says director OR admin
+- `backend/app/routers/config.py`: Rollback endpoint now uses `require_director_or_admin`
+- `frontend/src/app/admin/config/page.tsx`: Approve/Reject buttons gated on `user?.role === "director"` — Marcus was able to see (and attempt) them, API would 403
+- `frontend/src/app/governance/page.tsx`: Added "Exception Dashboard" button to header — Lorraine had no UI path to `/governance/exceptions`
+- `frontend/src/app/investigations/page.tsx`: Removed "Export Case List" button; wired "View SLA Report" to open a live-data modal
+
+### Dev setup
+- PostgreSQL runs in Docker: `docker compose up -d db` (from repo root)
+- Backend: `python -m uvicorn app.main:app --port 8000 --reload` (from `backend/`, after DB is up)
+- Frontend: `npx next dev -p 3001` (from `frontend/`)
 
 ## Implementation plan
 See `docs/Implementation_Plan.md` for the full phased plan with ticket breakdowns, parallel tracks, estimates, and risk mitigation. Team: 2 engineers + 1 designer, ~7 weeks.

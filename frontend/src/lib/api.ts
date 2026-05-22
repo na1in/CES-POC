@@ -21,7 +21,9 @@ async function apiFetch<T = unknown>(
   const res = await fetch(`${BASE}${path}`, { ...options, headers })
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(text || `HTTP ${res.status}`)
+    let message = text || `HTTP ${res.status}`
+    try { const j = JSON.parse(text); message = j.detail ?? j.error ?? message } catch { /* not JSON */ }
+    throw new Error(message)
   }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>

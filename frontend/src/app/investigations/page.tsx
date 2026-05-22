@@ -222,6 +222,7 @@ export default function InvestigationQueue() {
   const [riskFilter, setRiskFilter] = useState<Set<RiskLevel>>(new Set())
   const [statusFilter, setStatusFilter] = useState<Set<InvestigationStatus>>(new Set())
   const [sortKey, setSortKey] = useState("risk_asc")
+  const [showSlaReport, setShowSlaReport] = useState(false)
 
   useEffect(() => {
     listPayments({ page_size: 200 })
@@ -447,7 +448,7 @@ export default function InvestigationQueue() {
                   <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>REASON</TableHead>
                   <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>RISK</TableHead>
                   <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>ESCALATED BY</TableHead>
-                  <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>AGE</TableHead>
+                  <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>TIME IN QUEUE</TableHead>
                   <TableHead style={{ color: "var(--pw-text-secondary)", fontSize: 11 }}>STATUS</TableHead>
                 </TableRow>
               </TableHeader>
@@ -506,6 +507,7 @@ export default function InvestigationQueue() {
             </p>
             <div className="flex gap-2">
               <button
+                onClick={() => setShowSlaReport(true)}
                 className="rounded-md px-3 py-1.5 text-xs font-medium border"
                 style={{
                   borderColor: "var(--pw-border)",
@@ -515,18 +517,83 @@ export default function InvestigationQueue() {
               >
                 View SLA Report
               </button>
-              <button
-                className="rounded-md px-3 py-1.5 text-xs font-semibold text-white"
-                style={{ background: "var(--pw-primary)" }}
-              >
-                Export Case List
-              </button>
             </div>
           </div>
         </div>
       </div>
 
       {/* Status bar */}
+      {/* ── SLA Report modal ── */}
+      {showSlaReport && (() => {
+        const slaBreached   = openRows.filter(r => r.invStatus === "sla_breached")
+        const pendingOut    = openRows.filter(r => r.invStatus === "pending_outreach")
+        const highRisk      = openRows.filter(r => r.riskLevel === "high")
+        const mediumRisk    = openRows.filter(r => r.riskLevel === "medium")
+        const resolvedCount = closedRows.length
+        const generated     = new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true })
+        return (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ background: "var(--pw-surface)", borderRadius: 12, width: "100%", maxWidth: 560, boxShadow: "var(--pw-shadow-md)", overflow: "hidden" }}>
+              {/* Header */}
+              <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--pw-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <p style={{ fontSize: 15, fontWeight: 700, fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)", margin: 0 }}>SLA Report — Sample</p>
+                  <p style={{ fontSize: 11, color: "var(--pw-text-muted)", margin: "3px 0 0" }}>Generated {generated}</p>
+                </div>
+                <button onClick={() => setShowSlaReport(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--pw-text-muted)", fontSize: 18, lineHeight: 1 }} aria-label="Close">✕</button>
+              </div>
+              {/* Metric grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1, background: "var(--pw-border)", borderBottom: "1px solid var(--pw-border)" }}>
+                {[
+                  { label: "Open Cases",       value: openRows.length,    color: "var(--pw-text-primary)" },
+                  { label: "SLA Breached",      value: slaBreached.length, color: "var(--pw-escalate)"    },
+                  { label: "Pending Outreach",  value: pendingOut.length,  color: "var(--pw-hold)"        },
+                  { label: "High Risk",         value: highRisk.length,    color: "var(--pw-escalate)"    },
+                  { label: "Medium Risk",       value: mediumRisk.length,  color: "var(--pw-hold)"        },
+                  { label: "Resolved (closed)", value: resolvedCount,      color: "var(--pw-apply)"       },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ background: "var(--pw-surface)", padding: "16px 20px" }}>
+                    <p style={{ fontSize: 11, color: "var(--pw-text-muted)", margin: "0 0 4px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</p>
+                    <p style={{ fontSize: 22, fontWeight: 700, color, margin: 0 }}>{value}</p>
+                  </div>
+                ))}
+              </div>
+              {/* SLA breached case list */}
+              <div style={{ padding: "16px 24px" }}>
+                <p style={{ fontSize: 12, fontWeight: 600, color: "var(--pw-text-secondary)", margin: "0 0 10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>SLA Breached Cases</p>
+                {slaBreached.length === 0 ? (
+                  <p style={{ fontSize: 13, color: "var(--pw-text-muted)", margin: 0 }}>No SLA breaches — all cases within deadline.</p>
+                ) : (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--pw-border)" }}>
+                        {["Payment ID", "Sender", "Amount", "Escalated"].map(h => (
+                          <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: "var(--pw-text-muted)", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {slaBreached.slice(0, 5).map(r => (
+                        <tr key={r.payment.payment_id} style={{ borderBottom: "1px solid var(--pw-border)" }}>
+                          <td style={{ padding: "8px 10px", fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-secondary)" }}>{r.payment.payment_id}</td>
+                          <td style={{ padding: "8px 10px" }}>{r.payment.sender_name}</td>
+                          <td style={{ padding: "8px 10px", fontFamily: "var(--pw-font-mono)" }}>{formatUSD(r.payment.amount)}</td>
+                          <td style={{ padding: "8px 10px", color: "var(--pw-text-muted)" }}>{formatTimeSince(r.payment.created_timestamp)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+              {/* Footer */}
+              <div style={{ padding: "12px 24px", borderTop: "1px solid var(--pw-border)", display: "flex", justifyContent: "flex-end" }}>
+                <button onClick={() => setShowSlaReport(false)} style={{ background: "var(--pw-primary)", color: "#fff", border: "none", borderRadius: 8, padding: "7px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Close</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       <footer
         className="fixed bottom-0 left-0 right-0 flex items-center justify-between px-5 text-[11px]"
         style={{

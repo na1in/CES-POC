@@ -435,7 +435,7 @@ export default function ConfigManagementPage() {
                       <td style={TD}><StatusBadge status={r.status} /></td>
                       <td style={{ ...TD, whiteSpace: "nowrap" }}>
                         <div style={{ display: "flex", gap: 6 }}>
-                          {r.status === "pending" && (
+                          {r.status === "pending" && user?.role === "director" && (
                             <>
                               <button
                                 onClick={() => handleApprove(r)}

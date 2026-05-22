@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Bell, Settings as SettingsIcon, ChevronDown,
-  CheckCircle2, Clock, AlertTriangle, Users, TrendingUp, BarChart2,
+  CheckCircle2, Clock, AlertTriangle, Users, TrendingUp, BarChart2, Shield,
 } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid,
@@ -225,6 +225,18 @@ export default function GovernancePage() {
               style={inputStyle}
               aria-label="Date to"
             />
+            <button
+              onClick={() => router.push("/governance/exceptions")}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: "none", color: "var(--pw-hold)",
+                border: "1px solid var(--pw-hold)", borderRadius: 8, padding: "6px 14px",
+                fontSize: 13, fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              <Shield size={14} />
+              Exception Dashboard
+            </button>
             <button
               onClick={() => router.push("/governance/export")}
               style={{
