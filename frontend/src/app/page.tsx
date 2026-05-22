@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, X, Search, Bell, Settings, CheckCircle2, Clock, TriangleAlert } from "lucide-react"
+import { AlertTriangle, X, Search, Bell, Settings, CheckCircle2, Clock, TriangleAlert, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -132,12 +132,8 @@ function ConfidencePct({ score }: { score: number }) {
 function Nav() {
   const { user, logout } = useAuth()
   const router = useRouter()
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false)
   const initials = user?.name.split(" ").map(w => w[0]).join("").slice(0, 2) ?? "?"
-
-  function handleLogout() {
-    logout()
-    router.push("/login")
-  }
 
   return (
     <nav
@@ -182,15 +178,50 @@ function Nav() {
       <Bell size={18} style={{ color: "var(--pw-text-secondary)" }} />
       <Settings size={18} style={{ color: "var(--pw-text-secondary)" }} />
 
-      {/* Avatar + logout */}
-      <button
-        onClick={handleLogout}
-        title={`${user?.name} (${user?.role}) — click to sign out`}
-        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0"
-        style={{ background: "var(--pw-primary)", border: "none", cursor: "pointer" }}
-      >
-        {initials}
-      </button>
+      {/* Avatar + role dropdown */}
+      <div style={{ position: "relative" }}>
+        <button
+          aria-label="Switch role"
+          onClick={() => setRoleMenuOpen(o => !o)}
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            background: "var(--pw-bg)", border: "1px solid var(--pw-border)",
+            borderRadius: 8, padding: "4px 10px", fontSize: 12,
+            color: "var(--pw-text-secondary)", cursor: "pointer",
+          }}
+        >
+          <div style={{
+            width: 22, height: 22, borderRadius: "50%", background: "var(--pw-primary)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#fff", fontWeight: 700, fontSize: 10,
+          }}>
+            {initials}
+          </div>
+          {user?.name.split(" ")[0] ?? "User"}
+          <ChevronDown size={12} />
+        </button>
+        {roleMenuOpen && (
+          <div style={{
+            position: "absolute", right: 0, top: "calc(100% + 6px)",
+            background: "var(--pw-surface)", border: "1px solid var(--pw-border)",
+            borderRadius: 8, boxShadow: "var(--pw-shadow-md)", zIndex: 60,
+            minWidth: 180, overflow: "hidden",
+          }}>
+            <button
+              onClick={() => { logout(); router.push("/login"); setRoleMenuOpen(false) }}
+              style={{
+                display: "block", width: "100%", textAlign: "left",
+                padding: "9px 14px", fontSize: 13, cursor: "pointer",
+                background: "transparent",
+                border: "none", color: "var(--pw-escalate)",
+              }}
+            >
+              Sign out
+              <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>({user?.role})</span>
+            </button>
+          </div>
+        )}
+      </div>
     </nav>
   )
 }

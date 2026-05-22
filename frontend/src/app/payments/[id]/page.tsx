@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle2, Clock } from "lucide-react"
+import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle2, Clock, ChevronDown } from "lucide-react"
 import {
   getPayment, approvePayment, rejectPayment, overridePayment, returnPayment, markPendingOutreach, reprocessPayment,
   type PaymentDetail,
@@ -149,6 +149,7 @@ export default function PaymentDetail() {
   const [applyNoteOpen, setApplyNoteOpen] = useState(false)
   const [applyNote, setApplyNote] = useState("")
   const [toast, setToast] = useState<string | null>(null)
+  const [roleMenuOpen, setRoleMenuOpen] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -310,17 +311,49 @@ export default function PaymentDetail() {
         </div>
         <Bell size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
         <Settings size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
-        <button
-          onClick={() => { logout(); router.push("/login") }}
-          title={`${user?.name} — sign out`}
-          style={{
-            width: 28, height: 28, borderRadius: "50%", background: "var(--pw-primary)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            color: "#fff", fontWeight: 700, fontSize: 11, border: "none", cursor: "pointer",
-          }}
-        >
-          {user?.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) ?? "?"}
-        </button>
+        <div style={{ position: "relative" }}>
+          <button
+            aria-label="Switch role"
+            onClick={() => setRoleMenuOpen(o => !o)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: "var(--pw-bg)", border: "1px solid var(--pw-border)",
+              borderRadius: 8, padding: "4px 10px", fontSize: 12,
+              color: "var(--pw-text-secondary)", cursor: "pointer",
+            }}
+          >
+            <div style={{
+              width: 22, height: 22, borderRadius: "50%", background: "var(--pw-primary)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontWeight: 700, fontSize: 10,
+            }}>
+              {user?.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) ?? "?"}
+            </div>
+            {user?.name.split(" ")[0] ?? "User"}
+            <ChevronDown size={12} />
+          </button>
+          {roleMenuOpen && (
+            <div style={{
+              position: "absolute", right: 0, top: "calc(100% + 6px)",
+              background: "var(--pw-surface)", border: "1px solid var(--pw-border)",
+              borderRadius: 8, boxShadow: "var(--pw-shadow-md)", zIndex: 60,
+              minWidth: 180, overflow: "hidden",
+            }}>
+              <button
+                onClick={() => { logout(); router.push("/login"); setRoleMenuOpen(false) }}
+                style={{
+                  display: "block", width: "100%", textAlign: "left",
+                  padding: "9px 14px", fontSize: 13, cursor: "pointer",
+                  background: "transparent",
+                  border: "none", color: "var(--pw-escalate)",
+                }}
+              >
+                Sign out
+                <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>({user?.role})</span>
+              </button>
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* Page header */}
