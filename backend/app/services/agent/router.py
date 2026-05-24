@@ -64,7 +64,7 @@ def _route(signals: dict, payment: dict, thresholds: dict) -> tuple[int, str]:
         return 4, "scenario_4_no_customer_match"
 
     # Scenario 3 — amount variance exceeds auto-apply tolerance
-    variance = abs(float(signals.get("amount_variance_pct", 0)))
+    variance = abs(float(signals.get("amount_variance_pct") or 0))
     if variance > amount_tol:
         tier = _variance_tier(variance)
         return 3, f"scenario_3_tier_{tier}"

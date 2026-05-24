@@ -1,6 +1,6 @@
 """Tests for the pipeline orchestrator pure helpers (CES-24)."""
 import pytest
-import anthropic
+import openai
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from unittest.mock import MagicMock
 
@@ -27,20 +27,20 @@ class TestIsRetryable:
         exc = OperationalError("db timeout", params={}, orig=Exception())
         assert _is_retryable(exc) is True
 
-    def test_claude_timeout_retryable(self):
-        exc = anthropic.APITimeoutError(request=MagicMock())
+    def test_llm_timeout_retryable(self):
+        exc = openai.APITimeoutError(request=MagicMock())
         assert _is_retryable(exc) is True
 
-    def test_claude_rate_limit_retryable(self):
-        exc = anthropic.RateLimitError(
+    def test_llm_rate_limit_retryable(self):
+        exc = openai.RateLimitError(
             message="rate limit",
-            response=MagicMock(headers={}),
+            response=MagicMock(headers={}, status_code=429),
             body={},
         )
         assert _is_retryable(exc) is True
 
-    def test_claude_connection_error_retryable(self):
-        exc = anthropic.APIConnectionError(request=MagicMock())
+    def test_llm_connection_error_retryable(self):
+        exc = openai.APIConnectionError(request=MagicMock())
         assert _is_retryable(exc) is True
 
     def test_unknown_exception_not_retryable(self):

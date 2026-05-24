@@ -1,19 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   Bell, Settings as SettingsIcon, ChevronDown, ChevronRight,
   AlertTriangle, Activity, Shield, X,
 } from "lucide-react"
 import {
-  mockSlaBreachedPayments,
-  mockAnomalyFlags,
-  mockPendingChangeRequests,
-} from "@/mocks/exceptions"
-import { mockUsers } from "@/mocks/thresholds"
-import type { UserRole } from "@/types/user"
-import type { AnomalyFlag, ConfigChangeRequest } from "@/types/governance"
+  listPayments, getAnomalies, getChangeRequests, approveChangeRequest, rejectChangeRequest,
+  type PaymentRow, type AnomalyFlag, type ChangeRequest,
+} from "@/lib/api"
+import { useAuth } from "@/contexts/auth"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,31 +32,19 @@ function formatDate(iso: string): string {
 
 // ── Collapsible section ───────────────────────────────────────────────────────
 
-interface SectionCardProps {
-  title: string
-  count: number
-  icon: React.ReactNode
-  accentColor: string
-  children: React.ReactNode
-  defaultOpen?: boolean
-}
-
-function SectionCard({ title, count, icon, accentColor, children, defaultOpen = true }: SectionCardProps) {
+function SectionCard({ title, count, icon, accentColor, children, defaultOpen = true }: {
+  title: string; count: number; icon: React.ReactNode
+  accentColor: string; children: React.ReactNode; defaultOpen?: boolean
+}) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="pw-card" style={{ marginBottom: 16, overflow: "hidden" }}>
       <button
         onClick={() => setOpen(o => !o)}
-        style={{
-          width: "100%", display: "flex", alignItems: "center", gap: 10,
-          padding: "14px 20px", background: "none", border: "none", cursor: "pointer",
-          borderBottom: open ? "1px solid var(--pw-border)" : "none",
-        }}
+        style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "14px 20px", background: "none", border: "none", cursor: "pointer", borderBottom: open ? "1px solid var(--pw-border)" : "none" }}
       >
         <span style={{ color: accentColor }}>{icon}</span>
-        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)", flex: 1, textAlign: "left" }}>
-          {title}
-        </span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)", flex: 1, textAlign: "left" }}>{title}</span>
         <span style={{
           fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 9999,
           background: count === 0 ? "var(--pw-surface-elevated)" : `rgba(${accentColor === "var(--pw-escalate)" ? "239,68,68" : "245,158,11"},0.1)`,
@@ -76,44 +61,30 @@ function SectionCard({ title, count, icon, accentColor, children, defaultOpen = 
 
 // ── Anomaly status chip ───────────────────────────────────────────────────────
 
-function AnomalyStatusChip({ status }: { status: AnomalyFlag["status"] }) {
-  const map = {
-    open:         { label: "Open",         cls: "pw-badge pw-badge-escalate" },
-    investigating:{ label: "Investigating",cls: "pw-badge pw-badge-hold" },
-    resolved:     { label: "Resolved",     cls: "pw-badge pw-badge-apply" },
+function AnomalyStatusChip({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    open:          { label: "Open",          cls: "pw-badge pw-badge-escalate" },
+    investigating: { label: "Investigating", cls: "pw-badge pw-badge-hold" },
+    resolved:      { label: "Resolved",      cls: "pw-badge pw-badge-apply" },
   }
-  const { label, cls } = map[status]
+  const { label, cls } = map[status] ?? { label: status, cls: "pw-badge pw-badge-neutral" }
   return <span className={cls}>{label}</span>
 }
 
 // ── Reject modal ──────────────────────────────────────────────────────────────
 
-interface RejectModalProps {
-  request: ConfigChangeRequest
-  onConfirm: (comment: string) => void
-  onClose: () => void
-}
-
-function RejectModal({ request, onConfirm, onClose }: RejectModalProps) {
+function RejectModal({ request, onConfirm, onClose }: {
+  request: ChangeRequest; onConfirm: (comment: string) => void; onClose: () => void
+}) {
   const [comment, setComment] = useState("")
   const invalid = comment.trim().length === 0
-
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100,
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div className="pw-card" style={{ width: 480, padding: "24px", position: "relative" }}>
-        <button
-          onClick={onClose}
-          style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", color: "var(--pw-text-muted)" }}
-          aria-label="Close modal"
-        >
+        <button onClick={onClose} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", cursor: "pointer", color: "var(--pw-text-muted)" }} aria-label="Close modal">
           <X size={18} />
         </button>
-        <h2 style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)", margin: "0 0 6px" }}>
-          Reject Change Request
-        </h2>
+        <h2 style={{ fontSize: 16, fontWeight: 700, fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)", margin: "0 0 6px" }}>Reject Change Request</h2>
         <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "0 0 16px" }}>
           Rejecting <span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12, background: "var(--pw-surface-elevated)", padding: "1px 5px", borderRadius: 4 }}>{request.parameter_name}</span>{" "}
           → <strong>{request.proposed_value}</strong> proposed by {request.proposed_by}.
@@ -122,43 +93,16 @@ function RejectModal({ request, onConfirm, onClose }: RejectModalProps) {
           Review comment <span style={{ color: "var(--pw-escalate)" }}>*</span>
         </label>
         <textarea
-          value={comment}
-          onChange={e => setComment(e.target.value)}
-          placeholder="Explain the reason for rejection…"
-          rows={4}
-          style={{
-            width: "100%", boxSizing: "border-box",
-            border: `1px solid ${invalid && comment.length > 0 ? "var(--pw-escalate)" : "var(--pw-border)"}`,
-            borderRadius: 8, padding: "8px 12px", fontSize: 13,
-            color: "var(--pw-text-primary)", resize: "vertical", outline: "none",
-            fontFamily: "var(--pw-font-sans)",
-          }}
+          value={comment} onChange={e => setComment(e.target.value)}
+          placeholder="Explain the reason for rejection…" rows={4}
+          style={{ width: "100%", boxSizing: "border-box", border: `1px solid ${invalid && comment.length > 0 ? "var(--pw-escalate)" : "var(--pw-border)"}`, borderRadius: 8, padding: "8px 12px", fontSize: 13, color: "var(--pw-text-primary)", resize: "vertical", outline: "none" }}
           aria-label="Review comment"
         />
-        {comment.length > 0 && invalid && (
-          <p style={{ fontSize: 11, color: "var(--pw-escalate)", margin: "4px 0 0" }}>Comment is required before rejecting.</p>
-        )}
         <div style={{ display: "flex", gap: 8, marginTop: 16, justifyContent: "flex-end" }}>
+          <button onClick={onClose} style={{ padding: "7px 16px", borderRadius: 8, fontSize: 13, border: "1px solid var(--pw-border)", background: "none", color: "var(--pw-text-secondary)", cursor: "pointer" }}>Cancel</button>
           <button
-            onClick={onClose}
-            style={{
-              padding: "7px 16px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-              border: "1px solid var(--pw-border)", background: "none",
-              color: "var(--pw-text-secondary)", cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => !invalid && onConfirm(comment)}
-            disabled={invalid}
-            style={{
-              padding: "7px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
-              border: "1px solid var(--pw-escalate)",
-              background: invalid ? "var(--pw-surface-elevated)" : "transparent",
-              color: invalid ? "var(--pw-text-muted)" : "var(--pw-escalate)",
-              cursor: invalid ? "not-allowed" : "pointer",
-            }}
+            onClick={() => !invalid && onConfirm(comment)} disabled={invalid}
+            style={{ padding: "7px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "1px solid var(--pw-escalate)", background: invalid ? "var(--pw-surface-elevated)" : "transparent", color: invalid ? "var(--pw-text-muted)" : "var(--pw-escalate)", cursor: invalid ? "not-allowed" : "pointer" }}
           >
             Confirm Reject
           </button>
@@ -168,25 +112,11 @@ function RejectModal({ request, onConfirm, onClose }: RejectModalProps) {
   )
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div style={{ padding: "32px 20px", textAlign: "center", color: "var(--pw-text-muted)", fontSize: 13 }}>
-      {message}
-    </div>
-  )
-}
-
-// ── Table header ──────────────────────────────────────────────────────────────
+// ── Table helpers ─────────────────────────────────────────────────────────────
 
 function TH({ children }: { children: React.ReactNode }) {
   return (
-    <th style={{
-      padding: "9px 16px", fontSize: 10, fontWeight: 700,
-      color: "var(--pw-text-muted)", textTransform: "uppercase" as const,
-      letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" as const,
-    }}>
+    <th style={{ padding: "9px 16px", fontSize: 10, fontWeight: 700, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "left", whiteSpace: "nowrap" }}>
       {children}
     </th>
   )
@@ -200,111 +130,78 @@ function TD({ children, style }: { children: React.ReactNode; style?: React.CSSP
   )
 }
 
+function EmptyState({ message }: { message: string }) {
+  return <div style={{ padding: "32px 20px", textAlign: "center", color: "var(--pw-text-muted)", fontSize: 13 }}>{message}</div>
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ExceptionDashboardPage() {
   const router = useRouter()
-  const [activeRole, setActiveRole] = useState<UserRole>("director")
+  const { user, logout } = useAuth()
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
 
-  // Section 1 — SLA breached cases
-  const [slaPayments, setSlaPayments] = useState(mockSlaBreachedPayments)
+  const [slaPayments, setSlaPayments] = useState<PaymentRow[]>([])
+  const [anomalies, setAnomalies] = useState<AnomalyFlag[]>([])
+  const [expandedAnomaly, setExpandedAnomaly] = useState<number | null>(null)
+  const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([])
+  const [rejectTarget, setRejectTarget] = useState<ChangeRequest | null>(null)
 
-  // Section 2 — Anomaly flags
-  const [anomalies, setAnomalies] = useState(mockAnomalyFlags)
-  const [expandedAnomaly, setExpandedAnomaly] = useState<string | null>(null)
+  const reload = useCallback(() => {
+    listPayments({ page_size: 200 })
+      .then(r => setSlaPayments(r.payments.filter(p => p.sla_breached)))
+      .catch(console.error)
+    getAnomalies()
+      .then(r => setAnomalies(r.anomalies))
+      .catch(console.error)
+    getChangeRequests()
+      .then(r => setChangeRequests(r.change_requests.filter(r => r.status === "pending")))
+      .catch(console.error)
+  }, [])
 
-  // Section 3 — Config change requests
-  const [changeRequests, setChangeRequests] = useState(mockPendingChangeRequests)
-  const [rejectTarget, setRejectTarget] = useState<ConfigChangeRequest | null>(null)
+  useEffect(() => { reload() }, [reload])
 
-  const currentUser = mockUsers.find(u => u.role === activeRole) ?? mockUsers[0]
-
-  function handleApprove(requestId: string) {
-    setChangeRequests(prev => prev.filter(r => r.request_id !== requestId))
+  async function handleApprove(changeId: number) {
+    await approveChangeRequest(changeId).catch(console.error)
+    reload()
   }
 
-  function handleRejectConfirm(requestId: string, comment: string) {
-    setChangeRequests(prev => prev.filter(r => r.request_id !== requestId))
+  async function handleRejectConfirm(changeId: number, comment: string) {
+    await rejectChangeRequest(changeId, comment).catch(console.error)
     setRejectTarget(null)
-    void comment // in a real app: POST to /api/settings/change-requests/{id}/reject
+    reload()
   }
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--pw-bg)", display: "flex", flexDirection: "column" }}>
 
       {/* Nav */}
-      <nav style={{
-        height: "var(--pw-nav-height)", background: "var(--pw-surface)",
-        borderBottom: "1px solid var(--pw-border)", display: "flex",
-        alignItems: "center", padding: "0 20px", gap: 12,
-        position: "sticky", top: 0, zIndex: 50,
-      }}>
-        <button
-          onClick={() => router.push("/")}
-          style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", marginRight: "auto" }}
-        >
-          <div style={{
-            width: 28, height: 28, background: "var(--pw-primary)", borderRadius: 6,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
+      <nav style={{ height: "var(--pw-nav-height)", background: "var(--pw-surface)", borderBottom: "1px solid var(--pw-border)", display: "flex", alignItems: "center", padding: "0 20px", gap: 12, position: "sticky", top: 0, zIndex: 50 }}>
+        <button onClick={() => router.push("/")} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: "pointer", marginRight: "auto" }}>
+          <div style={{ width: 28, height: 28, background: "var(--pw-primary)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <span style={{ color: "#fff", fontWeight: 700, fontSize: 13, fontFamily: "var(--pw-font-display)" }}>P</span>
           </div>
           <span style={{ fontWeight: 700, fontSize: 15, fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)" }}>PayWise</span>
         </button>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6,
-          background: "var(--pw-bg)", border: "1px solid var(--pw-border)",
-          borderRadius: 8, padding: "5px 10px", width: 200,
-        }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--pw-bg)", border: "1px solid var(--pw-border)", borderRadius: 8, padding: "5px 10px", width: 200 }}>
           <span style={{ fontSize: 12, color: "var(--pw-text-muted)", flex: 1 }}>Search…</span>
           <span style={{ fontSize: 10, color: "var(--pw-text-muted)", background: "var(--pw-border)", padding: "1px 4px", borderRadius: 3 }}>⌘K</span>
         </div>
         <Bell size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
         <SettingsIcon size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} onClick={() => router.push("/settings")} />
         <div style={{ position: "relative" }}>
-          <button
-            aria-label="Switch role"
-            onClick={() => setRoleMenuOpen(o => !o)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: "var(--pw-bg)", border: "1px solid var(--pw-border)",
-              borderRadius: 8, padding: "4px 10px", fontSize: 12,
-              color: "var(--pw-text-secondary)", cursor: "pointer",
-            }}
-          >
-            <div style={{
-              width: 22, height: 22, borderRadius: "50%", background: "var(--pw-primary)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: "#fff", fontWeight: 700, fontSize: 10,
-            }}>
-              {currentUser.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}
+          <button aria-label="User menu" onClick={() => setRoleMenuOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--pw-bg)", border: "1px solid var(--pw-border)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: "var(--pw-text-secondary)", cursor: "pointer" }}>
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--pw-primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 10 }}>
+              {user?.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) ?? "?"}
             </div>
-            {currentUser.name.split(" ")[0]}
+            {user?.name.split(" ")[0] ?? "User"}
             <ChevronDown size={12} />
           </button>
           {roleMenuOpen && (
-            <div style={{
-              position: "absolute", right: 0, top: "calc(100% + 6px)",
-              background: "var(--pw-surface)", border: "1px solid var(--pw-border)",
-              borderRadius: 8, boxShadow: "var(--pw-shadow-md)", zIndex: 60,
-              minWidth: 180, overflow: "hidden",
-            }}>
-              {mockUsers.map((u: { user_id: string; role: UserRole; name: string }) => (
-                <button
-                  key={u.user_id}
-                  onClick={() => { setActiveRole(u.role); setRoleMenuOpen(false) }}
-                  style={{
-                    display: "block", width: "100%", textAlign: "left",
-                    padding: "9px 14px", fontSize: 13, cursor: "pointer",
-                    background: u.role === activeRole ? "var(--pw-bg)" : "transparent",
-                    border: "none", color: "var(--pw-text-primary)",
-                  }}
-                >
-                  {u.name}
-                  <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>({u.role})</span>
-                </button>
-              ))}
+            <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "var(--pw-surface)", border: "1px solid var(--pw-border)", borderRadius: 8, boxShadow: "var(--pw-shadow-md)", zIndex: 60, minWidth: 180, overflow: "hidden" }}>
+              <button onClick={() => { logout(); router.push("/login"); setRoleMenuOpen(false) }} style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 14px", fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--pw-escalate)" }}>
+                Sign out <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>({user?.role})</span>
+              </button>
             </div>
           )}
         </div>
@@ -314,9 +211,7 @@ export default function ExceptionDashboardPage() {
       <div style={{ background: "var(--pw-surface)", borderBottom: "1px solid var(--pw-border)", padding: "16px 24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <AlertTriangle size={18} color="var(--pw-escalate)" />
-          <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)", margin: 0 }}>
-            Exception Dashboard
-          </h1>
+          <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)", margin: 0 }}>Exception Dashboard</h1>
         </div>
         <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "4px 0 0" }}>
           SLA breaches, anomaly flags, and config changes awaiting approval.
@@ -324,54 +219,33 @@ export default function ExceptionDashboardPage() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, padding: "24px", maxWidth: 1120, width: "100%", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, padding: "24px", width: "100%", boxSizing: "border-box" }}>
 
         {/* ── Section 1: SLA Breached Cases ── */}
-        <SectionCard
-          title="SLA Breached Cases"
-          count={slaPayments.length}
-          icon={<AlertTriangle size={16} />}
-          accentColor="var(--pw-escalate)"
-        >
+        <SectionCard title="SLA Breached Cases" count={slaPayments.length} icon={<AlertTriangle size={16} />} accentColor="var(--pw-escalate)">
           {slaPayments.length === 0 ? (
             <EmptyState message="No SLA breaches — all escalations resolved within deadline." />
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "var(--pw-bg)", borderBottom: "1px solid var(--pw-border)" }}>
-                  <TH>Payment ID</TH>
-                  <TH>Sender</TH>
-                  <TH>Amount</TH>
-                  <TH>Scenario</TH>
-                  <TH>Time Since Breach</TH>
-                  <TH>Investigator</TH>
+                  <TH>Payment ID</TH><TH>Sender</TH><TH>Amount</TH><TH>Scenario</TH><TH>Due Since</TH>
                 </tr>
               </thead>
               <tbody>
                 {slaPayments.map((p, i) => (
                   <tr
                     key={p.payment_id}
-                    style={{
-                      background: "rgba(239,68,68,0.06)",
-                      borderBottom: i < slaPayments.length - 1 ? "1px solid var(--pw-border)" : "none",
-                      cursor: "pointer",
-                    }}
+                    style={{ background: "rgba(239,68,68,0.06)", borderBottom: i < slaPayments.length - 1 ? "1px solid var(--pw-border)" : "none", cursor: "pointer" }}
                     onClick={() => router.push(`/payments/${p.payment_id}`)}
                   >
-                    <TD>
-                      <span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12 }}>{p.payment_id}</span>
-                    </TD>
+                    <TD><span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12 }}>{p.payment_id}</span></TD>
                     <TD>{p.sender_name}</TD>
-                    <TD>
-                      <span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12 }}>{formatUSD(p.amount)}</span>
-                    </TD>
-                    <TD>
-                      <span className="pw-badge pw-badge-neutral">{p.scenario}</span>
-                    </TD>
+                    <TD><span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12 }}>{formatUSD(p.amount)}</span></TD>
+                    <TD><span className="pw-badge pw-badge-neutral">{p.scenario_route?.replace("scenario_", "S") ?? "—"}</span></TD>
                     <TD style={{ color: "var(--pw-escalate)", fontWeight: 600 }}>
-                      {timeSince(p.investigation_due_date)}
+                      {p.investigation_due_date ? timeSince(p.investigation_due_date) : "—"}
                     </TD>
-                    <TD style={{ color: "var(--pw-text-secondary)" }}>{p.investigator}</TD>
                   </tr>
                 ))}
               </tbody>
@@ -380,53 +254,39 @@ export default function ExceptionDashboardPage() {
         </SectionCard>
 
         {/* ── Section 2: Anomaly Flags ── */}
-        <SectionCard
-          title="Anomaly Flags"
-          count={anomalies.filter(a => a.status !== "resolved").length}
-          icon={<Activity size={16} />}
-          accentColor="var(--pw-hold)"
-        >
+        <SectionCard title="Anomaly Flags" count={anomalies.filter(a => a.status !== "resolved").length} icon={<Activity size={16} />} accentColor="var(--pw-hold)">
           {anomalies.length === 0 ? (
             <EmptyState message="No anomaly flags for this period." />
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "var(--pw-bg)", borderBottom: "1px solid var(--pw-border)" }}>
-                  <TH>Metric</TH>
-                  <TH>Description</TH>
-                  <TH>Period</TH>
-                  <TH>Flagged By</TH>
-                  <TH>Status</TH>
-                  <TH>Details</TH>
+                  <TH>Metric</TH><TH>Description</TH><TH>Period</TH><TH>Flagged By</TH><TH>Status</TH><TH>Details</TH>
                 </tr>
               </thead>
               <tbody>
                 {anomalies.map((a, i) => (
                   <>
-                    <tr
-                      key={a.anomaly_id}
-                      style={{ borderBottom: "1px solid var(--pw-border)" }}
-                    >
-                      <TD><span style={{ fontWeight: 600 }}>{a.metric}</span></TD>
+                    <tr key={a.flag_id} style={{ borderBottom: "1px solid var(--pw-border)" }}>
+                      <TD><span style={{ fontWeight: 600 }}>{a.metric_name}</span></TD>
                       <TD style={{ color: "var(--pw-text-secondary)", maxWidth: 320 }}>{a.description}</TD>
-                      <TD style={{ color: "var(--pw-text-muted)", whiteSpace: "nowrap" }}>{a.period}</TD>
+                      <TD style={{ color: "var(--pw-text-muted)", whiteSpace: "nowrap" }}>
+                        {formatDate(a.period_start)} – {formatDate(a.period_end)}
+                      </TD>
                       <TD style={{ color: "var(--pw-text-secondary)" }}>{a.flagged_by}</TD>
                       <TD><AnomalyStatusChip status={a.status} /></TD>
                       <TD>
                         <button
-                          onClick={() => setExpandedAnomaly(expandedAnomaly === a.anomaly_id ? null : a.anomaly_id)}
-                          aria-label={`View details for ${a.metric}`}
-                          style={{
-                            fontSize: 12, color: "var(--pw-primary)", background: "none",
-                            border: "none", cursor: "pointer", fontWeight: 500, padding: 0,
-                          }}
+                          onClick={() => setExpandedAnomaly(expandedAnomaly === a.flag_id ? null : a.flag_id)}
+                          aria-label={`View details for ${a.metric_name}`}
+                          style={{ fontSize: 12, color: "var(--pw-primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0 }}
                         >
-                          {expandedAnomaly === a.anomaly_id ? "Hide" : "View Details"}
+                          {expandedAnomaly === a.flag_id ? "Hide" : "View Details"}
                         </button>
                       </TD>
                     </tr>
-                    {expandedAnomaly === a.anomaly_id && (
-                      <tr key={`${a.anomaly_id}-detail`} style={{ borderBottom: i < anomalies.length - 1 ? "1px solid var(--pw-border)" : "none" }}>
+                    {expandedAnomaly === a.flag_id && (
+                      <tr key={`${a.flag_id}-detail`} style={{ borderBottom: i < anomalies.length - 1 ? "1px solid var(--pw-border)" : "none" }}>
                         <td colSpan={6} style={{ padding: "12px 16px", background: "var(--pw-bg)" }}>
                           <p style={{ fontSize: 12, fontWeight: 600, color: "var(--pw-text-secondary)", margin: "0 0 4px" }}>Resolution Notes</p>
                           <p style={{ fontSize: 13, color: "var(--pw-text-primary)", margin: 0 }}>
@@ -443,32 +303,19 @@ export default function ExceptionDashboardPage() {
         </SectionCard>
 
         {/* ── Section 3: Config Changes Pending Approval ── */}
-        <SectionCard
-          title="Config Changes Pending Approval"
-          count={changeRequests.length}
-          icon={<Shield size={16} />}
-          accentColor="var(--pw-hold)"
-        >
+        <SectionCard title="Config Changes Pending Approval" count={changeRequests.length} icon={<Shield size={16} />} accentColor="var(--pw-hold)">
           {changeRequests.length === 0 ? (
             <EmptyState message="No config changes pending approval." />
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "var(--pw-bg)", borderBottom: "1px solid var(--pw-border)" }}>
-                  <TH>Parameter</TH>
-                  <TH>Current Value</TH>
-                  <TH>Proposed Value</TH>
-                  <TH>Proposed By</TH>
-                  <TH>Date</TH>
-                  <TH>Actions</TH>
+                  <TH>Parameter</TH><TH>Current Value</TH><TH>Proposed Value</TH><TH>Proposed By</TH><TH>Date</TH><TH>Actions</TH>
                 </tr>
               </thead>
               <tbody>
                 {changeRequests.map((r, i) => (
-                  <tr
-                    key={r.request_id}
-                    style={{ borderBottom: i < changeRequests.length - 1 ? "1px solid var(--pw-border)" : "none" }}
-                  >
+                  <tr key={r.change_id} style={{ borderBottom: i < changeRequests.length - 1 ? "1px solid var(--pw-border)" : "none" }}>
                     <TD>
                       <span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12, background: "var(--pw-surface-elevated)", padding: "2px 6px", borderRadius: 4 }}>
                         {r.parameter_name}
@@ -481,24 +328,16 @@ export default function ExceptionDashboardPage() {
                     <TD>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
-                          onClick={() => handleApprove(r.request_id)}
+                          onClick={() => handleApprove(r.change_id)}
                           aria-label={`Approve ${r.parameter_name}`}
-                          style={{
-                            padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600,
-                            background: "var(--pw-apply-tint)", color: "var(--pw-apply)",
-                            border: "1px solid var(--pw-apply)", cursor: "pointer",
-                          }}
+                          style={{ padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "var(--pw-apply-tint)", color: "var(--pw-apply)", border: "1px solid var(--pw-apply)", cursor: "pointer" }}
                         >
                           Approve
                         </button>
                         <button
                           onClick={() => setRejectTarget(r)}
                           aria-label={`Reject ${r.parameter_name}`}
-                          style={{
-                            padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600,
-                            background: "transparent", color: "var(--pw-escalate)",
-                            border: "1px solid var(--pw-escalate)", cursor: "pointer",
-                          }}
+                          style={{ padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "transparent", color: "var(--pw-escalate)", border: "1px solid var(--pw-escalate)", cursor: "pointer" }}
                         >
                           Reject
                         </button>
@@ -513,29 +352,21 @@ export default function ExceptionDashboardPage() {
 
       </div>
 
-      {/* Reject modal */}
       {rejectTarget && (
         <RejectModal
           request={rejectTarget}
-          onConfirm={(comment) => handleRejectConfirm(rejectTarget.request_id, comment)}
+          onConfirm={(comment) => handleRejectConfirm(rejectTarget.change_id, comment)}
           onClose={() => setRejectTarget(null)}
         />
       )}
 
       {/* Footer */}
-      <footer style={{
-        height: "var(--pw-footer-height)", background: "var(--pw-surface)",
-        borderTop: "1px solid var(--pw-border)", display: "flex",
-        alignItems: "center", padding: "0 20px", gap: 16, fontSize: 11,
-        color: "var(--pw-text-muted)", position: "sticky", bottom: 0, zIndex: 40,
-      }}>
+      <footer style={{ height: "var(--pw-footer-height)", background: "var(--pw-surface)", borderTop: "1px solid var(--pw-border)", display: "flex", alignItems: "center", padding: "0 20px", gap: 16, fontSize: 11, color: "var(--pw-text-muted)", position: "sticky", bottom: 0, zIndex: 40 }}>
         <span style={{ color: "var(--pw-apply)", fontWeight: 600 }}>● Audit Active</span>
-        <span>User: {currentUser.name}</span>
-        <span>Role: {currentUser.role}</span>
+        <span>User: {user?.name ?? "—"}</span>
+        <span>Role: {user?.role ?? "—"}</span>
         <span style={{ marginLeft: "auto" }}>
-          Press{" "}
-          <kbd style={{ background: "var(--pw-surface-elevated)", padding: "1px 5px", borderRadius: 3, fontFamily: "var(--pw-font-mono)" }}>?</kbd>
-          {" "}for keyboard shortcuts
+          Press <kbd style={{ background: "var(--pw-surface-elevated)", padding: "1px 5px", borderRadius: 3, fontFamily: "var(--pw-font-mono)" }}>?</kbd> for keyboard shortcuts
         </span>
       </footer>
     </div>

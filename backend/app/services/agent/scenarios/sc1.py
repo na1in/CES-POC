@@ -22,7 +22,7 @@ _SCENARIO = 1
 def _decide(signals: dict, thresholds: dict) -> tuple[str, float, bool, str | None, str]:
     """Pure decision logic — no I/O."""
     name_score = float(signals.get("name_similarity_score", 0))
-    variance = abs(float(signals.get("amount_variance_pct", 0)))
+    variance = abs(float(signals.get("amount_variance_pct") or 0))
     has_risk = signals.get("has_risk_flags", False)
     account_status = signals.get("account_status", "inactive")
     method_risk = signals.get("payment_method_risk_level", "high")

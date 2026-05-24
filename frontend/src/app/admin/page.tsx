@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Bell, Settings as SettingsIcon, ChevronDown,
@@ -8,13 +8,10 @@ import {
 } from "lucide-react"
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, CartesianGrid,
   PieChart, Pie, Cell, Legend,
 } from "recharts"
-import { mockAdminAnalytics } from "@/mocks/analytics"
-import { mockUsers } from "@/mocks/thresholds"
-import type { AdminScenarioData } from "@/types/analytics"
-import type { UserRole } from "@/types/user"
+import { getAnalyticsDecisions, type AnalyticsDecisions } from "@/lib/api"
+import { useAuth } from "@/contexts/auth"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -31,14 +28,14 @@ type TabKey = (typeof TABS)[number]["key"]
 
 const PIE_COLORS: Record<string, string> = {
   "AI Autonomous":   "#10B981",
-  "Human Confirmed": "#7C4DFF",
-  "Human Override":  "#F59E0B",
+  "Operator Confirmed": "#7C4DFF",
+  "Operator Override":  "#F59E0B",
 }
 
-const BAND_COLORS: Record<string, string> = {
-  Low:    "#EF4444",
-  Medium: "#F59E0B",
-  High:   "#10B981",
+const DECISION_COLORS: Record<string, string> = {
+  "APPLY":    "#10B981",
+  "HOLD":     "#F59E0B",
+  "ESCALATE": "#EF4444",
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -88,15 +85,67 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 
 export default function AdminDashboardPage() {
   const router = useRouter()
-  const [activeRole, setActiveRole] = useState<UserRole>("admin")
+  const { user, logout } = useAuth()
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabKey>("all")
+  const [data, setData] = useState<AnalyticsDecisions | null>(null)
 
-  const currentUser = mockUsers.find(u => u.role === activeRole) ?? mockUsers[0]
-  const data: AdminScenarioData = mockAdminAnalytics[activeTab]
+  useEffect(() => {
+    getAnalyticsDecisions().then(setData).catch(console.error)
+  }, [])
 
   const tooltipStyle = { border: "1px solid var(--pw-border)", borderRadius: 8, fontSize: 12 }
   const axisTickStyle = { fontSize: 11, fill: "var(--pw-text-muted)" }
+
+  // Build scenario-specific stats
+  const scenarioData = data?.by_scenario ?? []
+  const activeScenario = activeTab === "all"
+    ? null
+    : scenarioData.find(s => s.scenario_route === activeTab) ?? null
+
+  const volume = activeTab === "all"
+    ? (data?.summary.total_processed ?? 0)
+    : (activeScenario?.volume ?? 0)
+
+  const avgConf = activeTab === "all"
+    ? (scenarioData.length > 0
+        ? Math.round(scenarioData.reduce((a, s) => a + s.avg_confidence, 0) / scenarioData.length)
+        : 0)
+    : Math.round(activeScenario?.avg_confidence ?? 0)
+
+  const overrideCount = activeTab === "all"
+    ? (data?.summary.human_overrides ?? 0)
+    : (activeScenario?.override_count ?? 0)
+
+  // Decision distribution pie data
+  const pieData = activeTab === "all"
+    ? [
+        { label: "AI Autonomous",   value: data?.summary.auto_applied ?? 0 },
+        { label: "Operator Confirmed", value: data?.summary.applied_human_review ?? 0 },
+        { label: "Operator Override",  value: data?.summary.human_overrides ?? 0 },
+      ].filter(d => d.value > 0)
+    : [
+        { label: "AI Autonomous",   value: activeScenario?.ai_autonomous ?? 0 },
+        { label: "Operator Confirmed", value: activeScenario?.human_confirmed ?? 0 },
+        { label: "Operator Override",  value: activeScenario?.human_override ?? 0 },
+      ].filter(d => d.value > 0)
+
+  // Decision outcome bar data
+  const outcomeData = activeTab === "all"
+    ? scenarioData.map(s => ({
+        scenario: s.scenario_route?.replace("scenario_", "S") ?? s.scenario_route,
+        APPLY:    s.apply_count,
+        HOLD:     s.hold_count,
+        ESCALATE: s.escalate_count,
+      }))
+    : activeScenario
+      ? [{ scenario: activeTab.replace("scenario_", "S"), APPLY: activeScenario.apply_count, HOLD: activeScenario.hold_count, ESCALATE: activeScenario.escalate_count }]
+      : []
+
+  // Confidence histogram
+  const histData = data
+    ? Object.entries(data.confidence_histogram).map(([bucket, count]) => ({ bucket, count }))
+    : []
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--pw-bg)", display: "flex", flexDirection: "column" }}>
@@ -125,28 +174,25 @@ export default function AdminDashboardPage() {
         <SettingsIcon size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} onClick={() => router.push("/settings")} />
         <div style={{ position: "relative" }}>
           <button
-            aria-label="Switch role"
+            aria-label="User menu"
             onClick={() => setRoleMenuOpen(o => !o)}
             style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--pw-bg)", border: "1px solid var(--pw-border)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: "var(--pw-text-secondary)", cursor: "pointer" }}
           >
             <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--pw-primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 10 }}>
-              {currentUser.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2)}
+              {user?.name.split(" ").map((w: string) => w[0]).join("").slice(0, 2) ?? "?"}
             </div>
-            {currentUser.name.split(" ")[0]}
+            {user?.name.split(" ")[0] ?? "User"}
             <ChevronDown size={12} />
           </button>
           {roleMenuOpen && (
             <div style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", background: "var(--pw-surface)", border: "1px solid var(--pw-border)", borderRadius: 8, boxShadow: "var(--pw-shadow-md)", zIndex: 60, minWidth: 180, overflow: "hidden" }}>
-              {mockUsers.map((u: { user_id: string; role: UserRole; name: string }) => (
-                <button
-                  key={u.user_id}
-                  onClick={() => { setActiveRole(u.role); setRoleMenuOpen(false) }}
-                  style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 14px", fontSize: 13, cursor: "pointer", background: u.role === activeRole ? "var(--pw-bg)" : "transparent", border: "none", color: "var(--pw-text-primary)" }}
-                >
-                  {u.name}
-                  <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>({u.role})</span>
-                </button>
-              ))}
+              <button
+                onClick={() => { logout(); router.push("/login"); setRoleMenuOpen(false) }}
+                style={{ display: "block", width: "100%", textAlign: "left", padding: "9px 14px", fontSize: 13, cursor: "pointer", background: "transparent", border: "none", color: "var(--pw-escalate)" }}
+              >
+                Sign out
+                <span style={{ fontSize: 11, color: "var(--pw-text-muted)", marginLeft: 6 }}>({user?.role})</span>
+              </button>
             </div>
           )}
         </div>
@@ -198,27 +244,27 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Body */}
-      <div style={{ flex: 1, padding: "24px", maxWidth: 1280, width: "100%", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, padding: "24px", width: "100%", boxSizing: "border-box" }}>
 
         {/* Summary tiles */}
         <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
           <StatTile
             label="Volume"
-            value={data.volume.toLocaleString()}
+            value={volume.toLocaleString()}
             icon={<Activity size={18} />}
             iconColor="var(--pw-primary)"
             iconBg="rgba(124,77,255,0.1)"
           />
           <StatTile
             label="Avg Confidence"
-            value={`${data.avg_confidence}%`}
+            value={`${avgConf}%`}
             icon={<TrendingUp size={18} />}
             iconColor="var(--pw-apply)"
             iconBg="var(--pw-apply-tint)"
           />
           <StatTile
             label="Override Count"
-            value={data.override_count}
+            value={overrideCount}
             icon={<AlertTriangle size={18} />}
             iconColor="#EF4444"
             iconBg="rgba(239,68,68,0.1)"
@@ -228,28 +274,29 @@ export default function AdminDashboardPage() {
         {/* Charts 2×2 */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
-          {/* 1 — Case volume trend */}
-          <ChartCard title="Case Volume Trend">
-            {data.volume === 0 ? (
+          {/* 1 — Decision outcomes by scenario */}
+          <ChartCard title={activeTab === "all" ? "Decision Outcomes by Scenario" : "Decision Outcomes"}>
+            {volume === 0 ? (
               <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={{ fontSize: 13, color: "var(--pw-text-muted)" }}>No data for this scenario</span>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={data.case_volume_trend}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--pw-border)" vertical={false} />
-                  <XAxis dataKey="week" tick={axisTickStyle} axisLine={false} tickLine={false} />
+                <BarChart data={outcomeData} barCategoryGap="35%">
+                  <XAxis dataKey="scenario" tick={axisTickStyle} axisLine={false} tickLine={false} />
                   <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} width={30} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Line type="monotone" dataKey="count" name="CASES" stroke="#7C4DFF" strokeWidth={2} dot={{ r: 4, fill: "#7C4DFF" }} />
-                </LineChart>
+                  <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--pw-bg)" }} />
+                  {["APPLY", "HOLD", "ESCALATE"].map(k => (
+                    <Bar key={k} dataKey={k} name={k} fill={DECISION_COLORS[k]} radius={[4, 4, 0, 0]} stackId="a" />
+                  ))}
+                </BarChart>
               </ResponsiveContainer>
             )}
           </ChartCard>
 
           {/* 2 — Decision distribution pie */}
-          <ChartCard title="Decision Distribution">
-            {data.volume === 0 ? (
+          <ChartCard title="Decision Attribution">
+            {volume === 0 ? (
               <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={{ fontSize: 13, color: "var(--pw-text-muted)" }}>No data for this scenario</span>
               </div>
@@ -257,7 +304,7 @@ export default function AdminDashboardPage() {
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
                   <Pie
-                    data={data.decision_distribution.filter(d => d.value > 0)}
+                    data={pieData}
                     dataKey="value"
                     nameKey="label"
                     cx="50%" cy="50%"
@@ -265,7 +312,7 @@ export default function AdminDashboardPage() {
                     label={({ percent }) => `${Math.round((percent ?? 0) * 100)}%`}
                     labelLine={false}
                   >
-                    {data.decision_distribution.filter(d => d.value > 0).map(entry => (
+                    {pieData.map(entry => (
                       <Cell key={entry.label} fill={PIE_COLORS[entry.label] ?? "#94A3B8"} />
                     ))}
                   </Pie>
@@ -279,37 +326,39 @@ export default function AdminDashboardPage() {
             )}
           </ChartCard>
 
-          {/* 3 — Override rate by confidence band */}
-          <ChartCard title="Override Rate by Confidence Band">
-            {data.volume === 0 ? (
+          {/* 3 — Scenario volume comparison (all) or placeholder */}
+          <ChartCard title="Volume by Scenario">
+            {scenarioData.length === 0 ? (
               <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: 13, color: "var(--pw-text-muted)" }}>No data for this scenario</span>
+                <span style={{ fontSize: 13, color: "var(--pw-text-muted)" }}>No data</span>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={data.override_by_band} barCategoryGap="35%">
-                  <XAxis dataKey="band" tick={axisTickStyle} axisLine={false} tickLine={false} />
-                  <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} unit="%" width={36} domain={[0, 35]} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v}%`, "OVERRIDE RATE"]} cursor={{ fill: "var(--pw-bg)" }} />
-                  <Bar dataKey="override_rate_pct" name="OVERRIDE RATE %" radius={[4, 4, 0, 0]}>
-                    {data.override_by_band.map(entry => (
-                      <Cell key={entry.band} fill={BAND_COLORS[entry.band] ?? "#94A3B8"} />
-                    ))}
-                  </Bar>
+                <BarChart
+                  data={scenarioData.map(s => ({
+                    scenario: s.scenario_route?.replace("scenario_", "S") ?? s.scenario_route,
+                    volume: s.volume,
+                  }))}
+                  barCategoryGap="35%"
+                >
+                  <XAxis dataKey="scenario" tick={axisTickStyle} axisLine={false} tickLine={false} />
+                  <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} width={30} />
+                  <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--pw-bg)" }} />
+                  <Bar dataKey="volume" name="VOLUME" fill="#7C4DFF" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
           </ChartCard>
 
           {/* 4 — Confidence histogram */}
-          <ChartCard title="Confidence Score Histogram">
-            {data.volume === 0 ? (
+          <ChartCard title="Confidence Score Distribution">
+            {histData.length === 0 ? (
               <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: 13, color: "var(--pw-text-muted)" }}>No data for this scenario</span>
+                <span style={{ fontSize: 13, color: "var(--pw-text-muted)" }}>No data</span>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={data.confidence_histogram} barCategoryGap="20%">
+                <BarChart data={histData} barCategoryGap="20%">
                   <XAxis dataKey="bucket" tick={axisTickStyle} axisLine={false} tickLine={false} />
                   <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} width={30} />
                   <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--pw-bg)" }} />
@@ -330,8 +379,8 @@ export default function AdminDashboardPage() {
         color: "var(--pw-text-muted)", position: "sticky", bottom: 0, zIndex: 40,
       }}>
         <span style={{ color: "var(--pw-apply)", fontWeight: 600 }}>● Audit Active</span>
-        <span>User: {currentUser.name}</span>
-        <span>Role: {currentUser.role}</span>
+        <span>User: {user?.name ?? "—"}</span>
+        <span>Role: {user?.role ?? "—"}</span>
         <span style={{ marginLeft: "auto" }}>
           Press{" "}
           <kbd style={{ background: "var(--pw-surface-elevated)", padding: "1px 5px", borderRadius: 3, fontFamily: "var(--pw-font-mono)" }}>?</kbd>

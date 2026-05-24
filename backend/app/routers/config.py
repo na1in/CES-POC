@@ -19,7 +19,7 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import CurrentUser, get_current_user, require_admin, require_director
+from app.auth import CurrentUser, get_current_user, require_admin, require_director, require_director_or_admin
 from app.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -379,7 +379,7 @@ async def deploy_change_request(
 async def rollback_change_request(
     change_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: CurrentUser = Depends(require_director),
+    current_user: CurrentUser = Depends(require_director_or_admin),
 ):
     """
     Emergency rollback of a deployed change. Restores the previous value from
@@ -394,24 +394,21 @@ async def rollback_change_request(
 
     param = change["parameter_name"]
 
-    # Find the previous value (the history entry that was closed when this was deployed)
+    # Find the previous value (the history entry that was closed when this was deployed).
+    # Use IS DISTINCT FROM so NULL change_request_id entries are included — plain != excludes NULLs.
     prev_row = await db.execute(text("""
         SELECT parameter_value, version_id
         FROM configuration_threshold_history
         WHERE parameter_name = :param
-          AND change_request_id != :change_id
+          AND change_request_id IS DISTINCT FROM :change_id
         ORDER BY effective_from DESC
         LIMIT 1
     """), {"param": param, "change_id": change_id})
     prev = prev_row.mappings().one_or_none()
 
-    if prev is None:
-        raise HTTPException(
-            status_code=409,
-            detail="No previous value found to rollback to",
-        )
-
-    prev_value = prev["parameter_value"]
+    # Fall back to the value recorded on the change request itself if no history entry exists
+    # (happens when the initial seed value was never written to configuration_threshold_history)
+    prev_value = prev["parameter_value"] if prev is not None else change["current_value"]
 
     # Close current active history entry
     await db.execute(text("""

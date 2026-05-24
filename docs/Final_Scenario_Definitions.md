@@ -144,7 +144,7 @@ AND Amount_Variance_Percentage <= 2%
 AND Risk_Flag_Present == False
 AND Policy_Status == "Active"
 AND Payment_Method_Risk_Level == "Low"
-THEN APPLY (auto-apply without approval)
+THEN AI recommends APPLY (human approval always required — payment lands HELD for analyst)
 ```
 
 **HOLD Conditions:**
@@ -524,7 +524,7 @@ Absolute_Variance = abs(Amount_Variance_Percentage)
 # Tier-based decision
 IF Absolute_Variance <= 2%:
   # Tier 1: Acceptable
-  APPLY (no approval needed)
+  AI recommends APPLY (human approval always required — payment lands HELD for analyst)
 
 ELIF Absolute_Variance > 2% AND Absolute_Variance <= 15%:
   # Tier 2: Minor variance
@@ -1120,12 +1120,12 @@ Payment Received
 
 | Scenario | Primary Condition | Confidence | Action | Approval Required |
 |----------|------------------|------------|--------|-------------------|
-| 1 | Name >90%, Amount ≤2%, No risk flags, Low risk method | 90-100% | APPLY | No |
-| 1 (Hold) | Name 75-90%, Amount ≤2% variance | 60-85% | HOLD/APPLY | Yes |
+| 1 | Name >90%, Amount ≤2%, No risk flags, Low risk method | 90-100% | HOLD (AI rec: APPLY) | Yes (always) |
+| 1 (Hold) | Name 75-90%, Amount ≤2% variance | 60-85% | HOLD | Yes |
 | 1 (Hold) | Risk flags present OR High risk method | 50-70% | HOLD | Yes |
-| 2 | ≥90% customer match, No policy# OR supporting signals | 75-90% | APPLY | Yes (always) |
+| 2 | ≥90% customer match, No policy# OR supporting signals | 75-90% | HOLD (AI rec: APPLY) | Yes (always) |
 | 2 (Hold) | Customer matched, Multiple policies, cannot disambiguate | 70-80% | HOLD | Yes |
-| 3 (Tier 2) | Name ≥90%, 2-15% variance | 85-90% | APPLY | Yes |
+| 3 (Tier 2) | Name ≥90%, 2-15% variance | 85-90% | HOLD (AI rec: APPLY) | Yes |
 | 3 (Tier 3) | Name ≥90%, 15-50% variance (or special case detected) | 60-75% | HOLD | Yes |
 | 3 (Tier 4) | Name ≥90%, 50-100% variance | 40-60% | HOLD | Yes |
 | 3 (Tier 5) | Name ≥90%, >100% variance | 0-40% | ESCALATE | Yes |

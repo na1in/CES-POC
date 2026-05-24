@@ -45,7 +45,7 @@ def _decide(
     Returns (recommendation, confidence, approval_reason, decision_path, matched_policy_id).
     """
     customer_conf = float(signals.get("customer_match_confidence", 0))
-    variance = abs(float(signals.get("amount_variance_pct", 0)))
+    variance = abs(float(signals.get("amount_variance_pct") or 0))
     account_match = signals.get("account_match", False)
     amount_match = signals.get("amount_match", False)
     historical_match = signals.get("historical_match", False)
@@ -147,7 +147,7 @@ async def run(payment: dict, signals: dict, context: dict, thresholds: dict) -> 
     customer_name = context.get("customer_name", "unknown")
     customer_conf = signals.get("customer_match_confidence", 0)
     active_policy_count = context.get("active_policy_count", 0)
-    variance = signals.get("amount_variance_pct", 0)
+    variance = signals.get("amount_variance_pct") or 0
 
     context_summary = (
         f"- Sender: {payment.get('sender_name')} vs customer: {customer_name} (confidence: {customer_conf:.0f}%)\n"
