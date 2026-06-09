@@ -2,6 +2,8 @@
 
 Step-by-step guide to get CES running locally for development and demo.
 
+> **First time on this repo?** See [`SETUP.md`](SETUP.md) for a full onboarding guide with prerequisites, dependency install steps, and detailed troubleshooting.
+
 ---
 
 ## Prerequisites
@@ -27,7 +29,7 @@ Verify it's healthy:
 docker ps   # db-1 should show "healthy"
 ```
 
-> **Important:** The `docker compose` file also defines `backend` and `frontend` containers, but their images may be stale. Always run the backend and frontend locally (steps 2–3) to get the latest code.
+> **Note:** `docker compose up -d` (no service name) starts all three services — db, backend (:8000), and frontend (:3000). Use this when you want a quick full-stack run without a dev server. For active development, run backend and frontend locally (steps 2–3) so `--reload` and hot-reload pick up your changes.
 
 ---
 
@@ -47,7 +49,7 @@ curl http://localhost:8000/health
 # {"status":"ok"}
 ```
 
-The backend reads credentials from `backend/.env`. The file is already configured for the local Docker database — no changes needed.
+The backend reads credentials from `backend/.env`. The file is already configured for the local Docker database — no changes needed. If you don't have a `.env` yet, copy the template: `cp backend/.env.example backend/.env` and fill in `OPENROUTER_API_KEY`.
 
 ---
 

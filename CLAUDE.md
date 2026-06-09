@@ -234,7 +234,7 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 - 38 Playwright tests across 6 spec files (01-login through 06-admin); chromium only, 1 worker
 - Run with `npx playwright test` from `frontend/` (backend on :8000 + Next.js on :3001 must be running)
 - All tests are read-only (navigation/visibility) — mutations stay in backend pytest suite
-- `helpers/auth.ts`: `loginAs()` clears localStorage before each login to prevent RouteGuard bounce
+- `helpers/auth.ts`: `loginAs()` clears sessionStorage before each login to prevent RouteGuard bounce
 - Key selector patterns: `getByText(/^PMT-/).first()` for row nav; `{ exact: true }` to avoid audit-log false matches; `page.locator('input[aria-label="..."]')` for `<input type="date">`
 - `PMT-ESC-001` is seeded as a pre-escalated payment to enable investigation workflow tests
 - `PMT-H-001`..`PMT-H-009` are seeded historical payments (applied/returned/escalated with correct `decision_attribution`) to populate the Governance Dashboard with meaningful data; protected from `demo_restore.py` cleanup via `SEED_PAYMENT_IDS`
@@ -251,10 +251,16 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 - `frontend/src/app/governance/page.tsx`: Added "Exception Dashboard" button to header — Lorraine had no UI path to `/governance/exceptions`
 - `frontend/src/app/investigations/page.tsx`: Removed "Export Case List" button; wired "View SLA Report" to open a live-data modal
 
+### Bug fixes (2026-06-08)
+- `frontend/src/contexts/auth.tsx`, `frontend/src/lib/api.ts`, `frontend/e2e/helpers/auth.ts`: Switched auth token storage from `localStorage` to `sessionStorage` — app now always starts at `/login` on a fresh browser open or new tab; session persists across page refreshes within the same tab
+
 ### Dev setup
 - PostgreSQL runs in Docker: `docker compose up -d db` (from repo root)
 - Backend: `python -m uvicorn app.main:app --port 8000 --reload` (from `backend/`, after DB is up)
 - Frontend: `npx next dev -p 3001` (from `frontend/`)
+- Full Docker stack (all three services): `docker compose up -d` — frontend on :3000, backend on :8000
+- External / mentor onboarding: see `SETUP.md` at repo root
+- Backend env template: `backend/.env.example` (copy to `backend/.env` and fill in `OPENROUTER_API_KEY`)
 
 ## Implementation plan
 See `docs/Implementation_Plan.md` for the full phased plan with ticket breakdowns, parallel tracks, estimates, and risk mitigation. Team: 2 engineers + 1 designer, ~7 weeks.
