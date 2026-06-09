@@ -2,7 +2,7 @@ const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null
-  return localStorage.getItem("ces_token")
+  return sessionStorage.getItem("ces_token")
 }
 
 async function apiFetch<T = unknown>(
