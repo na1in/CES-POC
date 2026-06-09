@@ -23,14 +23,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem("ces_token")
-    const stored = localStorage.getItem("ces_user")
+    const token = sessionStorage.getItem("ces_token")
+    const stored = sessionStorage.getItem("ces_user")
     if (token && stored) {
       try {
         setUser(JSON.parse(stored))
       } catch {
-        localStorage.removeItem("ces_token")
-        localStorage.removeItem("ces_user")
+        sessionStorage.removeItem("ces_token")
+        sessionStorage.removeItem("ces_user")
       }
     }
     setLoading(false)
@@ -38,15 +38,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (userId: string) => {
     const res: LoginResponse = await apiLogin(userId)
-    localStorage.setItem("ces_token", res.access_token)
+    sessionStorage.setItem("ces_token", res.access_token)
     const u: AuthUser = { user_id: userId, name: res.name, role: res.role }
-    localStorage.setItem("ces_user", JSON.stringify(u))
+    sessionStorage.setItem("ces_user", JSON.stringify(u))
     setUser(u)
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem("ces_token")
-    localStorage.removeItem("ces_user")
+    sessionStorage.removeItem("ces_token")
+    sessionStorage.removeItem("ces_user")
     setUser(null)
   }, [])
 

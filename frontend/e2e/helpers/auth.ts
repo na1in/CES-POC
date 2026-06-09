@@ -13,8 +13,8 @@ export async function loginAs(page: Page, name: string) {
   // Clear any existing session so RouteGuard doesn't bounce us from /login
   await page.goto("/")
   await page.evaluate(() => {
-    localStorage.removeItem("ces_token")
-    localStorage.removeItem("ces_user")
+    sessionStorage.removeItem("ces_token")
+    sessionStorage.removeItem("ces_user")
   })
   await page.goto("/login")
   await page.getByText(name).click()
