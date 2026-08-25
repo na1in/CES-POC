@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   Bell, Settings as SettingsIcon, ChevronDown, ChevronRight,
   ChevronLeft, SlidersHorizontal, X,
+  CheckCircle2,
 } from "lucide-react"
 import {
   getThresholds, getChangeRequests, getThresholdHistory,
@@ -382,6 +383,17 @@ export default function ConfigManagementPage() {
 
         {/* ── Section 3: Change Request List ── */}
         <SectionCard title="Change Requests" icon={<ChevronRight size={16} />}>
+          {/* With no requests at all, the tab strip is five zero-counts above a
+              tall empty card — collapse to one compact line instead. */}
+          {changeRequests.length === 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px" }}>
+              <CheckCircle2 size={18} color="var(--pw-apply)" style={{ flexShrink: 0 }} />
+              <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: 0 }}>
+                All clear — no change requests have been submitted.
+              </p>
+            </div>
+          ) : (
+          <>
           <div style={{ display: "flex", borderBottom: "1px solid var(--pw-border)", padding: "0 20px" }}>
             {REQUEST_TABS.map(tab => (
               <button
@@ -405,7 +417,7 @@ export default function ConfigManagementPage() {
           </div>
 
           {filteredRequests.length === 0 ? (
-            <div style={{ padding: "32px 24px", textAlign: "center" }}>
+            <div style={{ padding: "14px 24px" }}>
               <p style={{ fontSize: 13, color: "var(--pw-text-muted)", margin: 0 }}>No change requests in this category.</p>
             </div>
           ) : (
@@ -482,6 +494,8 @@ export default function ConfigManagementPage() {
                 </tbody>
               </table>
             </div>
+          )}
+          </>
           )}
         </SectionCard>
 

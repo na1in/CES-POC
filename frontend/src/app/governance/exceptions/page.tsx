@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import {
   Bell, Settings as SettingsIcon, ChevronDown, ChevronRight,
-  AlertTriangle, Activity, Shield, X,
+  AlertTriangle, Activity, Shield, X, CheckCircle2,
 } from "lucide-react"
 import {
   listPayments, getAnomalies, getChangeRequests, approveChangeRequest, rejectChangeRequest,
@@ -128,6 +128,27 @@ function EmptyState({ message }: { message: string }) {
   return <div style={{ padding: "32px 20px", textAlign: "center", color: "var(--pw-text-muted)", fontSize: 13 }}>{message}</div>
 }
 
+/**
+ * Shown in place of the three section cards when every section is empty.
+ * Three stacked full-height "no data" cards read as a broken page rather than
+ * a clean one, so collapse them into a single compact line.
+ */
+function AllClear({ items }: { items: string[] }) {
+  return (
+    <div className="pw-card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px" }}>
+      <CheckCircle2 size={20} color="var(--pw-apply)" style={{ flexShrink: 0 }} />
+      <div>
+        <p style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--pw-font-display)", color: "var(--pw-text-primary)", margin: 0 }}>
+          All clear
+        </p>
+        <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "2px 0 0" }}>
+          No {items.join(", no ")}.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ExceptionDashboardPage() {
@@ -219,134 +240,140 @@ export default function ExceptionDashboardPage() {
       {/* Body */}
       <div style={{ flex: 1, padding: "24px", width: "100%", boxSizing: "border-box" }}>
 
-        {/* ── Section 1: SLA Breached Cases ── */}
-        <SectionCard title="SLA Breached Cases" count={slaPayments.length} icon={<AlertTriangle size={16} />} accentColor="var(--pw-escalate)">
-          {slaPayments.length === 0 ? (
-            <EmptyState message="No SLA breaches — all escalations resolved within deadline." />
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "var(--pw-bg)", borderBottom: "1px solid var(--pw-border)" }}>
-                  <TH>Payment ID</TH><TH>Sender</TH><TH>Amount</TH><TH>Scenario</TH><TH>Due Since</TH>
-                </tr>
-              </thead>
-              <tbody>
-                {slaPayments.map((p, i) => (
-                  <tr
-                    key={p.payment_id}
-                    style={{ background: "rgba(239,68,68,0.06)", borderBottom: i < slaPayments.length - 1 ? "1px solid var(--pw-border)" : "none", cursor: "pointer" }}
-                    onClick={() => router.push(`/payments/${p.payment_id}`)}
-                  >
-                    <TD><span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12 }}>{p.payment_id}</span></TD>
-                    <TD>{p.sender_name}</TD>
-                    <TD><span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12 }}>{formatUSD(p.amount)}</span></TD>
-                    <TD><span className="pw-badge pw-badge-neutral">{scenarioShortLabel(p.scenario_route)}</span></TD>
-                    <TD style={{ color: "var(--pw-escalate)", fontWeight: 600 }}>
-                      {p.investigation_due_date ? formatAge(p.investigation_due_date) : "—"}
-                    </TD>
+        {slaPayments.length === 0 && anomalies.length === 0 && changeRequests.length === 0 ? (
+          <AllClear items={["SLA breaches", "anomaly flags", "config changes pending approval"]} />
+        ) : (
+          <>
+          {/* ── Section 1: SLA Breached Cases ── */}
+          <SectionCard title="SLA Breached Cases" count={slaPayments.length} icon={<AlertTriangle size={16} />} accentColor="var(--pw-escalate)">
+            {slaPayments.length === 0 ? (
+              <EmptyState message="No SLA breaches — all escalations resolved within deadline." />
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "var(--pw-bg)", borderBottom: "1px solid var(--pw-border)" }}>
+                    <TH>Payment ID</TH><TH>Sender</TH><TH>Amount</TH><TH>Scenario</TH><TH>Due Since</TH>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </SectionCard>
-
-        {/* ── Section 2: Anomaly Flags ── */}
-        <SectionCard title="Anomaly Flags" count={anomalies.filter(a => a.status !== "resolved").length} icon={<Activity size={16} />} accentColor="var(--pw-hold)">
-          {anomalies.length === 0 ? (
-            <EmptyState message="No anomaly flags for this period." />
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "var(--pw-bg)", borderBottom: "1px solid var(--pw-border)" }}>
-                  <TH>Metric</TH><TH>Description</TH><TH>Period</TH><TH>Flagged By</TH><TH>Status</TH><TH>Details</TH>
-                </tr>
-              </thead>
-              <tbody>
-                {anomalies.map((a, i) => (
-                  <>
-                    <tr key={a.flag_id} style={{ borderBottom: "1px solid var(--pw-border)" }}>
-                      <TD><span style={{ fontWeight: 600 }}>{a.metric_name}</span></TD>
-                      <TD style={{ color: "var(--pw-text-secondary)", maxWidth: 320 }}>{a.description}</TD>
-                      <TD style={{ color: "var(--pw-text-muted)", whiteSpace: "nowrap" }}>
-                        {formatDate(a.period_start)} – {formatDate(a.period_end)}
-                      </TD>
-                      <TD style={{ color: "var(--pw-text-secondary)" }}>{a.flagged_by}</TD>
-                      <TD><AnomalyStatusChip status={a.status} /></TD>
-                      <TD>
-                        <button
-                          onClick={() => setExpandedAnomaly(expandedAnomaly === a.flag_id ? null : a.flag_id)}
-                          aria-label={`View details for ${a.metric_name}`}
-                          style={{ fontSize: 12, color: "var(--pw-primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0 }}
-                        >
-                          {expandedAnomaly === a.flag_id ? "Hide" : "View Details"}
-                        </button>
+                </thead>
+                <tbody>
+                  {slaPayments.map((p, i) => (
+                    <tr
+                      key={p.payment_id}
+                      style={{ background: "rgba(239,68,68,0.06)", borderBottom: i < slaPayments.length - 1 ? "1px solid var(--pw-border)" : "none", cursor: "pointer" }}
+                      onClick={() => router.push(`/payments/${p.payment_id}`)}
+                    >
+                      <TD><span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12 }}>{p.payment_id}</span></TD>
+                      <TD>{p.sender_name}</TD>
+                      <TD><span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12 }}>{formatUSD(p.amount)}</span></TD>
+                      <TD><span className="pw-badge pw-badge-neutral">{scenarioShortLabel(p.scenario_route)}</span></TD>
+                      <TD style={{ color: "var(--pw-escalate)", fontWeight: 600 }}>
+                        {p.investigation_due_date ? formatAge(p.investigation_due_date) : "—"}
                       </TD>
                     </tr>
-                    {expandedAnomaly === a.flag_id && (
-                      <tr key={`${a.flag_id}-detail`} style={{ borderBottom: i < anomalies.length - 1 ? "1px solid var(--pw-border)" : "none" }}>
-                        <td colSpan={6} style={{ padding: "12px 16px", background: "var(--pw-bg)" }}>
-                          <p style={{ fontSize: 12, fontWeight: 600, color: "var(--pw-text-secondary)", margin: "0 0 4px" }}>Resolution Notes</p>
-                          <p style={{ fontSize: 13, color: "var(--pw-text-primary)", margin: 0 }}>
-                            {a.resolution_notes ?? <span style={{ color: "var(--pw-text-muted)" }}>No resolution notes yet.</span>}
-                          </p>
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </SectionCard>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </SectionCard>
 
-        {/* ── Section 3: Config Changes Pending Approval ── */}
-        <SectionCard title="Config Changes Pending Approval" count={changeRequests.length} icon={<Shield size={16} />} accentColor="var(--pw-hold)">
-          {changeRequests.length === 0 ? (
-            <EmptyState message="No config changes pending approval." />
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "var(--pw-bg)", borderBottom: "1px solid var(--pw-border)" }}>
-                  <TH>Parameter</TH><TH>Current Value</TH><TH>Proposed Value</TH><TH>Proposed By</TH><TH>Date</TH><TH>Actions</TH>
-                </tr>
-              </thead>
-              <tbody>
-                {changeRequests.map((r, i) => (
-                  <tr key={r.change_id} style={{ borderBottom: i < changeRequests.length - 1 ? "1px solid var(--pw-border)" : "none" }}>
-                    <TD>
-                      <span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12, background: "var(--pw-surface-elevated)", padding: "2px 6px", borderRadius: 4 }}>
-                        {r.parameter_name}
-                      </span>
-                    </TD>
-                    <TD style={{ fontFamily: "var(--pw-font-mono)", fontSize: 13, color: "var(--pw-text-muted)" }}>{r.current_value}</TD>
-                    <TD style={{ fontFamily: "var(--pw-font-mono)", fontSize: 13, fontWeight: 700, color: "var(--pw-primary)" }}>{r.proposed_value}</TD>
-                    <TD style={{ color: "var(--pw-text-secondary)" }}>{r.proposed_by}</TD>
-                    <TD style={{ color: "var(--pw-text-muted)", whiteSpace: "nowrap" }}>{formatDate(r.proposed_at)}</TD>
-                    <TD>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          onClick={() => handleApprove(r.change_id)}
-                          aria-label={`Approve ${r.parameter_name}`}
-                          style={{ padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "var(--pw-apply-tint)", color: "var(--pw-apply)", border: "1px solid var(--pw-apply)", cursor: "pointer" }}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => setRejectTarget(r)}
-                          aria-label={`Reject ${r.parameter_name}`}
-                          style={{ padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "transparent", color: "var(--pw-escalate)", border: "1px solid var(--pw-escalate)", cursor: "pointer" }}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    </TD>
+          {/* ── Section 2: Anomaly Flags ── */}
+          <SectionCard title="Anomaly Flags" count={anomalies.filter(a => a.status !== "resolved").length} icon={<Activity size={16} />} accentColor="var(--pw-hold)">
+            {anomalies.length === 0 ? (
+              <EmptyState message="No anomaly flags for this period." />
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "var(--pw-bg)", borderBottom: "1px solid var(--pw-border)" }}>
+                    <TH>Metric</TH><TH>Description</TH><TH>Period</TH><TH>Flagged By</TH><TH>Status</TH><TH>Details</TH>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </SectionCard>
+                </thead>
+                <tbody>
+                  {anomalies.map((a, i) => (
+                    <>
+                      <tr key={a.flag_id} style={{ borderBottom: "1px solid var(--pw-border)" }}>
+                        <TD><span style={{ fontWeight: 600 }}>{a.metric_name}</span></TD>
+                        <TD style={{ color: "var(--pw-text-secondary)", maxWidth: 320 }}>{a.description}</TD>
+                        <TD style={{ color: "var(--pw-text-muted)", whiteSpace: "nowrap" }}>
+                          {formatDate(a.period_start)} – {formatDate(a.period_end)}
+                        </TD>
+                        <TD style={{ color: "var(--pw-text-secondary)" }}>{a.flagged_by}</TD>
+                        <TD><AnomalyStatusChip status={a.status} /></TD>
+                        <TD>
+                          <button
+                            onClick={() => setExpandedAnomaly(expandedAnomaly === a.flag_id ? null : a.flag_id)}
+                            aria-label={`View details for ${a.metric_name}`}
+                            style={{ fontSize: 12, color: "var(--pw-primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 500, padding: 0 }}
+                          >
+                            {expandedAnomaly === a.flag_id ? "Hide" : "View Details"}
+                          </button>
+                        </TD>
+                      </tr>
+                      {expandedAnomaly === a.flag_id && (
+                        <tr key={`${a.flag_id}-detail`} style={{ borderBottom: i < anomalies.length - 1 ? "1px solid var(--pw-border)" : "none" }}>
+                          <td colSpan={6} style={{ padding: "12px 16px", background: "var(--pw-bg)" }}>
+                            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--pw-text-secondary)", margin: "0 0 4px" }}>Resolution Notes</p>
+                            <p style={{ fontSize: 13, color: "var(--pw-text-primary)", margin: 0 }}>
+                              {a.resolution_notes ?? <span style={{ color: "var(--pw-text-muted)" }}>No resolution notes yet.</span>}
+                            </p>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </SectionCard>
+
+          {/* ── Section 3: Config Changes Pending Approval ── */}
+          <SectionCard title="Config Changes Pending Approval" count={changeRequests.length} icon={<Shield size={16} />} accentColor="var(--pw-hold)">
+            {changeRequests.length === 0 ? (
+              <EmptyState message="No config changes pending approval." />
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "var(--pw-bg)", borderBottom: "1px solid var(--pw-border)" }}>
+                    <TH>Parameter</TH><TH>Current Value</TH><TH>Proposed Value</TH><TH>Proposed By</TH><TH>Date</TH><TH>Actions</TH>
+                  </tr>
+                </thead>
+                <tbody>
+                  {changeRequests.map((r, i) => (
+                    <tr key={r.change_id} style={{ borderBottom: i < changeRequests.length - 1 ? "1px solid var(--pw-border)" : "none" }}>
+                      <TD>
+                        <span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12, background: "var(--pw-surface-elevated)", padding: "2px 6px", borderRadius: 4 }}>
+                          {r.parameter_name}
+                        </span>
+                      </TD>
+                      <TD style={{ fontFamily: "var(--pw-font-mono)", fontSize: 13, color: "var(--pw-text-muted)" }}>{r.current_value}</TD>
+                      <TD style={{ fontFamily: "var(--pw-font-mono)", fontSize: 13, fontWeight: 700, color: "var(--pw-primary)" }}>{r.proposed_value}</TD>
+                      <TD style={{ color: "var(--pw-text-secondary)" }}>{r.proposed_by}</TD>
+                      <TD style={{ color: "var(--pw-text-muted)", whiteSpace: "nowrap" }}>{formatDate(r.proposed_at)}</TD>
+                      <TD>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            onClick={() => handleApprove(r.change_id)}
+                            aria-label={`Approve ${r.parameter_name}`}
+                            style={{ padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "var(--pw-apply-tint)", color: "var(--pw-apply)", border: "1px solid var(--pw-apply)", cursor: "pointer" }}
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => setRejectTarget(r)}
+                            aria-label={`Reject ${r.parameter_name}`}
+                            style={{ padding: "5px 12px", borderRadius: 6, fontSize: 12, fontWeight: 600, background: "transparent", color: "var(--pw-escalate)", border: "1px solid var(--pw-escalate)", cursor: "pointer" }}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </TD>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </SectionCard>
+          </>
+        )}
 
       </div>
 
