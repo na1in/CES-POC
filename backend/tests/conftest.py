@@ -5,6 +5,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.config import settings
+
 from app.database import get_db
 from app.main import app
 
@@ -54,7 +56,10 @@ def maybe_mock_llm(request):
     ):
         yield
 
-TEST_DATABASE_URL = "postgresql+asyncpg://ces_user:ces_password@localhost:5432/ces"
+# Follow the app's own configuration (backend/.env) rather than hardcoding a
+# port — a local docker-compose override can move Postgres off 5432, and a
+# hardcoded URL silently makes the whole suite unrunnable on that machine.
+TEST_DATABASE_URL = settings.DATABASE_URL
 
 # NullPool ensures every test gets a brand-new connection — no recycled state
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)

@@ -32,6 +32,7 @@ enum AuditActionType {
   AUDIT_ACTION_TYPE_CONFIG_CHANGE_DEPLOYED = 18;  // Marcus deployed an approved change
   AUDIT_ACTION_TYPE_CONFIG_CHANGE_ROLLED_BACK = 19; // Emergency rollback
   AUDIT_ACTION_TYPE_SLA_BREACHED = 20;      // Investigation SLA exceeded (system-generated)
+  AUDIT_ACTION_TYPE_POLICY_ATTACHED = 21;   // Analyst manually attached a policy to an unmatched payment
 }
 
 // A single immutable audit log entry.

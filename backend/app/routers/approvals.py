@@ -6,6 +6,8 @@ POST /api/payments/{id}/reject     — Priya: HELD → ESCALATED + SLA deadline
 POST /api/payments/{id}/override   — Priya/Damien: explicit recommendation override
 POST /api/payments/{id}/return     — Damien: ESCALATED/PENDING → RETURNED
 POST /api/payments/{id}/reprocess  — Any: PROCESSING_FAILED → re-run pipeline
+POST /api/payments/{id}/attach-policy — Priya: manually attach a policy to an unmatched case
+GET  /api/policies/search          — Priya/Damien: find a policy by number or customer name
 """
 import json
 import logging
@@ -32,6 +34,8 @@ _REJECTABLE_STATUSES = {"held"}
 _RETURNABLE_STATUSES = {"escalated", "pending_sender_response"}
 _REPROCESSABLE_STATUSES = {"processing_failed"}
 _OVERRIDABLE_STATUSES = {"held", "escalated", "processing", "received"}
+# A policy can still be attached while the case is open for a decision.
+_ATTACHABLE_STATUSES = {"held", "escalated", "pending_sender_response"}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -126,6 +130,11 @@ class NotesBody(BaseModel):
 class OverrideBody(BaseModel):
     override_action: str   # "APPLY" | "HOLD" | "ESCALATE"
     reason: str
+
+
+class AttachPolicyBody(BaseModel):
+    policy_number: str
+    reason: str | None = None
 
 
 # ── POST /approve ─────────────────────────────────────────────────────────────
@@ -348,4 +357,66 @@ async def reprocess_payment(
             recommendation.get("requires_human_approval", True),
         ),
         "recommendation": recommendation,
+    }
+
+
+
+# ── Manual policy attach ──────────────────────────────────────────────────────
+
+@router.post("/{payment_id}/attach-policy")
+async def attach_policy(
+    payment_id: str,
+    body: AttachPolicyBody,
+    current_user: CurrentUser = Depends(require_analyst_or_investigator),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Manually link an unmatched payment to a policy.
+
+    Without this, an analyst looking at "No matched policy" could only escalate
+    or override-and-apply; there was no way to resolve the match itself.
+    """
+    payment = await _load_payment(payment_id, db)
+    _assert_status(payment, _ATTACHABLE_STATUSES, "attach a policy to")
+
+    policy = (await db.execute(text("""
+        SELECT p.policy_number, p.customer_id, p.status, c.name AS customer_name
+        FROM policies p
+        JOIN customers c ON c.customer_id = p.customer_id
+        WHERE p.policy_number = :pn
+    """), {"pn": body.policy_number})).mappings().one_or_none()
+
+    if policy is None:
+        raise HTTPException(status_code=404, detail=f"Policy {body.policy_number} not found")
+    if policy["status"] != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Policy {body.policy_number} is {policy['status']}, not active",
+        )
+
+    previous_policy = payment.get("matched_policy_id")
+
+    await db.execute(text("""
+        UPDATE payments
+        SET matched_policy_id = :pn, matched_customer_id = :cid
+        WHERE payment_id = :id
+    """), {"pn": policy["policy_number"], "cid": policy["customer_id"], "id": payment_id})
+
+    await _write_audit(
+        payment_id, "policy_attached", current_user.name, current_user.user_id,
+        {
+            "policy_number": policy["policy_number"],
+            "customer_id": policy["customer_id"],
+            "previous_policy_number": previous_policy,
+            "reason": body.reason,
+        },
+        db,
+    )
+    await db.commit()
+
+    return {
+        "payment_id": payment_id,
+        "matched_policy_id": policy["policy_number"],
+        "matched_customer_id": policy["customer_id"],
+        "customer_name": policy["customer_name"],
     }

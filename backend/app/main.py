@@ -18,6 +18,7 @@ from app.routers.config import router as config_router
 from app.routers.documents import router as documents_router
 from app.routers.governance import router as governance_router
 from app.routers.payments import router as payments_router
+from app.routers.policies import router as policies_router
 from app.services.sla import run_sla_monitor
 
 
@@ -54,6 +55,7 @@ app.include_router(documents_router)
 app.include_router(analytics_router)
 app.include_router(governance_router)
 app.include_router(config_router)
+app.include_router(policies_router)
 
 
 # ── Exception handlers ────────────────────────────────────────────────────────

@@ -2,13 +2,189 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle2, Clock, ChevronDown } from "lucide-react"
+import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle2, Clock, ChevronDown, Search, Link2 } from "lucide-react"
 import {
   getPayment, approvePayment, rejectPayment, overridePayment, returnPayment, reprocessPayment,
-  type PaymentDetail,
+  searchPolicies, attachPolicy,
+  type PaymentDetail, type PolicySearchResult,
 } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
 import { scenarioLabel } from "@/lib/scenarioLabels"
+
+// ── Manual policy attach ──────────────────────────────────────────────────────
+
+/**
+ * Shown in the Matched Policy card when nothing is linked. Without it the only
+ * routes out of a no-match case are Escalate or Override & Apply -- neither of
+ * which actually resolves the match.
+ */
+function AttachPolicyPanel({ onAttach }: {
+  onAttach: (policyNumber: string, reason: string) => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const [results, setResults] = useState<PolicySearchResult[] | null>(null)
+  const [selected, setSelected] = useState<PolicySearchResult | null>(null)
+  const [reason, setReason] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState("")
+
+  async function runSearch() {
+    const q = query.trim()
+    if (q.length < 2) { setError("Enter at least 2 characters"); return }
+    setBusy(true); setError(""); setSelected(null)
+    try {
+      const r = await searchPolicies(q)
+      setResults(r.policies)
+      if (r.policies.length === 0) setError("No policies match that search")
+    } catch {
+      setError("Search failed — try again")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirm() {
+    if (!selected) return
+    setBusy(true); setError("")
+    try {
+      await onAttach(selected.policy_number, reason)
+      setOpen(false); setQuery(""); setResults(null); setSelected(null); setReason("")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not attach policy")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div>
+        <p style={{ fontSize: 13, color: "var(--pw-text-muted)", margin: "0 0 12px" }}>No matched policy</p>
+        <button
+          onClick={() => setOpen(true)}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, width: "100%",
+            justifyContent: "center", background: "var(--pw-primary)", color: "#fff",
+            border: "none", borderRadius: 6, padding: "9px 12px",
+            fontSize: 13, fontWeight: 600, cursor: "pointer",
+          }}
+        >
+          <Search size={14} /> Search policies
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", gap: 6 }}>
+        <input
+          autoFocus
+          value={query}
+          onChange={e => { setQuery(e.target.value); setError("") }}
+          onKeyDown={e => { if (e.key === "Enter") runSearch() }}
+          placeholder="Policy no. or name"
+          aria-label="Search policies by number or customer name"
+          style={{
+            flex: 1, minWidth: 0, fontSize: 12, padding: "7px 9px", borderRadius: 6,
+            border: "1px solid var(--pw-border)", color: "var(--pw-text-primary)",
+            background: "var(--pw-surface)",
+          }}
+        />
+        <button
+          onClick={runSearch}
+          disabled={busy}
+          aria-label="Run policy search"
+          style={{
+            background: "var(--pw-primary)", color: "#fff", border: "none", borderRadius: 6,
+            padding: "7px 10px", fontSize: 12, fontWeight: 600,
+            cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1,
+          }}
+        >
+          <Search size={13} />
+        </button>
+      </div>
+
+      {error && (
+        <p style={{ fontSize: 11, color: "var(--pw-escalate)", margin: 0 }}>{error}</p>
+      )}
+
+      {results && results.length > 0 && (
+        <div style={{ maxHeight: 190, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+          {results.map(r => {
+            const isSel = selected?.policy_number === r.policy_number
+            const inactive = r.status !== "active"
+            return (
+              <button
+                key={r.policy_number}
+                onClick={() => !inactive && setSelected(r)}
+                disabled={inactive}
+                aria-pressed={isSel}
+                style={{
+                  textAlign: "left", padding: "7px 9px", borderRadius: 6, fontSize: 12,
+                  border: isSel ? "1px solid var(--pw-primary)" : "1px solid var(--pw-border)",
+                  background: isSel ? "rgba(10,102,194,0.06)" : "var(--pw-surface)",
+                  cursor: inactive ? "not-allowed" : "pointer",
+                  opacity: inactive ? 0.5 : 1,
+                }}
+              >
+                <span style={{ fontFamily: "var(--pw-font-mono)", fontWeight: 600, color: "var(--pw-text-primary)" }}>
+                  {r.policy_number}
+                </span>
+                <span style={{ display: "block", color: "var(--pw-text-secondary)" }}>
+                  {r.customer_name} · {r.policy_type}
+                </span>
+                <span style={{ display: "block", color: "var(--pw-text-muted)", fontSize: 11 }}>
+                  {formatUSD(r.premium_amount)} {r.premium_frequency}{inactive ? ` · ${r.status}` : ""}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {selected && (
+        <input
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          placeholder="Reason (optional)"
+          aria-label="Reason for attaching this policy"
+          style={{
+            fontSize: 12, padding: "7px 9px", borderRadius: 6,
+            border: "1px solid var(--pw-border)", color: "var(--pw-text-primary)",
+            background: "var(--pw-surface)",
+          }}
+        />
+      )}
+
+      <div style={{ display: "flex", gap: 6 }}>
+        <button
+          onClick={confirm}
+          disabled={!selected || busy}
+          style={{
+            flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+            background: selected ? "var(--pw-primary)" : "var(--pw-surface-elevated)",
+            color: selected ? "#fff" : "var(--pw-text-muted)",
+            border: "none", borderRadius: 6, padding: "8px 10px", fontSize: 12, fontWeight: 600,
+            cursor: selected && !busy ? "pointer" : "default",
+          }}
+        >
+          <Link2 size={13} /> {busy ? "Attaching…" : "Attach"}
+        </button>
+        <button
+          onClick={() => { setOpen(false); setError(""); setSelected(null); setResults(null) }}
+          style={{
+            background: "none", border: "1px solid var(--pw-border)", borderRadius: 6,
+            padding: "8px 10px", fontSize: 12, color: "var(--pw-text-secondary)", cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // ── Mock policy data (keyed by policy ID) ─────────────────────────────────────
 
@@ -154,6 +330,10 @@ export default function PaymentDetail() {
   const [contactedNote, setContactedNote] = useState("")
   const [toast, setToast] = useState<string | null>(null)
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
+  // Real policy record for whatever is currently attached. POLICY_INFO below
+  // only covers the demo policy IDs, so a seeded or newly attached policy
+  // would otherwise render as "No matched policy" even once linked.
+  const [livePolicy, setLivePolicy] = useState<PolicySearchResult | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -163,9 +343,30 @@ export default function PaymentDetail() {
       .finally(() => setLoading(false))
   }, [id])
 
+  const attachedPolicyId = (detail?.payment as { matched_policy_id?: string } | undefined)?.matched_policy_id ?? null
+
+  useEffect(() => {
+    if (!attachedPolicyId) { setLivePolicy(null); return }
+    let cancelled = false
+    searchPolicies(attachedPolicyId)
+      .then(r => {
+        if (cancelled) return
+        setLivePolicy(r.policies.find(p => p.policy_number === attachedPolicyId) ?? null)
+      })
+      .catch(console.error)
+    return () => { cancelled = true }
+  }, [attachedPolicyId])
+
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(null), 3000)
+  }
+
+  async function handleAttachPolicy(policyNumber: string, reason: string) {
+    if (!id) return
+    const result = await attachPolicy(id, policyNumber, reason || undefined)
+    showToast(`Attached ${result.matched_policy_id} — ${result.customer_name}`)
+    getPayment(id).then(setDetail).catch(console.error)
   }
 
   async function handleApprove() {
@@ -262,7 +463,15 @@ export default function PaymentDetail() {
   const annotations = detail.annotations
 
   const policyId = payment.matched_policy_id as string | null
-  const policy = policyId ? POLICY_INFO[policyId] : null
+  const policy = livePolicy
+    ? {
+        holder: livePolicy.customer_name,
+        type: livePolicy.policy_type,
+        premium: `${formatUSD(livePolicy.premium_amount)} ${livePolicy.premium_frequency}`,
+        next_due: livePolicy.next_due_date ?? "—",
+        balance_cents: livePolicy.outstanding_balance,
+      }
+    : policyId ? POLICY_INFO[policyId] : null
   const paymentHistory = policyId ? (PAYMENT_HISTORY[policyId] ?? []) : []
 
   const recColor =
@@ -795,7 +1004,7 @@ export default function PaymentDetail() {
                 </div>
               </div>
             ) : (
-              <p style={{ fontSize: 13, color: "var(--pw-text-muted)", margin: 0 }}>No matched policy</p>
+              <AttachPolicyPanel onAttach={handleAttachPolicy} />
             )}
           </div>
 

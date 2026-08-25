@@ -196,6 +196,34 @@ export function overridePayment(id: string, action: string, reason: string): Pro
   })
 }
 
+export interface PolicySearchResult {
+  policy_number: string
+  customer_id: string
+  customer_name: string
+  policy_type: string
+  premium_amount: number
+  premium_frequency: string
+  status: string
+  outstanding_balance: number
+  next_due_date: string | null
+}
+
+export function searchPolicies(q: string): Promise<{ policies: PolicySearchResult[]; count: number }> {
+  return apiFetch(`/api/policies/search?q=${encodeURIComponent(q)}`)
+}
+
+export function attachPolicy(id: string, policyNumber: string, reason?: string): Promise<{
+  payment_id: string
+  matched_policy_id: string
+  matched_customer_id: string
+  customer_name: string
+}> {
+  return apiFetch(`/api/payments/${id}/attach-policy`, {
+    method: "POST",
+    body: JSON.stringify({ policy_number: policyNumber, reason: reason ?? null }),
+  })
+}
+
 export function returnPayment(id: string, notes?: string): Promise<unknown> {
   return apiFetch(`/api/payments/${id}/return`, {
     method: "POST",
