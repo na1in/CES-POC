@@ -239,6 +239,29 @@ async def seed_historical_payments(db: AsyncSession) -> None:
         ON CONFLICT (payment_id) DO NOTHING
     """))
 
+    # The escalated/returned H-series cases were escalated by Priya. Without an
+    # 'escalated' audit row carrying a real actor, the investigator queue's
+    # "Escalated By" column renders blank — the API reads it from the latest
+    # audit_log row via a LATERAL join.
+    await db.execute(text("""
+        INSERT INTO audit_log
+            (payment_id, action_type, actor, actor_user_id, details, timestamp)
+        SELECT v.payment_id, 'escalated', u.name, u.user_id,
+               jsonb_build_object('reason', v.reason, 'escalated_to', 'investigator'),
+               p.payment_date + interval '2 hours'
+        FROM (VALUES
+                ('PMT-H-007', 'no_customer_match'),
+                ('PMT-H-008', 'no_customer_match'),
+                ('PMT-H-009', 'duplicate_zero_balance')
+             ) AS v(payment_id, reason)
+        JOIN payments p ON p.payment_id = v.payment_id
+        CROSS JOIN (SELECT user_id, name FROM users WHERE user_id = 'USR-0001') u
+        WHERE NOT EXISTS (
+            SELECT 1 FROM audit_log a
+            WHERE a.payment_id = v.payment_id AND a.action_type = 'escalated'
+        )
+    """))
+
 
 async def seed_configuration_thresholds(db: AsyncSession) -> None:
     await db.execute(text("""

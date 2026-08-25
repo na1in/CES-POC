@@ -8,21 +8,12 @@ import {
 } from "@/components/ui/table"
 import { listPayments, type PaymentRow } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { formatAge } from "@/lib/formatTime"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatUSD(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100)
-}
-
-function formatTimeSince(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const totalHours = Math.floor(diff / 3_600_000)
-  const days = Math.floor(totalHours / 24)
-  const hours = totalHours % 24
-  if (days === 0) return `${totalHours}h ago`
-  if (hours === 0) return `${days}d ago`
-  return `${days}d ${hours}h ago`
 }
 
 function formatEscalationDate(iso: string): string {
@@ -485,7 +476,7 @@ export default function InvestigationQueue() {
                       {payment.escalated_by ?? "—"}
                     </TableCell>
                     <TableCell className="text-sm font-medium" style={{ color: "var(--pw-text-secondary)" }}>
-                      {formatTimeSince(payment.created_timestamp)}
+                      {formatAge(payment.created_timestamp)}
                     </TableCell>
                     <TableCell>
                       {activeTab === "open"
@@ -582,7 +573,7 @@ export default function InvestigationQueue() {
                           <td style={{ padding: "8px 10px", fontFamily: "var(--pw-font-mono)", color: "var(--pw-text-secondary)" }}>{r.payment.payment_id}</td>
                           <td style={{ padding: "8px 10px" }}>{r.payment.sender_name}</td>
                           <td style={{ padding: "8px 10px", fontFamily: "var(--pw-font-mono)" }}>{formatUSD(r.payment.amount)}</td>
-                          <td style={{ padding: "8px 10px", color: "var(--pw-text-muted)" }}>{formatTimeSince(r.payment.created_timestamp)}</td>
+                          <td style={{ padding: "8px 10px", color: "var(--pw-text-muted)" }}>{formatAge(r.payment.created_timestamp)}</td>
                         </tr>
                       ))}
                     </tbody>

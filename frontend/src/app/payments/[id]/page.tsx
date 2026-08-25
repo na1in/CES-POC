@@ -8,6 +8,7 @@ import {
   type PaymentDetail,
 } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { scenarioLabel } from "@/lib/scenarioLabels"
 
 // ── Mock policy data (keyed by policy ID) ─────────────────────────────────────
 
@@ -817,7 +818,7 @@ export default function PaymentDetail() {
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>SCENARIO</p>
                   <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>
-                    {rec.scenario_route.replace("_", " ")}
+                    {scenarioLabel(rec.scenario_route)}
                   </p>
                 </div>
               )}

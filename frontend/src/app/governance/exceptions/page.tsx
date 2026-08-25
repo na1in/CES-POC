@@ -11,19 +11,13 @@ import {
   type PaymentRow, type AnomalyFlag, type ChangeRequest,
 } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { scenarioShortLabel } from "@/lib/scenarioLabels"
+import { formatAge } from "@/lib/formatTime"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatUSD(cents: number): string {
   return (cents / 100).toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 })
-}
-
-function timeSince(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const days = Math.floor(diff / 86_400_000)
-  const hours = Math.floor((diff % 86_400_000) / 3_600_000)
-  if (days > 0) return `${days}d ${hours}h ago`
-  return `${hours}h ago`
 }
 
 function formatDate(iso: string): string {
@@ -246,9 +240,9 @@ export default function ExceptionDashboardPage() {
                     <TD><span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12 }}>{p.payment_id}</span></TD>
                     <TD>{p.sender_name}</TD>
                     <TD><span style={{ fontFamily: "var(--pw-font-mono)", fontSize: 12 }}>{formatUSD(p.amount)}</span></TD>
-                    <TD><span className="pw-badge pw-badge-neutral">{p.scenario_route?.replace("scenario_", "S") ?? "—"}</span></TD>
+                    <TD><span className="pw-badge pw-badge-neutral">{scenarioShortLabel(p.scenario_route)}</span></TD>
                     <TD style={{ color: "var(--pw-escalate)", fontWeight: 600 }}>
-                      {p.investigation_due_date ? timeSince(p.investigation_due_date) : "—"}
+                      {p.investigation_due_date ? formatAge(p.investigation_due_date) : "—"}
                     </TD>
                   </tr>
                 ))}

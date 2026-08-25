@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/table"
 import { listPayments, type PaymentRow } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { formatAge } from "@/lib/formatTime"
+import { SCENARIO_LABEL, ALL_SCENARIOS } from "@/lib/scenarioLabels"
 import type { ScenarioRoute } from "@/types/recommendation"
 import type { PaymentMethod } from "@/types/payment"
 
@@ -21,16 +23,6 @@ import type { PaymentMethod } from "@/types/payment"
 
 function formatUSD(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100)
-}
-
-function formatAge(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const minutes = Math.floor(diff / 60_000)
-  const hours = Math.floor(diff / 3_600_000)
-  const days = Math.floor(diff / 86_400_000)
-  if (minutes < 60) return `${minutes}m ago`
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
 }
 
 function formatToday(): string {
@@ -57,17 +49,6 @@ function getFlags(payment: PaymentRow): string[] {
   return flags
 }
 
-const SCENARIO_LABEL: Record<ScenarioRoute, string> = {
-  scenario_1: "Policy Match",
-  scenario_2: "Cust. Match",
-  scenario_3: "High Variance",
-  scenario_4: "No Match",
-  scenario_5: "Duplicate",
-}
-
-const ALL_SCENARIOS: ScenarioRoute[] = [
-  "scenario_1", "scenario_2", "scenario_3", "scenario_4", "scenario_5",
-]
 const ALL_METHODS: PaymentMethod[] = ["ACH", "Check", "Credit Card", "Wire"]
 
 // ── Sub-components ────────────────────────────────────────────────────────────

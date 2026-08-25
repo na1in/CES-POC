@@ -12,16 +12,13 @@ import {
 } from "recharts"
 import { getAnalyticsDecisions, type AnalyticsDecisions } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { SCENARIO_LABEL, ALL_SCENARIOS, scenarioShortLabel } from "@/lib/scenarioLabels"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: "all",        label: "All" },
-  { key: "scenario_1", label: "Scenario 1" },
-  { key: "scenario_2", label: "Scenario 2" },
-  { key: "scenario_3", label: "Scenario 3" },
-  { key: "scenario_4", label: "Scenario 4" },
-  { key: "scenario_5", label: "Scenario 5" },
+  { key: "all", label: "All" },
+  ...ALL_SCENARIOS.map(key => ({ key, label: SCENARIO_LABEL[key] })),
 ] as const
 
 type TabKey = (typeof TABS)[number]["key"]
@@ -133,13 +130,13 @@ export default function AdminDashboardPage() {
   // Decision outcome bar data
   const outcomeData = activeTab === "all"
     ? scenarioData.map(s => ({
-        scenario: s.scenario_route?.replace("scenario_", "S") ?? s.scenario_route,
+        scenario: scenarioShortLabel(s.scenario_route, s.scenario_route),
         APPLY:    s.apply_count,
         HOLD:     s.hold_count,
         ESCALATE: s.escalate_count,
       }))
     : activeScenario
-      ? [{ scenario: activeTab.replace("scenario_", "S"), APPLY: activeScenario.apply_count, HOLD: activeScenario.hold_count, ESCALATE: activeScenario.escalate_count }]
+      ? [{ scenario: scenarioShortLabel(activeTab), APPLY: activeScenario.apply_count, HOLD: activeScenario.hold_count, ESCALATE: activeScenario.escalate_count }]
       : []
 
   // Confidence histogram
@@ -340,7 +337,7 @@ export default function AdminDashboardPage() {
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart
                   data={scenarioData.map(s => ({
-                    scenario: s.scenario_route?.replace("scenario_", "S") ?? s.scenario_route,
+                    scenario: scenarioShortLabel(s.scenario_route, s.scenario_route),
                     volume: s.volume,
                   }))}
                   barCategoryGap="35%"

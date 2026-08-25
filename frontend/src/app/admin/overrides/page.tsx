@@ -7,16 +7,13 @@ import {
 } from "lucide-react"
 import { getOverrides, type OverrideRow } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { SCENARIO_LABEL, ALL_SCENARIOS, scenarioLabel } from "@/lib/scenarioLabels"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SCENARIO_OPTIONS = [
-  { value: "",           label: "All" },
-  { value: "scenario_1", label: "Scenario 1" },
-  { value: "scenario_2", label: "Scenario 2" },
-  { value: "scenario_3", label: "Scenario 3" },
-  { value: "scenario_4", label: "Scenario 4" },
-  { value: "scenario_5", label: "Scenario 5" },
+  { value: "", label: "All" },
+  ...ALL_SCENARIOS.map(value => ({ value, label: SCENARIO_LABEL[value] })),
 ]
 
 const BAND_OPTIONS = [
@@ -261,7 +258,7 @@ export default function OverrideAnalysisPage() {
                         </button>
                       </td>
                       <td style={{ ...TD, color: "var(--pw-text-secondary)", whiteSpace: "nowrap", fontSize: 12 }}>
-                        {o.scenario_route?.replace("scenario_", "Scenario ") ?? "—"}
+                        {scenarioLabel(o.scenario_route)}
                       </td>
                       <td style={TD}><RecBadge rec={o.original_recommendation} /></td>
                       <td style={TD}>

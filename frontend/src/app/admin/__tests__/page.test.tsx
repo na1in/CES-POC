@@ -69,11 +69,11 @@ describe("Admin Dashboard — scenario tabs", () => {
   it("renders all six tabs", () => {
     render(<AdminDashboardPage />)
     expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Scenario 1" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Scenario 2" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Scenario 3" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Scenario 4" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Scenario 5" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Policy Match" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Cust. Match" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "High Variance" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "No Match" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Duplicate" })).toBeInTheDocument()
   })
 
   it("All tab is selected by default", () => {
@@ -83,18 +83,18 @@ describe("Admin Dashboard — scenario tabs", () => {
 
   it("other tabs are not selected by default", () => {
     render(<AdminDashboardPage />)
-    expect(screen.getByRole("button", { name: "Scenario 1" })).toHaveAttribute("aria-selected", "false")
+    expect(screen.getByRole("button", { name: "Policy Match" })).toHaveAttribute("aria-selected", "false")
   })
 
   it("clicking a tab marks it as selected", () => {
     render(<AdminDashboardPage />)
-    fireEvent.click(screen.getByRole("button", { name: "Scenario 1" }))
-    expect(screen.getByRole("button", { name: "Scenario 1" })).toHaveAttribute("aria-selected", "true")
+    fireEvent.click(screen.getByRole("button", { name: "Policy Match" }))
+    expect(screen.getByRole("button", { name: "Policy Match" })).toHaveAttribute("aria-selected", "true")
   })
 
   it("clicking a tab deselects the previous tab", () => {
     render(<AdminDashboardPage />)
-    fireEvent.click(screen.getByRole("button", { name: "Scenario 2" }))
+    fireEvent.click(screen.getByRole("button", { name: "Cust. Match" }))
     expect(screen.getByRole("button", { name: "All" })).toHaveAttribute("aria-selected", "false")
   })
 })
@@ -138,31 +138,31 @@ describe("Admin Dashboard — summary tiles (All tab)", () => {
 describe("Admin Dashboard — tab switching updates stats", () => {
   it("switching to Scenario 1 shows scenario 1 volume", () => {
     render(<AdminDashboardPage />)
-    fireEvent.click(screen.getByRole("button", { name: "Scenario 1" }))
+    fireEvent.click(screen.getByRole("button", { name: "Policy Match" }))
     expect(screen.getByText(mockAdminAnalytics.scenario_1.volume.toLocaleString())).toBeInTheDocument()
   })
 
   it("switching to Scenario 1 shows scenario 1 avg confidence", () => {
     render(<AdminDashboardPage />)
-    fireEvent.click(screen.getByRole("button", { name: "Scenario 1" }))
+    fireEvent.click(screen.getByRole("button", { name: "Policy Match" }))
     expect(screen.getByText(`${mockAdminAnalytics.scenario_1.avg_confidence}%`)).toBeInTheDocument()
   })
 
   it("switching to Scenario 1 shows scenario 1 override count", () => {
     render(<AdminDashboardPage />)
-    fireEvent.click(screen.getByRole("button", { name: "Scenario 1" }))
+    fireEvent.click(screen.getByRole("button", { name: "Policy Match" }))
     expect(screen.getByText(String(mockAdminAnalytics.scenario_1.override_count))).toBeInTheDocument()
   })
 
   it("switching to Scenario 2 shows scenario 2 volume", () => {
     render(<AdminDashboardPage />)
-    fireEvent.click(screen.getByRole("button", { name: "Scenario 2" }))
+    fireEvent.click(screen.getByRole("button", { name: "Cust. Match" }))
     expect(screen.getByText(mockAdminAnalytics.scenario_2.volume.toLocaleString())).toBeInTheDocument()
   })
 
   it("switching back to All restores All data", () => {
     render(<AdminDashboardPage />)
-    fireEvent.click(screen.getByRole("button", { name: "Scenario 3" }))
+    fireEvent.click(screen.getByRole("button", { name: "High Variance" }))
     fireEvent.click(screen.getByRole("button", { name: "All" }))
     expect(screen.getByText(mockAdminAnalytics.all.volume.toLocaleString())).toBeInTheDocument()
   })
@@ -170,7 +170,7 @@ describe("Admin Dashboard — tab switching updates stats", () => {
   it("each scenario shows distinct volume values", () => {
     render(<AdminDashboardPage />)
     // Verify scenario volumes are not all the same as "All"
-    fireEvent.click(screen.getByRole("button", { name: "Scenario 4" }))
+    fireEvent.click(screen.getByRole("button", { name: "No Match" }))
     expect(screen.getByText(mockAdminAnalytics.scenario_4.volume.toLocaleString())).toBeInTheDocument()
     expect(screen.queryByText(mockAdminAnalytics.all.volume.toLocaleString())).not.toBeInTheDocument()
   })
