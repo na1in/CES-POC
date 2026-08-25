@@ -10,6 +10,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts"
+import type { PieLabelRenderProps } from "recharts"
 import { getAnalyticsDecisions, type AnalyticsDecisions } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
 import { SCENARIO_LABEL, ALL_SCENARIOS, scenarioShortLabel } from "@/lib/scenarioLabels"
@@ -34,6 +35,25 @@ const DECISION_COLORS: Record<string, string> = {
   "APPLY":    CHART_APPLY,
   "HOLD":     CHART_HOLD,
   "ESCALATE": CHART_ESCALATE,
+}
+
+// Recharts tints a pie label with its own slice colour. A fill that is fine for
+// the wedge (3:1, non-text) fails as 11px text, so render the label in ink —
+// as a hex, since SVG presentation attributes don't resolve CSS variables.
+const PIE_LABEL_INK = "#1E293B"
+
+function renderPieLabel(props: PieLabelRenderProps) {
+  const { x, y, textAnchor, percent } = props
+  return (
+    <text
+      x={Number(x)} y={Number(y)}
+      textAnchor={(textAnchor as "start" | "middle" | "end") ?? "middle"}
+      dominantBaseline="central"
+      fill={PIE_LABEL_INK} fontSize={11} fontWeight={600}
+    >
+      {`${Math.round((percent ?? 0) * 100)}%`}
+    </text>
+  )
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -255,7 +275,7 @@ export default function AdminDashboardPage() {
             value={volume.toLocaleString()}
             icon={<Activity size={18} />}
             iconColor="var(--pw-primary)"
-            iconBg="rgba(124,77,255,0.1)"
+            iconBg="rgba(10,102,194,0.1)"
           />
           <StatTile
             label="Avg Confidence"
@@ -268,8 +288,8 @@ export default function AdminDashboardPage() {
             label="Override Count"
             value={overrideCount}
             icon={<AlertTriangle size={18} />}
-            iconColor="#EF4444"
-            iconBg="rgba(239,68,68,0.1)"
+            iconColor="var(--pw-escalate)"
+            iconBg="var(--pw-escalate-tint)"
           />
         </div>
 
@@ -303,19 +323,22 @@ export default function AdminDashboardPage() {
                 <span style={{ fontSize: 13, color: "var(--pw-text-muted)" }}>No data for this scenario</span>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart margin={{ top: 16, right: 8, bottom: 8, left: 8 }}>
+                  {/* Taller than the bar charts, smaller radius: the slice
+                      percentages sit outside the arc and were clipping the
+                      card edge and colliding with the legend. */}
                   <Pie
                     data={pieData}
                     dataKey="value"
                     nameKey="label"
-                    cx="50%" cy="50%"
-                    outerRadius={70}
-                    label={({ percent }) => `${Math.round((percent ?? 0) * 100)}%`}
+                    cx="50%" cy="46%"
+                    outerRadius={62}
+                    label={renderPieLabel}
                     labelLine={false}
                   >
                     {pieData.map(entry => (
-                      <Cell key={entry.label} fill={PIE_COLORS[entry.label] ?? "#94A3B8"} />
+                      <Cell key={entry.label} fill={PIE_COLORS[entry.label] ?? CHART_NEUTRAL} />
                     ))}
                   </Pie>
                   <Tooltip contentStyle={tooltipStyle} />
