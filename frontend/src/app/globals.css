@@ -7,28 +7,31 @@
   --radius: 0.625rem;
 
   /* ── PayWise brand tokens ──────────────────────────────── */
-  --pw-primary:        #7C4DFF;
-  --pw-primary-hover:  #6A3FE8;
-  --pw-secondary:      #00E5FF;
+  --pw-primary:        #0A66C2;
+  --pw-primary-hover:  #004182;
+  --pw-secondary:      #378FE9;
 
-  --pw-apply:          #10B981;
-  --pw-apply-hover:    #059669;
+  /* Darkened from the original bright shades — the originals failed WCAG AA
+     contrast both as white-text button fills (2.1-3.8:1) and as badge text on
+     their own tint backgrounds (2.0-3.3:1). These pass both uses (>=4.5:1). */
+  --pw-apply:          #047857;
+  --pw-apply-hover:    #065F46;
   --pw-apply-tint:     rgba(16, 185, 129, 0.10);
 
-  --pw-hold:           #F59E0B;
-  --pw-hold-hover:     #D97706;
+  --pw-hold:           #B45309;
+  --pw-hold-hover:     #92400E;
   --pw-hold-tint:      rgba(245, 158, 11, 0.10);
 
-  --pw-escalate:       #EF4444;
-  --pw-escalate-hover: #DC2626;
+  --pw-escalate:       #B91C1C;
+  --pw-escalate-hover: #991B1B;
   --pw-escalate-tint:  rgba(239, 68, 68, 0.10);
 
-  --pw-info:           #3B82F6;
+  --pw-info:           #1D4ED8;
   --pw-info-tint:      rgba(59, 130, 246, 0.10);
 
   --pw-text-primary:   #1E293B;
   --pw-text-secondary: #64748B;
-  --pw-text-muted:     #94A3B8;
+  --pw-text-muted:     #5B6B82;  /* was #94A3B8 — 2.56:1, failed AA even at large-text size */
   --pw-border:         #E2E8F0;
   --pw-bg:             #F8F9FA;
   --pw-surface:        #FFFFFF;
@@ -50,7 +53,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #7C4DFF;
+  --primary: #0A66C2;
   --primary-foreground: #ffffff;
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);

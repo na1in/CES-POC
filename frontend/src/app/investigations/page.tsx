@@ -162,8 +162,12 @@ function Nav({ user, logout, router }: { user: { name: string; role?: string } |
           ⌘K
         </kbd>
       </div>
-      <Bell size={18} style={{ color: "var(--pw-text-secondary)" }} />
-      <Settings size={18} style={{ color: "var(--pw-text-secondary)" }} />
+      <button type="button" aria-label="Notifications" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+        <Bell size={18} style={{ color: "var(--pw-text-secondary)" }} />
+      </button>
+      <button type="button" aria-label="Settings" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+        <Settings size={18} style={{ color: "var(--pw-text-secondary)" }} />
+      </button>
       <div style={{ position: "relative" }}>
         <button
           aria-label="Switch role"

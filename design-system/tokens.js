@@ -11,9 +11,9 @@ export const colors = {
   bgSurfaceElevated:'#F1F3F5',
 
   // Brand
-  primary:          '#7C4DFF',
-  primaryHover:     '#6A3FE8',
-  secondary:        '#00E5FF',
+  primary:          '#0A66C2',
+  primaryHover:     '#004182',
+  secondary:        '#378FE9',
 
   // Status
   apply:            '#10B981',
@@ -94,7 +94,7 @@ export const layout = {
 export const transition = 'all 200ms ease'
 
 /** Gradient used on logo mark and avatars */
-export const gradientBrand = 'linear-gradient(135deg, #7C4DFF, #00E5FF)'
+export const gradientBrand = 'linear-gradient(135deg, #0A66C2, #378FE9)'
 
 /**
  * Semantic token map for recommendation / status values.
