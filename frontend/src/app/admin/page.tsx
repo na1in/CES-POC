@@ -14,7 +14,9 @@ import type { PieLabelRenderProps } from "recharts"
 import { getAnalyticsDecisions, type AnalyticsDecisions } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
 import { SCENARIO_LABEL, ALL_SCENARIOS, scenarioShortLabel } from "@/lib/scenarioLabels"
-import { CHART_NEUTRAL, CHART_APPLY, CHART_HOLD, CHART_ESCALATE } from "@/lib/chartColors"
+import {
+  CHART_NEUTRAL, CHART_APPLY, CHART_HOLD, CHART_ESCALATE, ATTRIBUTION_RAMP,
+} from "@/lib/chartColors"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -25,10 +27,12 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"]
 
+// Ordered by how much human involvement the decision took, so the ramp is
+// read light → dark rather than as three unrelated identities.
 const PIE_COLORS: Record<string, string> = {
-  "AI Autonomous":      CHART_APPLY,
-  "Operator Confirmed": CHART_NEUTRAL,
-  "Operator Override":  CHART_HOLD,
+  "AI Autonomous":      ATTRIBUTION_RAMP[0],
+  "Operator Confirmed": ATTRIBUTION_RAMP[1],
+  "Operator Override":  ATTRIBUTION_RAMP[2],
 }
 
 const DECISION_COLORS: Record<string, string> = {
@@ -336,6 +340,8 @@ export default function AdminDashboardPage() {
                     outerRadius={62}
                     label={renderPieLabel}
                     labelLine={false}
+                    stroke="#FFFFFF"
+                    strokeWidth={2}
                   >
                     {pieData.map(entry => (
                       <Cell key={entry.label} fill={PIE_COLORS[entry.label] ?? CHART_NEUTRAL} />

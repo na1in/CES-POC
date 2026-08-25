@@ -35,3 +35,23 @@ export const CHART_ESCALATE = "#E11D48"
  * and separates from every hue above (worst pair ΔE 15.9 simulated).
  */
 export const CHART_NEUTRAL = "#55657F"
+
+
+/**
+ * Decision attribution ramp — sequential, not categorical.
+ *
+ * AI Autonomous → Operator Confirmed → Operator Override is an *ordered* scale
+ * of increasing human involvement, so it takes one hue stepped light→dark
+ * rather than three competing hues. Previously it borrowed the apply/hold
+ * status colours, which made an identity breakdown impersonate a good/warning
+ * signal; status colours are reserved for state.
+ *
+ * A single recessive hue also keeps the chart clear of the action blue, and is
+ * colour-vision-safe by construction: the steps are ordered by lightness, so
+ * they survive any CVD simulation that flattens hue.
+ *
+ * Contrast vs white: 2.65:1 / 5.35:1 / 10.31:1, each step ~2:1 from the next.
+ * The lightest step sits under 3:1 by design — the slices carry direct
+ * percentage labels and a legend, which is the documented relief.
+ */
+export const ATTRIBUTION_RAMP = ["#8FA0BC", "#5A6B8D", "#334158"] as const
