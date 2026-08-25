@@ -11,6 +11,7 @@ import {
 } from "recharts"
 import { getAnalyticsDecisions, type AnalyticsDecisions } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { CHART_NEUTRAL } from "@/lib/chartColors"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -311,7 +312,7 @@ export default function GovernancePage() {
                   contentStyle={{ border: "1px solid var(--pw-border)", borderRadius: 8, fontSize: 12 }}
                   cursor={{ fill: "var(--pw-bg)" }}
                 />
-                <Bar yAxisId="left" dataKey="volume" name="Count" fill="#0A66C2" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="left" dataKey="volume" name="Count" fill={CHART_NEUTRAL} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -363,7 +364,7 @@ export default function GovernancePage() {
                   contentStyle={{ border: "1px solid var(--pw-border)", borderRadius: 8, fontSize: 12 }}
                   cursor={{ fill: "var(--pw-bg)" }}
                 />
-                <Bar dataKey="count" name="Payments" fill="#0A66C2" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" name="Payments" fill={CHART_NEUTRAL} radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>

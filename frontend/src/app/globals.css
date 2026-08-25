@@ -29,6 +29,11 @@
   --pw-info:           #1D4ED8;
   --pw-info-tint:      rgba(59, 130, 246, 0.10);
 
+  /* Decorative chart fills. Muted so full-saturation --pw-primary stays
+     reserved for actions, navigation and links — otherwise nothing on a
+     dashboard signals "this is clickable". */
+  --pw-chart-neutral:  #64748B;
+
   --pw-text-primary:   #1E293B;
   --pw-text-secondary: #64748B;
   --pw-text-muted:     #5B6B82;  /* was #94A3B8 — 2.56:1, failed AA even at large-text size */

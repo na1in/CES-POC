@@ -13,6 +13,7 @@ import {
 import { getAnalyticsDecisions, type AnalyticsDecisions } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
 import { SCENARIO_LABEL, ALL_SCENARIOS, scenarioShortLabel } from "@/lib/scenarioLabels"
+import { CHART_NEUTRAL, CHART_APPLY, CHART_HOLD, CHART_ESCALATE } from "@/lib/chartColors"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -24,15 +25,15 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"]
 
 const PIE_COLORS: Record<string, string> = {
-  "AI Autonomous":   "#10B981",
-  "Operator Confirmed": "#0A66C2",
-  "Operator Override":  "#F59E0B",
+  "AI Autonomous":      CHART_APPLY,
+  "Operator Confirmed": CHART_NEUTRAL,
+  "Operator Override":  CHART_HOLD,
 }
 
 const DECISION_COLORS: Record<string, string> = {
-  "APPLY":    "#10B981",
-  "HOLD":     "#F59E0B",
-  "ESCALATE": "#EF4444",
+  "APPLY":    CHART_APPLY,
+  "HOLD":     CHART_HOLD,
+  "ESCALATE": CHART_ESCALATE,
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -345,7 +346,7 @@ export default function AdminDashboardPage() {
                   <XAxis dataKey="scenario" tick={axisTickStyle} axisLine={false} tickLine={false} />
                   <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} width={30} />
                   <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--pw-bg)" }} />
-                  <Bar dataKey="volume" name="VOLUME" fill="#0A66C2" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="volume" name="VOLUME" fill={CHART_NEUTRAL} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -363,7 +364,7 @@ export default function AdminDashboardPage() {
                   <XAxis dataKey="bucket" tick={axisTickStyle} axisLine={false} tickLine={false} />
                   <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} width={30} />
                   <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--pw-bg)" }} />
-                  <Bar dataKey="count" name="PAYMENTS" fill="#0A66C2" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" name="PAYMENTS" fill={CHART_NEUTRAL} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
