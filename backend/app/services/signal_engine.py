@@ -46,7 +46,8 @@ async def run_signal_engine(
 
     payment keys:
         amount, payment_method, payment_date, sender_name, sender_account,
-        reference_1, reference_2, extracted_policy_number
+        reference_1, reference_2, extracted_policy_number,
+        reference_field_1  (policy reference for the duplicate check — the pipeline supplies DB column names)
 
     customer keys:
         customer_name, status, outstanding_balance_cents, next_due_date,
@@ -69,7 +70,7 @@ async def run_signal_engine(
             db=db,
             payment_id=payment_id,
             sender_name=payment["sender_name"],
-            sender_account=payment.get("sender_account"),
+            reference=payment.get("reference_field_1"),
             payment_method=payment["payment_method"],
             payment_date=payment["payment_date"],
             amount=payment["amount"],

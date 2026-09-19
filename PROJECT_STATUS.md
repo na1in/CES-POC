@@ -13,7 +13,7 @@
 | **Repo** | https://github.com/na1in/CES-POC |
 | **Current week** | Week 7 |
 | **Active phase** | All phases complete — PoC fully functional |
-| **Last updated** | 2026-05-21 |
+| **Last updated** | 2026-09-18 |
 | **Open PR** | None |
 
 ## Team
@@ -163,12 +163,29 @@
 
 ---
 
+## Post-PoC Quality Work (2026-09-18, no tickets)
+
+Synthetic evaluation of the live pipeline — methodology, results and evidence in [`docs/Evaluation_Harness.md`](docs/Evaluation_Harness.md).
+
+| Item | Owner | Status | Notes |
+|------|-------|--------|-------|
+| Evaluation harness — LLM-generated synthetic world + 22 scenario archetypes + seeded noise, run through the real pipeline in an isolated DB | Eng A | ✅ | `backend/scripts/eval/`; 192 cases; 94.4% (169/179) agreement on valid-label cases after fix, 87.2% before — synthetic test set |
+| Duplicate-detection rule aligned with spec (reference, not account) | Eng A | ✅ | 16/18 probe cases flipped to pass; +3 unit tests |
+| Reference parser: persist at ingest, normalise `POL90001`, temperature 0 | Eng A | ⬜ | Parser is called twice and varies run to run |
+| Scenario 2 treats missing variance as 0% (`sc2.py:48`) | Eng A | ⬜ | Can APPLY payments far below premium when no policy identified |
+| Scenario 1 crash on `None` variance (`sc1.py:82`) | Eng A | ⬜ | 3/192 eval payments → `PROCESSING_FAILED` |
+| Gray-zone name score nondeterminism (`matching.py`) | Eng A | ⬜ | No temperature set; APPLY↔HOLD flips at the 90% threshold |
+| Signal engine reads `reference_1/2`; pipeline supplies `reference_field_1/2` | Eng A | ⬜ | Third-party reference-text detection gets `None` in production |
+| 26 stale unit tests | Eng A | ⬜ | Expect `applied`/`escalated` where the pipeline now lands `held`; 396 tests total |
+
+---
+
 ## Open Questions
 
 | # | Question | Owner | Priority | Status |
 |---|----------|-------|----------|--------|
 | 1 | Notification channel for policyholder outreach — in-system, email, phone? | PM | 🟡 Medium | Open — contact_record model supports phone/email/letter but no dispatch service |
-| 2 | Staging/simulation environment — anonymised production data or synthetic data? | Eng A | 🟡 Medium | Open — PoC uses synthetic seed data only |
+| 2 | Staging/simulation environment — anonymised production data or synthetic data? | Eng A | 🟡 Medium | Open — PoC uses synthetic seed data only; a synthetic evaluation harness now exists (`docs/Evaluation_Harness.md`) |
 
 ---
 

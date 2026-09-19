@@ -11,7 +11,7 @@ async def compute_duplicate(
     db: AsyncSession,
     payment_id: str,
     sender_name: str,
-    sender_account: str | None,
+    reference: str | None,
     payment_method: str,
     payment_date: datetime,
     amount: int,
@@ -20,14 +20,20 @@ async def compute_duplicate(
 ) -> dict:
     """
     Checks for a duplicate payment within the configured window.
-    Match criteria: same sender_name + sender_account + payment_method,
-    within window_hours, amount within amount_tolerance_cents.
+    Match criteria (docs/Final_Scenario_Definitions.md, Scenario 5): same sender_name,
+    payment_method and policy reference (reference_field_1), within window_hours, amount
+    within amount_tolerance_cents.
+
+    The sender's account is deliberately not a criterion: a duplicate can arrive from another
+    bank account or card, and the account says nothing about which policy is being paid.
+    The reference is compared as written rather than through the LLM reference parser, so this
+    check does not inherit the parser's run-to-run variation.
     """
     result = await db.execute(text("""
         SELECT payment_id, amount, payment_date
         FROM payments
         WHERE sender_name = :sender_name
-          AND sender_account IS NOT DISTINCT FROM :sender_account
+          AND reference_field_1 IS NOT DISTINCT FROM :reference
           AND payment_method = :payment_method
           AND payment_date >= :cutoff
           AND payment_id != :payment_id
@@ -36,7 +42,7 @@ async def compute_duplicate(
         LIMIT 1
     """), {
         "sender_name": sender_name,
-        "sender_account": sender_account,
+        "reference": reference,
         "payment_method": payment_method,
         "cutoff": payment_date - __import__("datetime").timedelta(hours=window_hours),
         "payment_id": payment_id,

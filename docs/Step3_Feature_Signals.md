@@ -297,6 +297,8 @@ ELSE: Duplicate = FALSE (0%)
 
 This is a binary check — either all criteria are met or it's not a duplicate. The $2 amount tolerance accounts for bank processing fees (e.g., $7,500 → $7,499), rounding differences, and small surcharges.
 
+**Implementation note**: `Policy_Reference` is compared as the exact text of `reference_field_1`, not through the LLM reference parser, so the check does not inherit the parser's run-to-run variation. The sender's account is deliberately **not** a criterion — a duplicate can arrive from another bank account or card, and the account says nothing about which policy is paid.
+
 **Output**: Boolean (duplicate detected / not detected)
 
 **Used In**: Scenario 5

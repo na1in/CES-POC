@@ -59,7 +59,7 @@ Signals are organized into **5 categories** with **19 total signals**, computed 
 
 | Signal | Range | Method |
 |--------|-------|--------|
-| Duplicate Match | 0% or 100% | 3 exact fields (sender, method, reference) + amount within $2, within 72hr |
+| Duplicate Match | 0% or 100% | 3 exact fields (sender name, payment method, `reference_field_1`) + amount within $2, within 72hr; sender account is not a criterion |
 | Time Between Payments | Hours | Hours since matching previous payment |
 | Balance Justification | Boolean | Does outstanding balance justify a second payment? |
 | Duplicate Amount Difference | Cents | Absolute difference between this and suspected duplicate (0 = exact) |

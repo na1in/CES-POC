@@ -32,6 +32,7 @@ Always before making any changes, search the web for the newest chanes and only 
   - `docs/Step3_Feature_Signals.md` — 19 signal computation methods across 5 categories
   - `docs/Executive_Summary_Scenarios.md` — overview with routing flow and decision matrix
   - `docs/Database_Design.md` — proto-to-DB mapping and design notes
+  - `docs/Evaluation_Harness.md` — synthetic evaluation methodology, results and open findings (harness in `backend/scripts/eval/`)
 
 ## Conventions
 - Monetary amounts are stored as integers in cents (never floats)
@@ -53,7 +54,7 @@ Always before making any changes, search the web for the newest chanes and only 
 2. **Customer Match, No Policy** — customer match ≥90% (or <90% with 2+ supporting signals), no policy ref. Always requires human approval
 3. **High Amount Variance** — match found but variance >2%. Tiers: 2-15% HOLD, 15-50% check special cases (multi-period, multi-method, third-party → HOLD), >100% ESCALATE. Name must be ≥90%
 4. **No Matching Customer** — all matching failed. Check for third-party payment first (employer, family, escrow → HOLD if amount ≤15%), otherwise ESCALATE
-5. **Duplicate Payment** — runs FIRST on every payment. Match: 3 exact fields (sender, method, reference) + amount within $2 tolerance, within 72hrs. Balance >0 → HOLD, balance =0 → ESCALATE
+5. **Duplicate Payment** — runs FIRST on every payment. Match: 3 exact fields (sender name, payment method, `reference_field_1`) + amount within $2 tolerance, within 72hrs; the sender's account is NOT a criterion. Balance >0 → HOLD, balance =0 → ESCALATE
 
 ## 19 Signals (5 categories, 3 computation waves)
 ### Category 1: Matching & Identification (4)
@@ -226,7 +227,7 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 ## Testing
 
 ### Backend (`backend/tests/`)
-- ~378 pytest tests; run with `python -m pytest tests/ -v` from `backend/`
+- 396 pytest tests (as of 2026-09-18); run with `python -m pytest tests/ -v` from `backend/`. 26 of them currently fail on stale expectations (e.g. expecting `applied`/`escalated` where the pipeline now lands `held`) — see Known issues below. Run against a freshly migrated + seeded database: the dev DB accumulates demo payments that collide with fixtures
 - `conftest.py` has `--live-llm` flag: default mocks `parse_reference_fields` + `get_reasoning`; pass `--live-llm` for real OpenRouter calls
 - E2E tests use `rollback_only` fixtures — all mutations are rolled back after each test
 
@@ -253,6 +254,23 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 
 ### Bug fixes (2026-06-08)
 - `frontend/src/contexts/auth.tsx`, `frontend/src/lib/api.ts`, `frontend/e2e/helpers/auth.ts`: Switched auth token storage from `localStorage` to `sessionStorage` — app now always starts at `/login` on a fresh browser open or new tab; session persists across page refreshes within the same tab
+
+### Bug fixes (2026-09-18)
+- `backend/app/services/signals/duplicate.py`, `backend/app/services/signal_engine.py`: duplicate detection now matches sender name + payment method + `reference_field_1` (exact) + amount ±$2 within 72h, as the spec requires. It previously matched on `sender_account`, so duplicates from another account were missed (APPLY) and identical-premium policies paid from one account were escalated. Tests rewritten (+3 new) in `tests/test_signals_wave1.py`
+
+### Evaluation harness (added 2026-09-18)
+- `backend/scripts/eval/`: `generate.py` (Gemini-generated synthetic world + scenario archetypes, independent checks, seeded noise) and `run_eval.py` (runs cases through the real ingest endpoint + pipeline against an isolated `ces_eval` database; refuses any database not ending in `_eval`)
+- Corpus and results in `backend/scripts/eval/data/`; full methodology, results and findings in `docs/Evaluation_Harness.md`
+- Result (synthetic test set, one pass): 169/179 = 94.4% scenario-and-recommendation agreement on valid-label cases (95% CI 90.0–96.9), after the duplicate fix; 87.2% before. This is agreement with spec-derived labels, not accuracy on real payments
+- Do not use `scripts/demo_restore.py` to clean up eval data — it wipes all non-seed payments, thresholds and governance records in the DB it targets
+
+### Known issues (open; found by the evaluation harness — details and evidence in `docs/Evaluation_Harness.md`)
+- Reference parser: called twice (ingest, then again in `pipeline.py`); results vary run to run on messy references and malformed numbers like `POL90001` are not normalised. Persist the parse at ingest, normalise, set temperature 0
+- `sc2.py:48` treats a missing variance as 0% → Scenario 2 can APPLY payments far below premium when no policy is identified
+- `sc1.py:82` crashes formatting a `None` variance → `PROCESSING_FAILED` (3/192 eval payments)
+- Gray-zone name score (`matching.py` `_llm_score`) sets no temperature and answers in round numbers against a ">90" apply threshold → APPLY↔HOLD flips
+- `run_signal_engine` reads `reference_1/2` but the pipeline supplies `reference_field_1/2` → reference-text third-party detection sees `None` in production
+- 26 stale unit tests (see Testing)
 
 ### Dev setup
 - PostgreSQL runs in Docker: `docker compose up -d db` (from repo root)
