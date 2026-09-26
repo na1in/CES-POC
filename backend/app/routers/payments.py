@@ -68,10 +68,10 @@ async def _next_payment_id(db: AsyncSession) -> str:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-async def _run_pipeline_bg(payment_id: str) -> None:
+async def _run_pipeline_bg(payment_id: str, parsed_refs: dict | None = None) -> None:
     async with AsyncSessionLocal() as db:
         try:
-            await run_pipeline(payment_id, db)
+            await run_pipeline(payment_id, db, parsed_refs)
         except Exception:
             logger.exception("Background pipeline failed for %s", payment_id)
 
@@ -82,7 +82,8 @@ async def ingest_payment(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    # Parse free-text references with Claude Haiku (never raises)
+    # Extract the policy number from the free-text references (deterministic, never raises). Parsed once here and
+    # handed to the pipeline.
     parsed = await parse_reference_fields(body.reference_field_1, body.reference_field_2)
 
     payment_id = await _next_payment_id(db)
@@ -129,7 +130,7 @@ async def ingest_payment(
     await db.commit()
     logger.info("Ingested %s — %s %s", payment_id, body.sender_name, body.amount)
 
-    background_tasks.add_task(_run_pipeline_bg, payment_id)
+    background_tasks.add_task(_run_pipeline_bg, payment_id, parsed)
 
     return IngestResponse(payment_id=payment_id, status="received", created_timestamp=now)
 

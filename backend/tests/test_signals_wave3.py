@@ -163,6 +163,18 @@ def test_supporting_signals_low_consistency_fails_historical_match():
     assert result["historical_match"] is False
 
 
+def test_supporting_signals_historical_match_needs_enough_history():
+    # compute_historical_consistency returns 100 for a customer with < 2 records ("not enough data to flag"). That must
+    # not count as the history supporting the payment.
+    kwargs = dict(sender_account="ACC-001", historical_sender_accounts=["ACC-001"], amount_variance_pct=1.0,
+                  historical_consistency_score=100.0)
+    assert compute_supporting_signals(**kwargs, historical_record_count=0)["historical_match"] is False
+    assert compute_supporting_signals(**kwargs, historical_record_count=1)["historical_match"] is False
+    assert compute_supporting_signals(**kwargs, historical_record_count=2)["historical_match"] is True
+    # callers that do not pass a count keep the previous behaviour
+    assert compute_supporting_signals(**kwargs)["historical_match"] is True
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Multi-Period
 # ══════════════════════════════════════════════════════════════════════════════

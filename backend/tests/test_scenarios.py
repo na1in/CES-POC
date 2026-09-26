@@ -7,6 +7,7 @@ they're covered by E2E tests in Phase 4.
 """
 import pytest
 
+from app.services.agent.scenarios import sc1
 from app.services.agent.scenarios.sc1 import _decide as sc1_decide
 from app.services.agent.scenarios.sc2 import _decide as sc2_decide, _matching_policies
 from app.services.agent.scenarios.sc3 import _decide as sc3_decide, _variance_tier
@@ -106,7 +107,7 @@ def s2_payment(amount=125000):
 
 def s2_signals(**overrides):
     base = {
-        "customer_match_confidence": 95.0,
+        "name_similarity_score": 95.0,
         "amount_variance_pct": 0.0,
         "account_match": False,
         "amount_match": True,
@@ -170,28 +171,144 @@ class TestScenario2:
         assert "no_active_policies" in path
 
     def test_apply_weak_match_two_supporting_signals(self):
-        sigs = s2_signals(customer_match_confidence=80.0, account_match=True, amount_match=True)
+        sigs = s2_signals(name_similarity_score=80.0, account_match=True, amount_match=True)
         rec, _, _, path, _ = sc2_decide(s2_payment(), sigs, s2_context(), BASE)
         assert rec == "APPLY"
         assert "supporting_signals" in path
 
     def test_escalate_weak_match_one_supporting_signal(self):
-        sigs = s2_signals(customer_match_confidence=80.0, account_match=False, amount_match=True, historical_match=False)
+        sigs = s2_signals(name_similarity_score=80.0, account_match=False, amount_match=True, historical_match=False)
         rec, _, _, path, _ = sc2_decide(s2_payment(), sigs, s2_context(), BASE)
         assert rec == "ESCALATE"
         assert "insufficient_confidence" in path
+
+    def test_strong_name_match_needs_no_supporting_signals(self):
+        # Spec: name match >= 90% is a strong match on its own. A missing sender account must not veto it.
+        sigs = s2_signals(name_similarity_score=100.0, account_match=False, amount_match=False, historical_match=False)
+        rec, _, _, path, pid = sc2_decide(s2_payment(), sigs, s2_context(), BASE)
+        assert rec == "APPLY"
+        assert "single_policy" in path
+        assert pid == "POL-A"
+
+    def test_blended_customer_confidence_does_not_gate_the_strong_path(self):
+        # customer_match_confidence blends in account/history (an exact name with neither = 60); sc2 must ignore it.
+        sigs = s2_signals(name_similarity_score=100.0, customer_match_confidence=60.0, account_match=False)
+        rec, _, _, path, _ = sc2_decide(s2_payment(), sigs, s2_context(), BASE)
+        assert rec == "APPLY"
+        assert "single_policy" in path
+
+    def test_strong_name_threshold_is_inclusive_at_90(self):
+        # 90 is strong (spec: >= 90); just under it falls to the weak path and needs 2 supporting signals.
+        weak_signals = dict(account_match=False, amount_match=False, historical_match=False)
+        rec_at, _, _, path_at, _ = sc2_decide(s2_payment(), s2_signals(name_similarity_score=90.0, **weak_signals), s2_context(), BASE)
+        rec_below, _, _, path_below, _ = sc2_decide(s2_payment(), s2_signals(name_similarity_score=89.9, **weak_signals), s2_context(), BASE)
+        assert rec_at == "APPLY"
+        assert rec_below == "ESCALATE" and "insufficient_confidence" in path_below
+
+    def test_strong_name_match_multi_policy_ambiguous_holds_not_escalates(self):
+        ctx = s2_context(
+            active_policy_count=2,
+            active_policies=[
+                {"policy_id": "POL-A", "premium_amount_cents": 125000},
+                {"policy_id": "POL-B", "premium_amount_cents": 130000},
+            ],
+        )
+        sigs = s2_signals(name_similarity_score=100.0, account_match=False, historical_match=False)
+        rec, _, _, path, _ = sc2_decide(s2_payment(125000), sigs, ctx, BASE)
+        assert rec == "HOLD"
+        assert "ambiguous" in path
 
     def test_all_paths_require_human_approval(self):
         # S2 always requires approval regardless of outcome
         cases = [
             sc2_decide(s2_payment(), s2_signals(), s2_context(), BASE),
             sc2_decide(s2_payment(), s2_signals(amount_variance_pct=20), s2_context(), BASE),
-            sc2_decide(s2_payment(), s2_signals(customer_match_confidence=80), s2_context(), BASE),
+            sc2_decide(s2_payment(), s2_signals(name_similarity_score=80), s2_context(), BASE),
         ]
         # The function doesn't return requires_approval directly — checked at run() level
         # Just verify the recommendations are valid values
         for rec, _, _, _, _ in cases:
             assert rec in ("APPLY", "HOLD", "ESCALATE")
+
+
+class TestScenario2Hardening:
+    """Risk flags, the variance fallback (F3) and the derived amount_match."""
+
+    def test_risk_flagged_customer_is_held_not_applied(self):
+        sigs = s2_signals(name_similarity_score=100.0, has_risk_flags=True)
+        rec, _, reason, path, pid = sc2_decide(s2_payment(), sigs, s2_context(), BASE)
+        assert rec == "HOLD"
+        assert path == "scenario_2_hold_risk_flag"
+        assert "risk" in reason.lower()
+        assert pid == "POL-A"  # the analyst still sees which policy the amount points at
+
+    def test_risk_flag_also_holds_the_multi_policy_apply_and_the_weak_apply(self):
+        ctx = s2_context(active_policy_count=2, active_policies=[
+            {"policy_id": "POL-A", "premium_amount_cents": 125000}, {"policy_id": "POL-B", "premium_amount_cents": 85000}])
+        rec, _, _, path, _ = sc2_decide(s2_payment(125000), s2_signals(has_risk_flags=True), ctx, BASE)
+        assert (rec, path) == ("HOLD", "scenario_2_hold_risk_flag")
+        weak = s2_signals(name_similarity_score=80.0, account_match=True, amount_match=True, has_risk_flags=True)
+        rec, _, _, path, _ = sc2_decide(s2_payment(), weak, s2_context(), BASE)
+        assert (rec, path) == ("HOLD", "scenario_2_hold_risk_flag")
+
+    def test_risk_flag_does_not_soften_an_escalation(self):
+        sigs = s2_signals(name_similarity_score=80.0, account_match=False, amount_match=False, historical_match=False,
+                          has_risk_flags=True)
+        rec, _, _, path, _ = sc2_decide(s2_payment(200000), sigs, s2_context(), BASE)
+        assert rec == "ESCALATE"
+
+    def test_no_risk_flags_key_behaves_as_no_risk(self):
+        rec, _, _, path, _ = sc2_decide(s2_payment(), s2_signals(), s2_context(), BASE)
+        assert rec == "APPLY"
+
+    def test_missing_variance_is_computed_from_the_single_policy_not_read_as_zero(self):
+        # Finding F3: no policy identified → variance None → used to be 0% → APPLY for $1,500 against a $2,000 premium
+        ctx = s2_context(active_policies=[{"policy_id": "POL-A", "policy_number": "POL-00001", "premium_amount_cents": 200000}])
+        sigs = s2_signals(amount_variance_pct=None)
+        rec, _, _, path, _ = sc2_decide(s2_payment(150000), sigs, ctx, BASE)   # 25% under
+        assert rec == "HOLD" and path == "scenario_2_hold_high_variance"
+        rec, _, _, path, _ = sc2_decide(s2_payment(200000), sigs, ctx, BASE)   # exact
+        assert rec == "APPLY" and path == "scenario_2_apply_single_policy"
+
+    def test_variance_that_cannot_be_computed_holds_instead_of_applying(self):
+        ctx = s2_context(active_policies=[{"policy_id": "POL-A", "policy_number": "POL-00001", "premium_amount_cents": 0}])
+        rec, _, _, path, _ = sc2_decide(s2_payment(), s2_signals(amount_variance_pct=None), ctx, BASE)
+        assert (rec, path) == ("HOLD", "scenario_2_hold_amount_unverified")
+
+    def test_signal_variance_still_wins_when_a_policy_was_identified(self):
+        rec, _, _, path, _ = sc2_decide(s2_payment(), s2_signals(amount_variance_pct=20.0), s2_context(), BASE)
+        assert (rec, path) == ("HOLD", "scenario_2_hold_high_variance")
+
+    def test_amount_match_is_derived_from_policy_premiums(self):
+        # The signal engine cannot set amount_match here (no policy → no variance). Account + an exact premium match
+        # are two supporting signals, so a weak name match can still APPLY.
+        sigs = s2_signals(name_similarity_score=80.0, account_match=True, amount_match=False, historical_match=False,
+                          amount_variance_pct=None)
+        rec, _, _, path, _ = sc2_decide(s2_payment(125000), sigs, s2_context(), BASE)
+        assert (rec, path) == ("APPLY", "scenario_2_apply_supporting_signals")
+
+    def test_amount_match_derivation_respects_the_tolerance(self):
+        sigs = s2_signals(name_similarity_score=80.0, account_match=True, amount_match=False, historical_match=False,
+                          amount_variance_pct=None)
+        rec, _, _, path, _ = sc2_decide(s2_payment(130000), sigs, s2_context(), BASE)   # 4% off: not an amount match
+        assert rec == "ESCALATE"
+
+    def test_multi_policy_unique_match_needs_no_signal_variance(self):
+        ctx = s2_context(active_policy_count=2, active_policies=[
+            {"policy_id": "POL-A", "premium_amount_cents": 125000}, {"policy_id": "POL-B", "premium_amount_cents": 85000}])
+        rec, _, _, path, pid = sc2_decide(s2_payment(125000), s2_signals(amount_variance_pct=None), ctx, BASE)
+        assert (rec, path, pid) == ("APPLY", "scenario_2_apply_amount_disambiguates", "POL-A")
+
+
+class TestScenario1NoneVariance:
+    async def test_run_survives_a_none_variance(self):
+        """Finding F4: the key was present with None, formatting it raised TypeError → PROCESSING_FAILED."""
+        signals = {"name_similarity_score": 95.0, "amount_variance_pct": None, "has_risk_flags": False,
+                   "account_status": "active", "payment_method_risk_level": "low"}
+        result = await sc1.run({"sender_name": "Jane Doe", "amount": 125000}, signals,
+                               {"policy_number": "POL-00001", "customer_name": "Jane Doe"}, BASE)
+        assert result["recommendation"] in ("APPLY", "HOLD", "ESCALATE")
+        assert result["scenario_route"] == 1
 
 
 class TestMatchingPolicies:

@@ -55,7 +55,7 @@ async def _held_payment(client: AsyncClient, db: AsyncSession) -> str:
 
 
 async def _escalated_payment(client: AsyncClient, db: AsyncSession) -> str:
-    """Ingest + pipeline → ESCALATED. Uses Sc4 (unrecognised sender)."""
+    """Ingest + pipeline (Sc4, unrecognised sender) → HELD, then analyst rejects → ESCALATED."""
     resp = await client.post("/api/payments/ingest", json={
         "amount": 50000,
         "sender_name": "Zxqvf Bljrpm 99999",
@@ -65,6 +65,10 @@ async def _escalated_payment(client: AsyncClient, db: AsyncSession) -> str:
     assert resp.status_code == 201
     pid = resp.json()["payment_id"]
     await run_pipeline(pid, db)
+    # The pipeline lands every payment HELD; a payment becomes ESCALATED when the analyst rejects it.
+    assert (await client.get(f"/api/payments/{pid}")).json()["payment"]["status"] == "held"
+    reject = await client.post(f"/api/payments/{pid}/reject", headers=_analyst_headers())
+    assert reject.status_code == 200
     body = (await client.get(f"/api/payments/{pid}")).json()
     assert body["payment"]["status"] == "escalated", f"Expected escalated, got {body['payment']['status']}"
     return pid
@@ -111,7 +115,7 @@ async def test_approve_writes_audit_entry(client: AsyncClient, db: AsyncSession)
     await client.post(f"/api/payments/{pid}/approve", headers=_analyst_headers())
 
     detail = (await client.get(f"/api/payments/{pid}")).json()
-    actions = [e["action_type"] for e in detail["audit_trail"]]
+    actions = [e["action_type"] for e in detail["audit_logs"]]
     assert "approved" in actions
     assert "applied" in actions
 
@@ -166,7 +170,7 @@ async def test_reject_writes_audit_entry(client: AsyncClient, db: AsyncSession):
     await client.post(f"/api/payments/{pid}/reject", headers=_analyst_headers())
 
     detail = (await client.get(f"/api/payments/{pid}")).json()
-    actions = [e["action_type"] for e in detail["audit_trail"]]
+    actions = [e["action_type"] for e in detail["audit_logs"]]
     assert "escalated" in actions
 
 
@@ -228,7 +232,7 @@ async def test_override_writes_annotation_and_audit(client: AsyncClient, db: Asy
     annotations = detail["annotations"]
     assert any(a["annotation_type"] == "override_reason" and reason in a["content"] for a in annotations)
     # Audit trail must include overridden
-    actions = [e["action_type"] for e in detail["audit_trail"]]
+    actions = [e["action_type"] for e in detail["audit_logs"]]
     assert "overridden" in actions
 
 
@@ -292,7 +296,7 @@ async def test_return_writes_audit_entry(client: AsyncClient, db: AsyncSession):
     await client.post(f"/api/payments/{pid}/return", headers=_investigator_headers())
 
     detail = (await client.get(f"/api/payments/{pid}")).json()
-    actions = [e["action_type"] for e in detail["audit_trail"]]
+    actions = [e["action_type"] for e in detail["audit_logs"]]
     assert "returned" in actions
 
 

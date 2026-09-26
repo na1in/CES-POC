@@ -134,9 +134,20 @@ def test_historical_consistency_exact_match():
 
 
 def test_historical_consistency_identical_history_no_stdev():
-    # All identical → stdev=0, should not divide by zero
+    # All identical → stdev=0: no division by zero, and an amount far off a constant history must NOT score 100.
+    # (It used to, so a customer paying a fixed premium could never be flagged: "historical match" was ~100% even for
+    # payments 15-184% off.)
     history = [150000] * 6
-    assert compute_historical_consistency(200000, history) == 100.0
+    assert compute_historical_consistency(150000, history) == 100.0
+    assert compute_historical_consistency(200000, history) == 0.0  # 33% off
+
+
+def test_historical_consistency_constant_history_small_deviation_still_passes():
+    history = [150000] * 6
+    # 2% off is the floor for the spread: z = 1 → 90, comfortably above the 70 "match" threshold
+    assert compute_historical_consistency(153000, history) == 90.0
+    # 10% off is well outside a fixed-premium pattern
+    assert compute_historical_consistency(165000, history) < 70.0
 
 
 def test_historical_consistency_slight_outlier():

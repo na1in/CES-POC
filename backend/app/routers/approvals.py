@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import CurrentUser, require_analyst, require_analyst_or_investigator, require_investigator
 from app.database import get_db
 from app.services.pipeline import run_pipeline
-from app.services.persist import _SLA_HOURS
+from app.services.persist import _SLA_HOURS, _target_status
 
 logger = logging.getLogger(__name__)
 

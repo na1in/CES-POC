@@ -36,7 +36,7 @@ from app.services.pipeline import run_pipeline
 async def test_sc1_auto_apply(client: AsyncClient, db: AsyncSession):
     """
     Robert Johnson, exact name, ACH, POL-00001 reference, correct amount.
-    Expect: scenario 1, APPLY, status=applied, requires_human_approval=False.
+    Expect: scenario 1, APPLY recommendation. Status is held: every payment lands for analyst review.
     """
     payload = {
         "amount": 150000,
@@ -59,7 +59,7 @@ async def test_sc1_auto_apply(client: AsyncClient, db: AsyncSession):
     pmt = body["payment"]
     rec = body["recommendation"]
 
-    assert pmt["status"] == "applied"
+    assert pmt["status"] == "held"  # recommendation is APPLY, but a human always approves
     assert rec["recommendation"] == "apply"
     assert rec["scenario_route"] == "scenario_1"
     assert rec["requires_human_approval"] is False
@@ -230,7 +230,7 @@ async def test_sc3_escalate_extreme_variance(client: AsyncClient, db: AsyncSessi
 
     assert rec["scenario_route"] == "scenario_3"
     assert rec["recommendation"] == "escalate"
-    assert pmt["status"] == "escalated"
+    assert pmt["status"] == "held"  # recommendation is ESCALATE; the analyst rejects to escalate
 
 
 # ── Scenario 4: No Matching Customer ─────────────────────────────────────────
@@ -260,7 +260,7 @@ async def test_sc4_escalate_no_match(client: AsyncClient, db: AsyncSession):
 
     assert rec["scenario_route"] == "scenario_4"
     assert rec["recommendation"] == "escalate"
-    assert pmt["status"] == "escalated"
+    assert pmt["status"] == "held"  # recommendation is ESCALATE; the analyst rejects to escalate
     assert rec["decision_path"] == "scenario_4_escalate_no_match"
 
 
@@ -306,7 +306,7 @@ async def test_sc5_escalate_true_duplicate(client: AsyncClient, db: AsyncSession
 
     assert rec["scenario_route"] == "scenario_5"
     assert rec["recommendation"] == "escalate"
-    assert pmt["status"] == "escalated"
+    assert pmt["status"] == "held"  # recommendation is ESCALATE; the analyst rejects to escalate
     assert rec["decision_path"] == "scenario_5_escalate_true_duplicate"
 
 

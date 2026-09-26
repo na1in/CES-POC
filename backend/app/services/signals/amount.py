@@ -3,6 +3,9 @@ import statistics
 
 logger = logging.getLogger(__name__)
 
+# Minimum spread, as a fraction of the mean, used by compute_historical_consistency (matches the 2% auto-apply tolerance).
+_MIN_SPREAD_FRACTION = 0.02
+
 
 def compute_amount_variance(payment_amount: int, premium_amount: int) -> dict:
     """
@@ -33,20 +36,24 @@ def compute_historical_consistency(
     historical_amounts: list[int],
 ) -> float:
     """
-    Z-score outlier detection against last 6 historical payments.
-    Returns 100 if fewer than 2 historical records (not enough data to flag).
-    Score: z=0 → 100, z=5 → 0, capped at 0.
+    Z-score outlier detection against the customer's payment history.
+    Returns 100 if fewer than 2 historical records (not enough data to flag). Callers that need "the history supports
+    this payment" must also check the record count: see compute_supporting_signals(historical_record_count=...).
+    Score: z=0 → 100, z=10 → 0, capped at 0.
+
+    The spread is floored at 2% of the mean. A customer who always pays the same premium has stdev 0, and without the
+    floor every amount, however far off, scored 100 (measured: 100% "historical match" even for payments 15-184% off).
     """
     if len(historical_amounts) < 2:
         return 100.0
 
     mean = statistics.mean(historical_amounts)
-    stdev = statistics.stdev(historical_amounts)
+    spread = max(statistics.stdev(historical_amounts), abs(mean) * _MIN_SPREAD_FRACTION)
 
-    if stdev == 0:
+    if spread == 0:  # mean of 0: nothing to compare against
         return 100.0
 
-    z_score = abs(current_amount - mean) / stdev
+    z_score = abs(current_amount - mean) / spread
     # z=0→100, z=10→0 (more forgiving than z*20 — small variations stay high)
     score = max(0.0, 100.0 - (z_score * 10.0))
     return round(score, 2)

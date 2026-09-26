@@ -28,6 +28,7 @@ from app.services.agent.scenarios import sc1, sc2, sc3, sc4, sc5
 from app.services.ingest import parse_reference_fields
 from app.services.persist import persist_recommendation
 from app.services.signal_engine import run_signal_engine
+from app.services.signals.matching import normalise_name_pair
 
 logger = logging.getLogger(__name__)
 
@@ -92,14 +93,14 @@ async def _find_best_customer(sender_name: str, db: AsyncSession) -> dict | None
     if not customers:
         return None
 
-    best = max(
-        customers,
-        key=lambda c: jellyfish.jaro_winkler_similarity(
-            sender_name.lower(), c["name"].lower()
-        ),
-    )
-    score = jellyfish.jaro_winkler_similarity(sender_name.lower(), best["name"].lower())
-    return best if score > 0.5 else None
+    def similarity(customer_name: str) -> float:
+        # Same normalisation as the name-similarity signal, so a middle initial cannot pick a different customer here
+        # than the one the score is later computed against.
+        a, b = normalise_name_pair(sender_name, customer_name)
+        return jellyfish.jaro_winkler_similarity(a, b)
+
+    best = max(customers, key=lambda c: similarity(c["name"]))
+    return best if similarity(best["name"]) > 0.5 else None
 
 
 async def _load_customer_dict(customer_id: str, db: AsyncSession) -> dict:
@@ -242,7 +243,7 @@ def _build_context(
 
 # ── Core pipeline ─────────────────────────────────────────────────────────────
 
-async def _process_payment(payment_id: str, db: AsyncSession) -> dict:
+async def _process_payment(payment_id: str, db: AsyncSession, parsed_refs: dict | None = None) -> dict:
     start = time.monotonic()
 
     payment = await _load_payment(payment_id, db)
@@ -252,10 +253,12 @@ async def _process_payment(payment_id: str, db: AsyncSession) -> dict:
         {"id": payment_id},
     )
 
-    # Re-parse reference fields to get extracted_policy_number (not persisted at ingest)
-    parsed_refs = await parse_reference_fields(
-        payment.get("reference_field_1"), payment.get("reference_field_2")
-    )
+    # Reuse the parse done at ingest. Callers without one (reprocess) re-parse; parsing is deterministic, so the
+    # result is the same either way.
+    if parsed_refs is None:
+        parsed_refs = await parse_reference_fields(
+            payment.get("reference_field_1"), payment.get("reference_field_2")
+        )
     payment = {**payment, **parsed_refs}
 
     customer, policy, active_policies, customer_id = await _resolve_customer_and_policy(payment, db)
@@ -304,9 +307,11 @@ async def _mark_failed(payment_id: str, error_detail: str, db: AsyncSession) -> 
         logger.error("Failed to mark %s as processing_failed: %s", payment_id, mark_exc)
 
 
-async def run_pipeline(payment_id: str, db: AsyncSession) -> dict:
+async def run_pipeline(payment_id: str, db: AsyncSession, parsed_refs: dict | None = None) -> dict:
     """
     Run the full pipeline with retry.
+
+    parsed_refs: the ingest-time reference parse, so the pipeline does not parse the same text a second time.
 
     Returns the recommendation dict on success.
     Raises the last exception after all retries are exhausted.
@@ -315,7 +320,7 @@ async def run_pipeline(payment_id: str, db: AsyncSession) -> dict:
 
     for attempt in range(3):
         try:
-            return await _process_payment(payment_id, db)
+            return await _process_payment(payment_id, db, parsed_refs)
         except Exception as exc:
             last_exc = exc
 

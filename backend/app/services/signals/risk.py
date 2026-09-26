@@ -66,12 +66,16 @@ def compute_supporting_signals(
     historical_consistency_score: float,
     amount_tolerance_pct: float = 2.0,
     historical_match_threshold: float = 70.0,
+    historical_record_count: int | None = None,
+    historical_min_records: int = 2,
 ) -> dict:
     """
     Three boolean supporting signals:
     - account_match: sender_account appears in payment history
     - amount_match: variance within tolerance
-    - historical_match: historical_consistency_score >= threshold
+    - historical_match: historical_consistency_score >= threshold, and (when historical_record_count is given) enough
+      history to say anything. compute_historical_consistency returns 100 for a customer with under 2 records, which
+      must not count as the history supporting the payment.
     """
     account_match = (
         sender_account is not None and
@@ -81,7 +85,9 @@ def compute_supporting_signals(
         amount_variance_pct is not None and
         amount_variance_pct <= amount_tolerance_pct
     )
-    historical_match = historical_consistency_score >= historical_match_threshold
+    historical_match = historical_consistency_score >= historical_match_threshold and (
+        historical_record_count is None or historical_record_count >= historical_min_records
+    )
 
     return {
         "account_match": account_match,

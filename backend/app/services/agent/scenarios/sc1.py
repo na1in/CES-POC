@@ -74,12 +74,14 @@ async def run(payment: dict, signals: dict, context: dict, thresholds: dict) -> 
     policy_number = context.get("policy_number", "unknown")
     customer_name = context.get("customer_name", "unknown")
     name_score = signals.get("name_similarity_score", 0)
-    variance = signals.get("amount_variance_pct", 0)
+    # The key can be present with a None value (no premium to compare); formatting None crashed the pipeline (F4).
+    variance = signals.get("amount_variance_pct")
+    variance_text = f"{variance:.1f}%" if variance is not None else "n/a (no premium to compare)"
 
     context_summary = (
         f"- Sender: {payment.get('sender_name')} vs policyholder: {customer_name} (similarity: {name_score:.0f}%)\n"
         f"- Policy reference: {policy_number}\n"
-        f"- Amount variance: {variance:.1f}%\n"
+        f"- Amount variance: {variance_text}\n"
         f"- Risk flags: {signals.get('has_risk_flags', False)}\n"
         f"- Account status: {signals.get('account_status', 'unknown')}\n"
         f"- Payment method risk: {signals.get('payment_method_risk_level', 'unknown')}"
@@ -88,7 +90,7 @@ async def run(payment: dict, signals: dict, context: dict, thresholds: dict) -> 
     fallback_reasoning = [
         f"Policy {policy_number} matched in payment reference",
         f"Name similarity: {name_score:.0f}% ({payment.get('sender_name')} vs {customer_name})",
-        f"Amount variance: {variance:.1f}%",
+        f"Amount variance: {variance_text}",
         f"Recommendation: {recommendation} — {approval_reason or 'all criteria met'}",
     ]
     fallback_action = (
