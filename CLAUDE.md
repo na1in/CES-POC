@@ -43,7 +43,7 @@ Always before making any changes, search the web for the newest chanes and only 
 - When updating decision logic, update in this order: protos → schema → scenario docs → architecture docs → reference docs
 
 ## Architecture (5-Stage Pipeline)
-1. **Ingest** (code + Gemini 2.5 Flash via OpenRouter) — validate fields, parse free-text references to extract policy numbers/intent/period count, persist payment as RECEIVED
+1. **Ingest** (code) — validate fields, extract the policy number from the free-text references with a deterministic regex (normalised to `POL-XXXXX`; no LLM), persist payment as RECEIVED. The parse is done once and handed to the pipeline
 2. **Compute Signals** (code + Gemini 2.5 Flash for gray-zone names) — 19 signals in 3 dependency waves, snapshot to `payment_signals`
 3. **AI Agent** (deterministic router + Gemini 2.5 Flash reasoning) — Scenario 5 runs first (duplicate check), then route to 1-4. Produces structured recommendation JSON
 4. **Persist** (code) — single DB transaction: save recommendation + update status to HELD + fill matched IDs + audit log. Human approval is always required — no auto-apply. Retry wrapper: 3 attempts with backoff
@@ -51,10 +51,10 @@ Always before making any changes, search the web for the newest chanes and only 
 
 ## 5 Scenarios (Routing is deterministic if/else, reasoning uses Gemini 2.5 Flash via OpenRouter)
 1. **Strong Policy Match** — policy # provided, name ≥75%, variance ≤2%. All matches land HELD for Priya; AI recommends APPLY when name >90%, no risk flags, active policy, low-risk method
-2. **Customer Match, No Policy** — customer match ≥90% (or <90% with 2+ supporting signals), no policy ref. Always requires human approval
+2. **Customer Match, No Policy** — name similarity ≥90% is a strong match on its own (or <90% with 2+ supporting signals), no policy ref. Always requires human approval. Variance is computed from the customer's active policy (never assumed 0%); an APPLY for a customer with risk flags becomes HOLD
 3. **High Amount Variance** — match found but variance >2%. Tiers: 2-15% HOLD, 15-50% check special cases (multi-period, multi-method, third-party → HOLD), >100% ESCALATE. Name must be ≥90%
 4. **No Matching Customer** — all matching failed. Check for third-party payment first (employer, family, escrow → HOLD if amount ≤15%), otherwise ESCALATE
-5. **Duplicate Payment** — runs FIRST on every payment. Match: 3 exact fields (sender name, payment method, `reference_field_1`) + amount within $2 tolerance, within 72hrs; the sender's account is NOT a criterion. Balance >0 → HOLD, balance =0 → ESCALATE
+5. **Duplicate Payment** — runs FIRST on every payment. Match: 3 exact fields (sender name, payment method, `reference_field_1`) + amount within $2 tolerance, within ±72hrs of the payment's date; the sender's account is NOT a criterion; `processing_failed` payments count, `returned` ones do not. Balance >0 → HOLD, balance =0 → ESCALATE
 
 ## 19 Signals (5 categories, 3 computation waves)
 ### Category 1: Matching & Identification (4)
@@ -88,7 +88,7 @@ Always before making any changes, search the web for the newest chanes and only 
 - Duplicate Amount Difference (cents, 0=exact, up to 200=$2)
 
 ## Hybrid Name Matching
-- Traditional: Jaro-Winkler + Levenshtein + Soundex → deterministic_score
+- Traditional: Jaro-Winkler + Levenshtein + Soundex → deterministic_score, after normalising: lower-case, drop punctuation, and ignore a middle initial that only one of the two names has ("Boris P. Ulker" = "Boris Ulker"). Nicknames are NOT expanded (business decision)
 - If score <70%: clear mismatch, no LLM call
 - If score >92%: clear match, no LLM call
 - If score 70-92% (gray zone): call Gemini 2.5 Flash → final = max(deterministic, llm)
@@ -215,7 +215,7 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 | `proto/payment.proto` | Payment, PaymentStatus (incl. pending_sender_response, returned) |
 | `proto/signals.proto` | PaymentSignals with full name matching breakdown |
 | `proto/recommendation.proto` | PaymentRecommendation with DecisionAttribution |
-| `proto/audit.proto` | AuditLogEntry (all 20 action types), ConfigurationThreshold |
+| `proto/audit.proto` | AuditLogEntry (all 21 action types), ConfigurationThreshold |
 | `proto/user.proto` | User, UserRole |
 | `proto/document.proto` | CaseDocument, DocumentType |
 | `proto/annotation.proto` | CaseAnnotation, AnnotationType |
@@ -227,8 +227,8 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 ## Testing
 
 ### Backend (`backend/tests/`)
-- 396 pytest tests (as of 2026-09-18); run with `python -m pytest tests/ -v` from `backend/`. 26 of them currently fail on stale expectations (e.g. expecting `applied`/`escalated` where the pipeline now lands `held`) — see Known issues below. Run against a freshly migrated + seeded database: the dev DB accumulates demo payments that collide with fixtures
-- `conftest.py` has `--live-llm` flag: default mocks `parse_reference_fields` + `get_reasoning`; pass `--live-llm` for real OpenRouter calls
+- 452 pytest tests (as of 2026-09-26), all passing; run with `python -m pytest tests/ -v` from `backend/`. Run against a database built by `alembic upgrade head` + seed (`ces_test`); the dev DB works too because every test rolls back. `conftest.py` mocks the reasoning LLM (patched where the scenario modules use it) and disables the gray-zone name LLM, so the suite is offline (~4 s); `--live-llm` uses real calls. `tests/test_schema_parity.py` fails if an enum in `db/schema.sql` differs from the migrated database
+- `conftest.py` has the `--live-llm` flag: by default it mocks `get_reasoning` and disables the gray-zone name LLM (reference parsing is deterministic and needs no mock); pass `--live-llm` for real OpenRouter calls
 - E2E tests use `rollback_only` fixtures — all mutations are rolled back after each test
 
 ### Frontend (`frontend/e2e/`)
@@ -258,19 +258,32 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 ### Bug fixes (2026-09-18)
 - `backend/app/services/signals/duplicate.py`, `backend/app/services/signal_engine.py`: duplicate detection now matches sender name + payment method + `reference_field_1` (exact) + amount ±$2 within 72h, as the spec requires. It previously matched on `sender_account`, so duplicates from another account were missed (APPLY) and identical-premium policies paid from one account were escalated. Tests rewritten (+3 new) in `tests/test_signals_wave1.py`
 
-### Evaluation harness (added 2026-09-18)
+### Bug fixes (2026-09-26)
+- `backend/app/services/agent/scenarios/sc2.py`: strong match tests the name similarity score, not the blended `customer_match_confidence` (an exact name without an account/history match was ESCALATED); variance comes from the customer's active policy and a payment whose variance cannot be computed is HELD (was read as 0%); an APPLY for a risk-flagged customer becomes HOLD; `amount_match` is derived from policy premiums
+- `backend/app/services/ingest.py`: reference parsing is a deterministic regex (was an LLM call made twice); `pipeline.py` / `routers/payments.py` pass the ingest parse to the pipeline
+- `backend/app/services/signals/matching.py`: middle-initial normalisation; `_llm_score` sets `temperature=0`. `pipeline.py` `_find_best_customer` uses the same normalisation
+- `backend/app/services/signals/amount.py` / `risk.py` / `signal_engine.py`: historical consistency spread floored at 2% of the mean, `historical_match` needs ≥2 records; the engine reads `reference_field_1/2`
+- `backend/app/services/signals/duplicate.py`: window is ±72h (had no upper bound), amount tolerance applied inside the query, `processing_failed` payments count
+- `backend/app/services/agent/scenarios/sc1.py`: no crash on a `None` variance
+- `backend/app/routers/approvals.py`: the reprocess endpoint imports `_target_status` (was a `NameError` → 500 after the pipeline had run)
+- `backend/alembic/versions/0002_audit_action_policy_attached.py`: `policy_attached` audit action (was only in `schema.sql`/proto, so attach-policy failed on migrated databases)
+- Dev DB: `amount_tolerance_auto` restored from 40 to 2 via the change-request rollback (#64, the "Testing the POC with Rama" change)
+- Tests: 26 stale/failing tests fixed and new ones added (452 total); `conftest.py` LLM patches now take effect
+
+### Evaluation harness (added 2026-09-18; extended 2026-09-26)
 - `backend/scripts/eval/`: `generate.py` (Gemini-generated synthetic world + scenario archetypes, independent checks, seeded noise) and `run_eval.py` (runs cases through the real ingest endpoint + pipeline against an isolated `ces_eval` database; refuses any database not ending in `_eval`)
+- Also: `ai_decider.py` (an LLM makes the final decision), `compare_runs.py` (paired comparison, McNemar) and `run_eval.py --llm regex|defaults|name-llm|ai-rules|ai-open|ai-tight --out FILE`; corpora `full.json`, `heldout.json`, `mock_5000.json` / `mock_500.json`
 - Corpus and results in `backend/scripts/eval/data/`; full methodology, results and findings in `docs/Evaluation_Harness.md`
-- Result (synthetic test set, one pass): 169/179 = 94.4% scenario-and-recommendation agreement on valid-label cases (95% CI 90.0–96.9), after the duplicate fix; 87.2% before. This is agreement with spec-derived labels, not accuracy on real payments
+- Result (synthetic test set, one pass): 169/179 = 94.4% scenario-and-recommendation agreement on valid-label cases (95% CI 90.0–96.9), after the duplicate fix; 87.2% before. After the 2026-09-26 fixes the code-only arm agrees on 179/179, 180/180 (held-out) and 4,649/4,650 (5,000-case) valid-label cases, but the failures were found on those same synthetic sets. This is agreement with spec-derived labels, not accuracy on real payments
+- Measured 2026-09-25/26: the remaining LLM calls (gray-zone names, reasoning text) cost about $0.70 per 1,000 payments and add ~2.6 s per payment; an LLM as the final decider did worse than the code and was less consistent
 - Do not use `scripts/demo_restore.py` to clean up eval data — it wipes all non-seed payments, thresholds and governance records in the DB it targets
 
-### Known issues (open; found by the evaluation harness — details and evidence in `docs/Evaluation_Harness.md`)
-- Reference parser: called twice (ingest, then again in `pipeline.py`); results vary run to run on messy references and malformed numbers like `POL90001` are not normalised. Persist the parse at ingest, normalise, set temperature 0
-- `sc2.py:48` treats a missing variance as 0% → Scenario 2 can APPLY payments far below premium when no policy is identified
-- `sc1.py:82` crashes formatting a `None` variance → `PROCESSING_FAILED` (3/192 eval payments)
-- Gray-zone name score (`matching.py` `_llm_score`) sets no temperature and answers in round numbers against a ">90" apply threshold → APPLY↔HOLD flips
-- `run_signal_engine` reads `reference_1/2` but the pipeline supplies `reference_field_1/2` → reference-text third-party detection sees `None` in production
-- 26 stale unit tests (see Testing)
+### Known issues (open; details in `docs/Evaluation_Harness.md`)
+- Initial + surname names (`C. Gomez` vs `Carlos Gomez`) score 61–66, skip the LLM (below the 70 floor) and ESCALATE — spec-conformant, a coverage gap. Nicknames ("Bob"/"Robert" ≈ 63) never reach the gray-zone LLM for the same reason; expanding them is a business decision
+- Gray-zone name LLM answers in round numbers (90/95) against a ">90" apply threshold; `temperature=0` is set but stability was not re-measured
+- Scenario 2 with a computed variance >15% HOLDs in S2 instead of rerouting to Scenario 3's tiers (so >100% variance holds rather than escalates)
+- Reference parser is untested on genuinely messy real references (the eval noise is templated); when text has a 5-digit number but no pattern matched, an info line is logged
+- `docs/architecture/pipeline-diagram.md` (untracked) still describes an LLM reference parser
 
 ### Dev setup
 - PostgreSQL runs in Docker: `docker compose up -d db` (from repo root)

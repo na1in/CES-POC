@@ -12,7 +12,7 @@ Payment arrives (POST /api/payments/ingest)
     │  ── STAGE 1: INGEST ──
     │
     ├── 1.  Validate required fields (amount, sender, method, date)
-    ├── 2.  Claude API: parse free-text references → extract policy #, intent, period count
+    ├── 2.  Regex: parse free-text references → extract policy # (normalised to POL-XXXXX)
     ├── 3.  Generate payment ID (PMT-XXX)
     ├── 4.  INSERT into payments (status = RECEIVED)
     ├── 5.  Audit log: RECEIVED

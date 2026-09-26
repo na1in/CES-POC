@@ -1,6 +1,6 @@
 # Stage 1: Ingest Layer (Event Monitoring)
 
-**Purpose:** Receive raw payments, validate fields, parse free-text references using Claude API, and persist to DB with status `RECEIVED`.
+**Purpose:** Receive raw payments, validate fields, parse free-text references (deterministic regex, no LLM), and persist to DB with status `RECEIVED`.
 
 ---
 
@@ -10,7 +10,7 @@ This is the front door of the system. Payments arrive via a REST endpoint and ma
 
 The Ingest layer does three things:
 1. Validate required fields
-2. Use Claude API to parse free-text references
+2. Extract the policy number from the free-text references (regex)
 3. Save the payment to the database
 
 ---
@@ -60,38 +60,30 @@ If validation fails, return 400 with error details. The payment is not saved.
 
 ---
 
-## Step 2: Claude API — Parse Free-Text References
+## Step 2: Parse Free-Text References (deterministic)
 
 Reference fields can contain anything:
 - `"For policy POL-12345 Jan premium"`
-- `"Payment for my car insurance jan to march"`
+- `"ins. policy no. 10169"`
+- `"pol 90003 - ins."`
 - `"Invoice #12345"`
-- `"Premium payment - John Smith"`
 
-Claude API extracts structured data from this free text:
+A regex (`parse_reference_fields` in `backend/app/services/ingest.py`) extracts the policy number. It is not an LLM call: the evaluation harness
+measured a regex matching or beating the LLM parser on policy-number extraction, with none of its failure modes (un-normalised output such as
+`POL90001`, missed plain references, timeouts, run-to-run variation), at no cost and without sending reference text to a third party.
 
-**Input to Claude:**
-```
-Parse the following payment reference fields and extract:
-- Policy number (if present)
-- Payment intent (premium, deposit, catch-up, etc.)
-- Period count (how many months/periods this covers)
+- **Formats accepted:** `POL-12345`, `POL12345`, `pol 12345`, `Pol.12345`, `Policy #12345`, `policy no. 12345`, `policy number: 12345`, `P0L-12345`.
+  The number must be exactly 5 digits and the keyword may not run into letters (`policyholder 12345` does not match).
+- **Output is always normalised** to `POL-XXXXX`.
+- **Ambiguity is left to a person:** if the text names two different policy numbers the payment is left unmatched (no policy number) so the analyst chooses.
+- **Fields:** both reference fields are read together. `payment_intent` and `period_count` keep their defaults (`unknown`, `1`): nothing
+  downstream reads them (multi-period detection is computed from amounts in `signals/amount.py`).
+- **Parsed once:** the ingest endpoint passes its parse to the pipeline, so the same text is never parsed twice. Parsing is a pure function, so the
+  reprocess path re-parses to the same result.
+- **Spotting gaps:** when the text contains a 5-digit number but no pattern matched, an info line is logged (the text itself is not logged).
 
-Reference 1: "For policy POL-12345 Jan premium"
-Reference 2: "Auto insurance payment"
-```
-
-**Claude returns:**
-```json
-{
-  "extracted_policy_number": "POL-12345",
-  "payment_intent": "premium_payment",
-  "period_count": 1,
-  "policy_type_hint": "auto"
-}
-```
-
-This extracted data is **not stored in the Payment proto** — the raw reference text is preserved as-is for auditability. The extracted data feeds into the next stage (Compute Signals) where it's used for policy lookup and matching.
+This extracted data is **not stored in the Payment proto** — the raw reference text is preserved as-is for auditability. The extracted policy number is
+recorded in the `received` audit entry and feeds the next stage (Compute Signals) where it is used for policy lookup and matching.
 
 ---
 
@@ -132,7 +124,7 @@ See: [02_Compute_Signals.md](./02_Compute_Signals.md)
 | File | Responsibility |
 |------|---------------|
 | `backend/app/routers/payments.py` | REST endpoint, request parsing |
-| `backend/app/services/ingest.py` | Field validation, Claude API text parsing, DB persist |
+| `backend/app/services/ingest.py` | Deterministic (regex) policy-number extraction from the reference fields |
 
 ---
 

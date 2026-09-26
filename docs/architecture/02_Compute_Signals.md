@@ -37,7 +37,7 @@ Signals are organized into **5 categories** with **19 total signals**, computed 
 | Multi-Period Indicator | Boolean + count | `round(payment / expected)`, check within 5% of multiple |
 | Multi-Method Indicator | Boolean + fraction | `payment / expected` ≈ 1/N for N in [2,3,4] — split premium across banks |
 | Third-Party Indicator | Boolean + relationship | Sender ≠ policyholder — corporate, family, escrow, trust, POA |
-| Historical Consistency | Score | Mean/stddev of last 6-12 payments, z-score outlier detection |
+| Historical Consistency | Score | Z-score of the payment against the customer's history (last 24 payments). The spread is floored at 2% of the mean, so a customer who always pays the same premium is still flagged when an amount is off. Fewer than 2 records scores 100 ("not enough data") but does **not** count as a `historical_match` supporting signal |
 
 ### Category 3: Temporal & Pattern
 
@@ -59,7 +59,7 @@ Signals are organized into **5 categories** with **19 total signals**, computed 
 
 | Signal | Range | Method |
 |--------|-------|--------|
-| Duplicate Match | 0% or 100% | 3 exact fields (sender name, payment method, `reference_field_1`) + amount within $2, within 72hr; sender account is not a criterion |
+| Duplicate Match | 0% or 100% | 3 exact fields (sender name, payment method, `reference_field_1`) + amount within $2, within ±72hr of the payment's date (symmetric); sender account is not a criterion; `processing_failed` payments count, `returned` ones do not |
 | Time Between Payments | Hours | Hours since matching previous payment |
 | Balance Justification | Boolean | Does outstanding balance justify a second payment? |
 | Duplicate Amount Difference | Cents | Absolute difference between this and suspected duplicate (0 = exact) |
@@ -129,6 +129,14 @@ If deterministic_score is 70-92% (gray zone):
     → Both scores are logged for auditability.
 ```
 
+### Middle initials (deterministic normalisation)
+
+Before scoring, both names are lower-cased, periods and commas are dropped, and a single-letter initial that only one of the two names has is
+ignored: "Boris P. Ulker" vs "Boris Ulker" compares as "boris ulker" twice (score 100). Without this the extra "P." cost about 19 points and
+sent nearly half of these payments to HOLD, although the spec expects a strong match ("John A Smith" vs "John Smith"). An initial is kept when it is
+evidence: the same initial on both sides, an initial that stands for a name the other side spells out ("Robert J Miller" vs "Robert James Miller"),
+or two different initials ("John B Smith" vs "John A Smith"). Nicknames are **not** expanded: whether "Bob" is "Robert" is a business decision.
+
 ### Why Hybrid?
 
 Traditional algorithms are character-level comparisons. They fail on semantic equivalences:
@@ -188,7 +196,7 @@ All threshold values used during computation are read from the `configuration_th
 | `backend/app/services/signals/amount.py` | Variance, multi-period, historical consistency |
 | `backend/app/services/signals/temporal.py` | Timing quality, days since last payment |
 | `backend/app/services/signals/risk.py` | Risk flags, account status, balance check |
-| `backend/app/services/signals/duplicate.py` | 72hr duplicate detection |
+| `backend/app/services/signals/duplicate.py` | ±72hr duplicate detection |
 
 ---
 

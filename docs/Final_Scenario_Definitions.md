@@ -363,6 +363,24 @@ IF Customer_Match_Confidence < 90%:
     ESCALATE (insufficient confidence)
 ```
 
+### Implementation Notes (added 2026-09-26)
+
+These clarify points the decision logic above leaves open. They are implemented in `backend/app/services/agent/scenarios/sc2.py`.
+
+- **Strong match is the name similarity score.** "Name match ≥90%" is tested against the name similarity score, not the blended
+  `customer_match_confidence` (name 60% + account 20% + history 20%). The blended value caps an exact name at 60 when the sender account or
+  history is missing, which sent 100%-name payments to ESCALATE. Account, amount and history matches are supporting signals for the
+  <90% path only.
+- **Risk flags.** A customer with any risk flag (`fraud_history`, `suspended_account`, `chronic_late_payments`) is never recommended for
+  APPLY here: what would be an APPLY becomes HOLD (path `scenario_2_hold_risk_flag`), as in Scenario 1 ("risk flag present → HOLD regardless
+  of other scores"). HOLD and ESCALATE outcomes are unchanged. *(New rule: this scenario's specification was silent.)*
+- **Amount variance basis.** With no policy identified there is no premium to compare, so the signal `amount_variance_pct` is null. Variance is
+  then computed from the customer's active policy (the single policy, or the policy the amount matches within 15%). If it still cannot be
+  computed the payment is HELD (`scenario_2_hold_amount_unverified`), never applied: a missing variance was previously read as 0%, which could
+  recommend APPLY for a payment far below premium.
+- **`amount_match` supporting signal.** "Amount matches expected premium" is derived from the active policies' premiums (within the
+  `amount_tolerance_auto` threshold), because the signal engine cannot set it when no policy is identified.
+
 ### Expected Agent Output
 
 **Example: Single Policy, Missing Reference**
@@ -856,6 +874,8 @@ ELSE:  # Max_Similarity_Score >= 90%
 
 ### Description
 Payment closely matches a recent transaction within 72-hour window on all critical fields. Amount matching allows a **$2 tolerance** to account for fees, charges, and rounding differences. Indicates potential accidental duplicate submission.
+
+> **Implementation note (2026-09-26):** the 72-hour window is symmetric, ±72 hours around the payment's own date, because a duplicate may be processed before the original. A payment dated months away is not a duplicate. The amount tolerance is applied inside the search, so a nearer payment with a different amount cannot hide a real duplicate. A payment that failed processing (`processing_failed`) still counts as received; only `returned` payments are ignored.
 
 ### Payment Input Data
 ```json
