@@ -100,6 +100,10 @@ async def get_threshold_history(
 
     rows = await db.execute(text(f"""
         SELECT version_id, parameter_name, parameter_value, changed_by, approved_by,
+               COALESCE((SELECT u.name FROM users u WHERE u.user_id = configuration_threshold_history.changed_by),
+                        changed_by) AS changed_by_name,
+               COALESCE((SELECT u.name FROM users u WHERE u.user_id = configuration_threshold_history.approved_by),
+                        approved_by) AS approved_by_name,
                rationale, change_request_id, effective_from, effective_to
         FROM configuration_threshold_history
         {where}
@@ -187,6 +191,10 @@ async def list_change_requests(
     rows = await db.execute(text(f"""
         SELECT change_id, parameter_name, current_value, proposed_value, rationale,
                projected_impact, proposed_by, approved_by, review_comment,
+               COALESCE((SELECT u.name FROM users u WHERE u.user_id = configuration_change_requests.proposed_by),
+                        proposed_by) AS proposed_by_name,
+               COALESCE((SELECT u.name FROM users u WHERE u.user_id = configuration_change_requests.approved_by),
+                        approved_by) AS approved_by_name,
                status, proposed_at, reviewed_at, deployed_at
         FROM configuration_change_requests
         {where}

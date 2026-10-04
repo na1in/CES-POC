@@ -6,7 +6,7 @@ governance records, anomalies, change requests, payment history entries added
 during demo) and resets configuration thresholds to their defaults.
 
 Then re-runs seed.py to restore the base seed data (users, customers, policies,
-payment history, PMT-ESC-001, default thresholds).
+payment history, PMT-900, default thresholds).
 
 Run with: python scripts/demo_restore.py
 Safe to run multiple times — idempotent.
@@ -25,11 +25,12 @@ from app.config import settings
 engine = create_async_engine(settings.DATABASE_URL)
 Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-# Seed payments that must not be deleted
+# Seed payments that must not be deleted. PMT-900 / PMT-901..909 (uniform PMT-NNN format, just a
+# reserved high block — see ESCALATED_CASE_ID / HISTORICAL_CASE_IDS in seed.py).
 SEED_PAYMENT_IDS = {
-    "PMT-ESC-001",
-    "PMT-H-001", "PMT-H-002", "PMT-H-003", "PMT-H-004",
-    "PMT-H-005", "PMT-H-006", "PMT-H-007", "PMT-H-008", "PMT-H-009",
+    "PMT-900",
+    "PMT-901", "PMT-902", "PMT-903", "PMT-904",
+    "PMT-905", "PMT-906", "PMT-907", "PMT-908", "PMT-909",
 }
 
 # Default threshold values (matches seed.py)
@@ -74,23 +75,25 @@ async def delete_demo_payments(db: AsyncSession) -> int:
 
 
 async def reset_seed_escalated_payment(db: AsyncSession) -> None:
-    """Restore PMT-ESC-001 to its original held state (AI recommends escalate, awaiting Priya's action)."""
+    """Restore PMT-900 to its original held state (AI recommends escalate, awaiting Priya's action)."""
     # Remove any annotations/audit entries added during the demo
     await db.execute(text("""
-        DELETE FROM case_annotations WHERE payment_id = 'PMT-ESC-001'
+        DELETE FROM case_annotations WHERE payment_id = 'PMT-900'
     """))
     # Keep only the original recommendation_made audit entry
     await db.execute(text("""
         DELETE FROM audit_log
-        WHERE payment_id = 'PMT-ESC-001'
+        WHERE payment_id = 'PMT-900'
           AND action_type != 'recommendation_made'
     """))
-    # Reset status back to held (Priya must manually escalate)
+    # Reset status back to held (Priya must manually escalate), and its payment_date back to a fresh
+    # "yesterday" so the case doesn't visibly age across repeated demo sessions.
     await db.execute(text("""
         UPDATE payments
         SET status = 'held',
-            investigation_due_date = NULL
-        WHERE payment_id = 'PMT-ESC-001'
+            investigation_due_date = NULL,
+            payment_date = now() - interval '18 hours'
+        WHERE payment_id = 'PMT-900'
     """))
 
 
@@ -112,6 +115,8 @@ async def delete_governance_data(db: AsyncSession) -> None:
 
 async def delete_config_change_requests(db: AsyncSession) -> None:
     """Remove all config change requests created during demo."""
+    # threshold history rows written by a deploy/rollback reference their change request
+    await db.execute(text("DELETE FROM configuration_threshold_history WHERE change_request_id IS NOT NULL"))
     await db.execute(text("DELETE FROM configuration_change_requests"))
 
 
@@ -139,11 +144,13 @@ async def reset_policy_balances(db: AsyncSession) -> None:
 async def delete_demo_payment_history(db: AsyncSession) -> None:
     """
     Remove payment_history entries added by approve actions during demo.
-    Seed entries are identified by their fixed payment_dates.
+    Seed entries are dated relative to now() (see seed.py's seed_payment_history — most recent one
+    ~20-25 days back); anything newer than that was added by a live approve/override during a demo
+    session, via _apply_ledger().
     """
     await db.execute(text("""
         DELETE FROM payment_history
-        WHERE payment_date > '2026-04-30'::timestamptz
+        WHERE payment_date > now() - interval '15 days'
     """))
 
 
@@ -158,7 +165,7 @@ async def main() -> None:
         count = await delete_demo_payments(db)
         print(f"  Removed {count} demo payment(s)")
 
-        print("Resetting PMT-ESC-001 to held state (AI recommends escalate, awaiting Priya)...")
+        print("Resetting PMT-900 to held state (AI recommends escalate, awaiting Priya)...")
         await reset_seed_escalated_payment(db)
 
         print("Resetting configuration thresholds to defaults...")

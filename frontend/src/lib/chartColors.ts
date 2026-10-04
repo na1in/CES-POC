@@ -40,7 +40,7 @@ export const CHART_NEUTRAL = "#55657F"
 /**
  * Decision attribution ramp — sequential, not categorical.
  *
- * AI Autonomous → Operator Confirmed → Operator Override is an *ordered* scale
+ * Auto-Applied → Operator Confirmed → Operator Override is an *ordered* scale
  * of increasing human involvement, so it takes one hue stepped light→dark
  * rather than three competing hues. Previously it borrowed the apply/hold
  * status colours, which made an identity breakdown impersonate a good/warning

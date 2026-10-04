@@ -192,6 +192,9 @@ async def reject_payment(
 
     due_date = datetime.now(timezone.utc) + timedelta(hours=_SLA_HOURS)
 
+    rec_row = await db.execute(text("SELECT recommendation FROM payment_recommendations WHERE payment_id = :id"), {"id": payment_id})
+    system_rec = rec_row.scalar_one_or_none()
+
     await db.execute(text("""
         UPDATE payments
         SET status = 'escalated', investigation_due_date = :due_date
@@ -208,7 +211,8 @@ async def reject_payment(
         await _write_annotation(payment_id, current_user.user_id, "case_note", body.notes, db)
 
     await _write_audit(payment_id, "escalated", current_user.name, current_user.user_id,
-                       {"via": "analyst_rejection", "sla_due": due_date.isoformat()}, db)
+                       {"via": "analyst_rejection", "sla_due": due_date.isoformat(),
+                        "system_recommendation": str(system_rec).lower() if system_rec else None}, db)
 
     await db.commit()
     logger.info("%s rejected %s → escalated", current_user.user_id, payment_id)
@@ -228,7 +232,7 @@ async def override_payment(
     db: AsyncSession = Depends(get_db),
     current_user: CurrentUser = Depends(require_analyst_or_investigator),
 ):
-    """Priya or Damien explicitly overrides the AI recommendation. Reason is mandatory."""
+    """Priya or Damien explicitly overrides the system recommendation. Reason is mandatory."""
     if body.override_action not in _OVERRIDE_ACTIONS:
         raise HTTPException(status_code=400, detail=f"override_action must be one of {_OVERRIDE_ACTIONS}")
 

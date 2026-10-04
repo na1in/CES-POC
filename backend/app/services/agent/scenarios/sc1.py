@@ -53,13 +53,13 @@ def _decide(signals: dict, thresholds: dict) -> tuple[str, float, bool, str | No
             path = "scenario_1_hold_high_risk_method"
             confidence = 65.0
         elif account_status != "active":
-            reason = f"Account status is {account_status} — cannot auto-apply"
+            reason = f"Account status is {account_status} — cannot recommend Apply"
             path = "scenario_1_hold_inactive_account"
             confidence = 60.0
         else:
             # Name in gray zone 75–90%
             confidence = 60.0 + (name_score - name_hold) / (name_auto - name_hold) * 20.0
-            reason = f"Name similarity {name_score:.0f}% is below auto-apply threshold ({name_auto:.0f}%) — requires approval"
+            reason = f"Name similarity {name_score:.0f}% is below the Apply-recommendation threshold ({name_auto:.0f}%) — requires approval"
             path = "scenario_1_hold_gray_zone_name"
         return "HOLD", confidence, True, reason, path
 

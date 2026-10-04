@@ -239,7 +239,7 @@ export default function OverrideAnalysisPage() {
                   <tr>
                     <th style={TH}>Payment ID</th>
                     <th style={TH}>Scenario</th>
-                    <th style={TH}>AI Rec</th>
+                    <th style={TH}>Recommended</th>
                     <th style={TH}>Confidence</th>
                     <th style={{ ...TH, width: "28%" }}>Override Reason</th>
                     <th style={TH}>Date</th>
@@ -275,7 +275,7 @@ export default function OverrideAnalysisPage() {
                         }
                       </td>
                       <td style={{ ...TD, color: "var(--pw-text-secondary)", whiteSpace: "nowrap", fontSize: 12 }}>
-                        {o.overridden_by ?? "—"}
+                        {o.overridden_by_name ?? o.overridden_by ?? "—"}
                       </td>
                     </tr>
                   ))}

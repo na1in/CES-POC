@@ -41,7 +41,7 @@ test.describe("Payment Detail", () => {
 
   test("investigator sees Add Investigation Note on escalated payment", async ({ page }) => {
     await loginAs(page, INVESTIGATOR)
-    // PMT-ESC-001 is seeded as escalated — shows the investigation note button
+    // PMT-900 is seeded as escalated — shows the investigation note button
     const paymentId = page.getByText(/^PMT-/).first()
     await paymentId.waitFor({ timeout: 10000 })
     await paymentId.click()

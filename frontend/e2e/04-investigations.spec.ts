@@ -30,7 +30,7 @@ test.describe("Investigation Queue", () => {
   })
 
   test("clicking a case row navigates to payment detail", async ({ page }) => {
-    // PMT-ESC-001 is seeded as an escalated payment for this test
+    // PMT-900 is seeded as an escalated payment for this test
     const paymentId = page.getByText(/^PMT-/).first()
     await paymentId.waitFor({ timeout: 10000 })
     await paymentId.click()

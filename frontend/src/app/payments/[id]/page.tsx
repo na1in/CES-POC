@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle2, Clock, ChevronDown, Search, Link2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, Bell, Settings, AlertTriangle, CheckCircle2, Clock, ChevronDown, Search, Link2 } from "lucide-react"
 import {
   getPayment, approvePayment, rejectPayment, overridePayment, returnPayment, reprocessPayment,
-  searchPolicies, attachPolicy,
+  searchPolicies, attachPolicy, BASE,
   type PaymentDetail, type PolicySearchResult,
 } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
@@ -289,14 +289,89 @@ const ACTION_LABELS: Record<string, string> = {
   contact_logged: "Contact Logged",
   annotated: "Note Added",
   approved: "Approved",
+  overridden: "System Recommendation Overridden",
+  returned: "Returned to Sender",
+  policy_attached: "Policy Attached",
+  document_uploaded: "Document Uploaded",
 }
 
 function auditActor(actor: string, actionType: string): string {
   if (actor === "system") {
-    if (actionType === "signals_computed" || actionType === "recommendation_made") return "AI Agent"
+    if (actionType === "signals_computed" || actionType === "recommendation_made") return "System"
     return "System"
   }
   return actor
+}
+
+/** "scenario_1_auto_apply" → "apply recommended" (the scenario itself is already shown separately). Nothing auto-applies. */
+function humanizeDecisionPath(path: unknown): string {
+  if (typeof path !== "string") return ""
+  return path.replace(/^scenario_\d+_/, "").replace(/_/g, " ").replace(/^auto apply$/, "apply recommended")
+}
+
+/**
+ * Turns a raw audit_log.details JSON blob into a sentence a human can act on, instead of a
+ * mechanical "key: value, key: value" dump of the underlying signal/decision fields. Falls back
+ * to the raw dump for any action type not covered here, so nothing is ever silently dropped.
+ */
+function formatAuditDetail(actionType: string, details: unknown, systemRec?: string | null): string | null {
+  if (!details || typeof details !== "object") return null
+  const d = details as Record<string, unknown>
+  const pct = (v: unknown) => (typeof v === "number" ? `${Math.round(v)}%` : "—")
+
+  switch (actionType) {
+    case "received": {
+      const method = typeof d.payment_method === "string" ? d.payment_method.toUpperCase() : d.payment_method
+      const policy = d.extracted_policy_number
+      return `${formatUSD(d.amount as number)} via ${method} from ${d.sender_name}. ` +
+        (policy ? `Reference matched to policy ${policy}.` : "No policy number found in the payment reference.")
+    }
+    case "signals_computed":
+      return `Name match ${pct(d.name_similarity_score)} · policy match ${pct(d.policy_match_confidence)} · ` +
+        `customer match ${pct(d.customer_match_confidence)}. ` +
+        `${d.has_risk_flags ? "Risk flags present." : "No risk flags."} ` +
+        `${d.is_duplicate_match ? "Flagged as a possible duplicate." : "Not a duplicate."}`
+    case "recommendation_made": {
+      const rec = typeof d.recommendation === "string" ? d.recommendation.toUpperCase() : d.recommendation
+      const scenario = scenarioLabel(d.scenario_route as string)
+      const path = humanizeDecisionPath(d.decision_path)
+      const confidence = typeof d.confidence_score === "number" ? ` at ${pct(d.confidence_score)} confidence` : ""
+      return `Recommended ${rec}${confidence} — ${scenario}` +
+        (path ? ` (${path}).` : ".") +
+        (d.auto_applied ? " Auto-applied, no human review required." : " Held for human review.")
+    }
+    case "approved":
+      return d.policy_id ? `Approved against policy ${d.policy_id}.` : "Approved."
+    case "applied":
+      return d.via === "human_override" ? "Applied after an analyst override." : "Applied after analyst approval — ledger updated."
+    case "escalated":
+      if (d.action === "marked_pending_outreach") return "Marked as awaiting a response from the sender."
+      if (d.via === "human_override") return "Escalated after an analyst override."
+      if (d.via === "analyst_rejection") {
+        // "rejected" only when the analyst's action differs from what the system recommended
+        const recommended = String(d.system_recommendation ?? systemRec ?? "").toLowerCase()
+        return recommended === "escalate"
+          ? "Escalated to investigator — analyst confirmed the system recommendation."
+          : "Escalated — analyst rejected the system recommendation."
+      }
+      return "Escalated to the investigation queue."
+    case "overridden":
+      return `Overrode the system recommendation → ${String(d.override_action).toUpperCase()}. Reason: "${d.reason_preview}"`
+    case "returned":
+      return d.notes_provided ? "Returned to sender, with an investigation note." : "Returned to sender."
+    case "policy_attached":
+      return `Manually attached policy ${d.policy_number}` +
+        (d.previous_policy_number ? ` (previously ${d.previous_policy_number})` : "") +
+        (d.reason ? `. Reason: "${d.reason}"` : ".")
+    case "document_uploaded":
+      return `Uploaded "${d.file_name}"${d.document_type ? ` (${d.document_type})` : ""}.`
+    case "annotated":
+      return typeof d.annotation_type === "string"
+        ? `Added a ${d.annotation_type.replace(/_/g, " ")}.`
+        : "Added a note."
+    default:
+      return Object.entries(d).map(([k, v]) => `${k}: ${v}`).join(", ")
+  }
 }
 
 function statusLabel(status: string): string {
@@ -622,7 +697,7 @@ export default function PaymentDetail() {
         {/* Left column */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
 
-          {/* AI Recommendation banner */}
+          {/* Recommendation banner */}
           {rec && (
             <div style={{
               background: recTint,
@@ -642,11 +717,11 @@ export default function PaymentDetail() {
                     : <AlertTriangle size={13} color="#fff" />}
                 </div>
                 <span style={{ fontWeight: 700, fontSize: 15, color: recColor, fontFamily: "var(--pw-font-display)" }}>
-                  AI Recommendation: {rec.recommendation.toUpperCase()}
+                  System Recommendation: {rec.recommendation.toUpperCase()}
                 </span>
               </div>
               <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: "2px 0 12px 32px" }}>
-                Confidence Score: {rec.confidence_score}%
+                Confidence Score: {Math.round(rec.confidence_score)}%
               </p>
 
               {/* First reasoning line */}
@@ -683,7 +758,7 @@ export default function PaymentDetail() {
                     AMOUNT CORRELATION
                   </p>
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--pw-text-primary)", margin: 0 }}>
-                    {variance === 0 ? "On target" : `${variance > 0 ? "+" : ""}${variance}% variance`}
+                    {variance === 0 ? "On target" : `${variance > 0 ? "+" : ""}${Number(variance).toFixed(1)}% variance`}
                   </p>
                 </div>
                 <div style={{ background: "rgba(255,255,255,0.65)", borderRadius: 8, padding: "10px 12px" }}>
@@ -894,12 +969,25 @@ export default function PaymentDetail() {
           {/* Audit Trail */}
           {logs.length > 0 && (
             <div className="pw-card" style={{ padding: 20 }}>
-              <h2 style={{
-                fontSize: 15, fontWeight: 700, margin: "0 0 16px",
-                color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)",
-              }}>
-                Audit Trail
-              </h2>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <h2 style={{
+                  fontSize: 15, fontWeight: 700, margin: 0,
+                  color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)",
+                }}>
+                  Audit Trail
+                </h2>
+                <a
+                  href={`${BASE}/api/payments/${id}/audit-report`}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    fontSize: 12.5, fontWeight: 600, color: "var(--pw-info)",
+                    background: "var(--pw-info-tint)", borderRadius: 8, padding: "6px 12px",
+                    textDecoration: "none",
+                  }}
+                >
+                  View audit report <ArrowRight size={13} />
+                </a>
+              </div>
               <div>
                 {logs.map((log, i) => (
                   <div key={log.log_id} style={{ display: "flex", gap: 12, paddingBottom: i < logs.length - 1 ? 16 : 0 }}>
@@ -919,11 +1007,9 @@ export default function PaymentDetail() {
                       <p style={{ fontSize: 13, fontWeight: 600, color: "var(--pw-text-primary)", margin: "0 0 2px" }}>
                         {ACTION_LABELS[log.action_type] ?? log.action_type}
                       </p>
-                      {log.details && (
+                      {formatAuditDetail(log.action_type, log.details, rec?.recommendation) && (
                         <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>
-                          {Object.entries(log.details as unknown as Record<string, unknown>)
-                            .map(([k, v]) => `${k}: ${v}`)
-                            .join(", ")}
+                          {formatAuditDetail(log.action_type, log.details, rec?.recommendation)}
                         </p>
                       )}
                     </div>
@@ -1058,7 +1144,7 @@ export default function PaymentDetail() {
               Override Recommendation
             </h2>
             <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "0 0 16px" }}>
-              Provide a reason for overriding the AI recommendation. This will be logged in the audit trail.
+              Provide a reason for overriding the system recommendation. This will be logged in the audit trail.
             </p>
             <textarea
               aria-label="Override reason"
@@ -1260,7 +1346,7 @@ export default function PaymentDetail() {
         color: "var(--pw-text-muted)", position: "sticky", bottom: 0, zIndex: 40,
       }}>
         <span style={{ color: "var(--pw-apply)", fontWeight: 600 }}>● Audit Active</span>
-        <span>User: Priya Venkataraman</span>
+        <span>User: {user?.name ?? "—"}</span>
         <span>Last sync: 2 minutes ago</span>
         <span style={{ marginLeft: "auto" }}>
           Press{" "}

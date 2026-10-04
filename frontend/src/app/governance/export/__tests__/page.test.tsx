@@ -96,7 +96,7 @@ describe("Compliance Export — scope checkboxes", () => {
 
   it("shows descriptions for each option", () => {
     render(<ComplianceExportPage />)
-    expect(screen.getByText(/All payment decisions with AI reasoning/i)).toBeInTheDocument()
+    expect(screen.getByText(/All payment decisions with reasoning/i)).toBeInTheDocument()
     expect(screen.getByText(/Human overrides with reason codes/i)).toBeInTheDocument()
     expect(screen.getByText(/Threshold change requests/i)).toBeInTheDocument()
   })

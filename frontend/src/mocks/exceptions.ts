@@ -40,8 +40,8 @@ export const mockAnomalyFlags: AnomalyFlag[] = [
   },
   {
     anomaly_id: "ANO-002",
-    metric: "Auto-Apply Rate",
-    description: "Auto-apply rate dropped to 38% week of 2026-04-14, against baseline of 62%.",
+    metric: "Apply Recommendation Rate",
+    description: "Apply recommendation rate dropped to 38% week of 2026-04-14, against baseline of 62%.",
     period: "2026-04-14 – 2026-04-20",
     flagged_by: "Lorraine Chen",
     status: "open",

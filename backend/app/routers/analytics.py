@@ -172,7 +172,12 @@ async def get_overrides(
 ):
     """Override detail list. Filterable by scenario, confidence band, and date range."""
     from datetime import date as _date
-    conditions = ["pr.decision_attribution = 'human_override'"]
+    # Only cases with an actual recorded override (reason + analyst + date). The count query shares these
+    # conditions, so the total always matches the rows listed.
+    conditions = [
+        "pr.decision_attribution = 'human_override'",
+        "EXISTS (SELECT 1 FROM case_annotations oa WHERE oa.payment_id = p.payment_id AND oa.annotation_type = 'override_reason')",
+    ]
     params: dict = {}
 
     if scenario:
@@ -212,6 +217,7 @@ async def get_overrides(
             pr.confidence_score, pr.decision_attribution,
             a.content AS override_reason,
             a.author_user_id AS overridden_by,
+            COALESCE(ou.name, a.author_user_id) AS overridden_by_name,
             a.created_at AS overridden_at
         FROM payments p
         JOIN payment_recommendations pr ON pr.payment_id = p.payment_id
@@ -223,6 +229,7 @@ async def get_overrides(
             ORDER BY created_at DESC
             LIMIT 1
         ) a ON true
+        LEFT JOIN users ou ON ou.user_id = a.author_user_id
         {where}
         ORDER BY p.payment_date DESC
         LIMIT :page_size OFFSET :offset

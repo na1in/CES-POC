@@ -444,7 +444,7 @@ export default function ConfigManagementPage() {
                         <span style={{ margin: "0 6px", color: "var(--pw-text-muted)" }}>→</span>
                         <span style={{ fontFamily: "var(--pw-font-mono)", fontWeight: 700, color: "var(--pw-primary)" }}>{r.proposed_value}</span>
                       </td>
-                      <td style={{ ...TD, fontSize: 12, color: "var(--pw-text-secondary)" }}>{r.proposed_by}</td>
+                      <td style={{ ...TD, fontSize: 12, color: "var(--pw-text-secondary)" }}>{r.proposed_by_name ?? r.proposed_by}</td>
                       <td style={{ ...TD, fontSize: 12, color: "var(--pw-text-muted)", whiteSpace: "nowrap" }}>
                         {new Date(r.proposed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       </td>
@@ -539,7 +539,7 @@ export default function ConfigManagementPage() {
                                 </td>
                                 <td style={{ ...TD, padding: "8px 10px", fontFamily: "var(--pw-font-mono)", fontSize: 11 }}>{v.old_value ?? "—"}</td>
                                 <td style={{ ...TD, padding: "8px 10px", fontFamily: "var(--pw-font-mono)", fontSize: 11, fontWeight: 700, color: "var(--pw-primary)" }}>{v.new_value}</td>
-                                <td style={{ ...TD, padding: "8px 10px", fontSize: 11, color: "var(--pw-text-secondary)" }}>{v.changed_by}</td>
+                                <td style={{ ...TD, padding: "8px 10px", fontSize: 11, color: "var(--pw-text-secondary)" }}>{v.changed_by_name ?? v.changed_by}</td>
                               </tr>
                             ))}
                           </tbody>

@@ -277,7 +277,7 @@ export default function GovernancePage() {
             iconBg="var(--pw-hold-tint)"
           />
           <StatCard
-            label="Escalated by AI"
+            label="Auto-Escalated"
             value={summary.escalated_by_ai}
             icon={<AlertTriangle size={18} />}
             iconColor="var(--pw-escalate)"

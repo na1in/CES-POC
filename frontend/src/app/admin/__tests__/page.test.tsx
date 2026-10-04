@@ -51,7 +51,7 @@ describe("Admin Dashboard — page structure", () => {
 
   it("shows the page subtitle", () => {
     render(<AdminDashboardPage />)
-    expect(screen.getByText(/Per-scenario AI performance analytics/i)).toBeInTheDocument()
+    expect(screen.getByText(/Per-scenario recommendation performance/i)).toBeInTheDocument()
   })
 
   it("shows all four chart section titles", () => {

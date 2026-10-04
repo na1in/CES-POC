@@ -12,7 +12,7 @@ import { useAuth } from "@/contexts/auth"
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SCOPE_OPTIONS = [
-  { key: "decisions"     as const, label: "Decisions",      description: "All payment decisions with AI reasoning and attribution" },
+  { key: "decisions"     as const, label: "Decisions",      description: "All payment decisions with reasoning and attribution" },
   { key: "overrides"     as const, label: "Override Log",   description: "Operator overrides with reason codes and timestamps" },
   { key: "config_changes"as const, label: "Config Changes", description: "Threshold change requests and deployment history" },
 ]

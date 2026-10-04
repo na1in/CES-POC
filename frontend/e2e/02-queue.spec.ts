@@ -29,21 +29,18 @@ test.describe("Payment Queue", () => {
   test("sort dropdown changes order", async ({ page }) => {
     const sort = page.getByRole("combobox", { name: /sort by/i })
     await expect(sort).toBeVisible()
-    await sort.selectOption("confidence_desc")
-    await expect(sort).toHaveValue("confidence_desc")
+    await sort.selectOption("rec_escalate_first")
+    await expect(sort).toHaveValue("rec_escalate_first")
   })
 
-  test("confidence filter chips are clickable", async ({ page }) => {
-    const low = page.getByRole("button", { name: /^low$/i })
-    await low.click()
-    // Filter chip should remain visible (no crash)
-    await expect(low).toBeVisible()
+  test("recommendation filter chips are clickable", async ({ page }) => {
+    const escalate = page.getByRole("button", { name: /^escalate$/i })
+    await escalate.click()
+    await expect(escalate).toBeVisible()
   })
 
-  test("method filter chips are clickable", async ({ page }) => {
-    const ach = page.getByRole("button", { name: /^ach$/i })
-    await ach.click()
-    await expect(ach).toBeVisible()
+  test("there is no payment method filter", async ({ page }) => {
+    await expect(page.getByRole("button", { name: /^ach$/i })).toHaveCount(0)
   })
 
   test("clicking a payment row navigates to detail", async ({ page }) => {

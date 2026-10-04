@@ -4,11 +4,13 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, StrictInt, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal, get_db
+from app.services.audit_report import render_audit_report_html
 from app.services.ingest import parse_reference_fields
 from app.services.pipeline import run_pipeline
 
@@ -55,7 +57,9 @@ class IngestResponse(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _next_payment_id(db: AsyncSession) -> str:
-    # Only consider numeric IDs (e.g. PMT-001) — skips seeded non-numeric ones like PMT-ESC-001
+    # Only consider numeric IDs (e.g. PMT-001) — defensive: every payment_id is this shape today
+    # (seed fixtures use a reserved PMT-9xx block, not a separate format), but this guards against a
+    # manually-inserted non-numeric ID ever breaking MAX() here.
     result = await db.execute(text("""
         SELECT MAX(CAST(split_part(payment_id, '-', 2) AS INTEGER))
         FROM payments
@@ -280,12 +284,12 @@ async def list_payments(
 
 # ── GET /api/payments/{id} ────────────────────────────────────────────────────
 
-@router.get("/{payment_id}")
-async def get_payment(
-    payment_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """Full payment detail: payment + signals (by category) + recommendation + audit + annotations + documents."""
+async def _load_payment_detail(payment_id: str, db: AsyncSession) -> dict:
+    """
+    Shared loader for the full payment detail: payment + signals (by category) + recommendation +
+    audit + annotations + documents. Used by both the JSON detail endpoint and the audit-report HTML
+    endpoint so the two never drift apart.
+    """
     payment_row = await db.execute(
         text("SELECT * FROM payments WHERE payment_id = :id"),
         {"id": payment_id},
@@ -362,7 +366,10 @@ async def get_payment(
     recommendation = dict(rec) if rec else None
 
     audit_rows = await db.execute(
-        text("SELECT * FROM audit_log WHERE payment_id = :id ORDER BY timestamp ASC"),
+        # log_id tiebreaker: two entries in the same request (e.g. approve's "approved" then "applied")
+        # can share the exact same timestamp, and ORDER BY timestamp alone doesn't guarantee insertion
+        # order on a tie — this pinned it to log_id, matching how the rows were actually written.
+        text("SELECT * FROM audit_log WHERE payment_id = :id ORDER BY timestamp ASC, log_id ASC"),
         {"id": payment_id},
     )
     audit_trail = [dict(r) for r in audit_rows.mappings()]
@@ -396,3 +403,40 @@ async def get_payment(
         "annotations": annotations,
         "documents": documents,
     }
+
+
+@router.get("/{payment_id}")
+async def get_payment(
+    payment_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Full payment detail: payment + signals (by category) + recommendation + audit + annotations + documents."""
+    return await _load_payment_detail(payment_id, db)
+
+
+@router.get("/{payment_id}/audit-report", response_class=HTMLResponse)
+async def get_payment_audit_report(
+    payment_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Renders the same data as GET /{payment_id} as a printable HTML report, styled to match the
+    PayWise frontend (frontend/src/app/globals.css tokens), for the "View audit report" button on the
+    Payment Detail page. Includes case notes / investigation notes so an investigator opening the
+    report sees everything an analyst has added — not just the system's own audit trail.
+
+    No auth dependency, matching GET /{payment_id} above (PoC has no per-endpoint read restriction on
+    payment detail; see CLAUDE.md "PoC auth" note).
+    """
+    detail = await _load_payment_detail(payment_id, db)
+
+    customer_name = None
+    if detail["payment"].get("matched_customer_id"):
+        row = await db.execute(
+            text("SELECT name FROM customers WHERE customer_id = :id"),
+            {"id": detail["payment"]["matched_customer_id"]},
+        )
+        found = row.one_or_none()
+        customer_name = found[0] if found else None
+
+    return HTMLResponse(render_audit_report_html(detail, customer_name))

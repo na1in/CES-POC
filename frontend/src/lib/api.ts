@@ -1,4 +1,4 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+export const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null
@@ -274,7 +274,9 @@ export interface ChangeRequest {
   projected_impact: string | null
   status: string
   proposed_by: string
+  proposed_by_name?: string
   approved_by: string | null
+  approved_by_name?: string | null
   review_comment: string | null
   proposed_at: string
   reviewed_at: string | null
@@ -363,6 +365,7 @@ export interface OverrideRow {
   decision_attribution: string | null
   override_reason: string | null
   overridden_by: string | null
+  overridden_by_name?: string | null
   overridden_at: string | null
 }
 
@@ -391,6 +394,7 @@ export interface ThresholdHistory {
   old_value: number | null
   new_value: number
   changed_by: string
+  changed_by_name?: string
   effective_from: string
   effective_to: string | null
   change_id: number | null

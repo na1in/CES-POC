@@ -30,7 +30,7 @@ type TabKey = (typeof TABS)[number]["key"]
 // Ordered by how much human involvement the decision took, so the ramp is
 // read light → dark rather than as three unrelated identities.
 const PIE_COLORS: Record<string, string> = {
-  "AI Autonomous":      ATTRIBUTION_RAMP[0],
+  "Auto-Applied":       ATTRIBUTION_RAMP[0],
   "Operator Confirmed": ATTRIBUTION_RAMP[1],
   "Operator Override":  ATTRIBUTION_RAMP[2],
 }
@@ -142,12 +142,12 @@ export default function AdminDashboardPage() {
   // Decision distribution pie data
   const pieData = activeTab === "all"
     ? [
-        { label: "AI Autonomous",   value: data?.summary.auto_applied ?? 0 },
+        { label: "Auto-Applied",    value: data?.summary.auto_applied ?? 0 },
         { label: "Operator Confirmed", value: data?.summary.applied_human_review ?? 0 },
         { label: "Operator Override",  value: data?.summary.human_overrides ?? 0 },
       ].filter(d => d.value > 0)
     : [
-        { label: "AI Autonomous",   value: activeScenario?.ai_autonomous ?? 0 },
+        { label: "Auto-Applied",    value: activeScenario?.ai_autonomous ?? 0 },
         { label: "Operator Confirmed", value: activeScenario?.human_confirmed ?? 0 },
         { label: "Operator Override",  value: activeScenario?.human_override ?? 0 },
       ].filter(d => d.value > 0)
@@ -245,7 +245,7 @@ export default function AdminDashboardPage() {
           </button>
         </div>
         <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "4px 0 0" }}>
-          Per-scenario AI performance analytics and threshold tuning signals.
+          Per-scenario recommendation performance and threshold tuning signals.
         </p>
       </div>
 

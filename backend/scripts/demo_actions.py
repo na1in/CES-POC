@@ -6,10 +6,11 @@ Simulates:
     • Approves the first HELD payment
     • Rejects the second HELD payment (→ escalated)
     • Overrides a third payment with a custom reason
+    • Escalates PMT-900 (the seeded case — seeded HELD, not escalated, so Damien has something to work)
 
   Damien (investigator):
-    • Adds an investigation note to PMT-ESC-001 (the seeded escalated case)
-    • Logs a contact record → transitions PMT-ESC-001 to pending_sender_response
+    • Adds an investigation note to PMT-900
+    • Logs a contact record → transitions PMT-900 to pending_sender_response
 
 Run with: python scripts/demo_actions.py
 Requires: backend running on :8000 + demo_payments.py already run (needs HELD payments)
@@ -67,19 +68,29 @@ def run() -> None:
     else:
         info("Not enough HELD payments for override demo — skipping")
 
+    # ── Priya: escalate the seeded PMT-900 case ───────────────────────────────
+    # PMT-900 is seeded HELD (AI recommends escalate, per seed.py) — Priya has to actually escalate it
+    # before Damien can work it, otherwise the contact_record below has nothing to transition out of
+    # (its pending_sender_response side effect only fires from 'escalated', not 'held').
+    section("Priya Sharma (analyst) — escalate the seeded PMT-900 case")
+    TARGET = "PMT-900"
+    api("POST", f"/api/payments/{TARGET}/reject",
+        analyst_token, json={"notes": "No customer match — routing to investigations for manual outreach."})
+    ok(f"Escalated {TARGET} → ESCALATED")
+
     # ── Damien: investigation note + contact record ───────────────────────────
     section("Damien Torres (investigator) — investigation note + contact log")
     inv_token = get_token(USR_INVESTIGATOR)
     ok("Authenticated as Damien Torres")
 
     # Add investigation note to seeded escalated payment
-    TARGET = "PMT-ESC-001"
     api("POST", f"/api/payments/{TARGET}/annotations",
         inv_token,
         json={
             "annotation_type": "investigation_note",
             "content": "Contacted sender Unknown Corp LLC via phone. Left voicemail — awaiting callback.",
-        })
+        },
+        expected=201)
     ok(f"Added investigation note to {TARGET}")
 
     # Log contact record → transitions payment to pending_sender_response
@@ -88,7 +99,11 @@ def run() -> None:
         json={
             "annotation_type": "contact_record",
             "content": "Outreach attempt #1: phone call to listed number. SLA clock started.",
-        })
+            "contact_method": "phone",
+            "contact_outcome": "voicemail",
+            "contacted_party": "Unknown Corp LLC",
+        },
+        expected=201)
     ok(f"Logged contact record on {TARGET} → pending_sender_response (SLA timer started)")
 
     # Confirm status

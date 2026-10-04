@@ -15,7 +15,7 @@ test.describe("Governance Dashboard", () => {
     await expect(page.getByText("Auto-Applied by AI")).toBeVisible()
     await expect(page.getByText("Applied after Human Review")).toBeVisible()
     await expect(page.getByText("Held Pending Review")).toBeVisible()
-    await expect(page.getByText("Escalated by AI")).toBeVisible()
+    await expect(page.getByText("Auto-Escalated")).toBeVisible()
     await expect(page.getByText("Escalated by Human")).toBeVisible()
     await expect(page.getByText("Human Overrides")).toBeVisible()
   })
