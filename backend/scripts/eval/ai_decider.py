@@ -29,7 +29,8 @@ from app.config import settings
 MODEL = "google/gemini-2.5-flash"  # the model the pipeline already uses
 SPEC = (Path(__file__).resolve().parents[3] / "docs" / "Final_Scenario_Definitions.md").read_text()
 
-STATS = {"calls": 0, "retries": 0, "failures": 0, "seconds": 0.0, "prompt_tokens": 0, "completion_tokens": 0}
+STATS = {"calls": 0, "retries": 0, "failures": 0, "seconds": 0.0, "prompt_tokens": 0, "completion_tokens": 0,
+         "reasoning_tokens": 0, "visible_chars": 0, "latencies": []}
 
 SCHEMA = {
     "name": "payment_decision",
@@ -192,11 +193,16 @@ async def decide(mode: str, scenario: int, payment: dict, signals: dict, context
                 response_format={"type": "json_schema", "json_schema": schema},
                 extra_body={"provider": {"require_parameters": True}},
             )
+            elapsed = time.monotonic() - started
             STATS["calls"] += 1
-            STATS["seconds"] += time.monotonic() - started
+            STATS["seconds"] += elapsed
+            STATS["latencies"].append(round(elapsed, 3))
             if response.usage:
                 STATS["prompt_tokens"] += response.usage.prompt_tokens or 0
                 STATS["completion_tokens"] += response.usage.completion_tokens or 0
+                details = getattr(response.usage, "completion_tokens_details", None)
+                STATS["reasoning_tokens"] += (getattr(details, "reasoning_tokens", 0) or 0) if details else 0
+            STATS["visible_chars"] += len(response.choices[0].message.content or "")
             out = json.loads(response.choices[0].message.content)
             if mode == "ai-tight":  # fold the checklist into the single reasoning string the pipeline stores
                 checks = "; ".join(f"{c['condition']} [{c['case_value']}] -> {'yes' if c['holds'] else 'no'}" for c in out["checks"])

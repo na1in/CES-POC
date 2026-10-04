@@ -237,8 +237,8 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 - All tests are read-only (navigation/visibility) — mutations stay in backend pytest suite
 - `helpers/auth.ts`: `loginAs()` clears sessionStorage before each login to prevent RouteGuard bounce
 - Key selector patterns: `getByText(/^PMT-/).first()` for row nav; `{ exact: true }` to avoid audit-log false matches; `page.locator('input[aria-label="..."]')` for `<input type="date">`
-- `PMT-ESC-001` is seeded as a pre-escalated payment to enable investigation workflow tests
-- `PMT-H-001`..`PMT-H-009` are seeded historical payments (applied/returned/escalated with correct `decision_attribution`) to populate the Governance Dashboard with meaningful data; protected from `demo_restore.py` cleanup via `SEED_PAYMENT_IDS`
+- `PMT-900` is seeded as a pre-escalated payment to enable investigation workflow tests
+- `PMT-901`..`PMT-909` are seeded historical payments (applied/returned/escalated with correct `decision_attribution`) to populate the Governance Dashboard with meaningful data; protected from `demo_restore.py` cleanup via `SEED_PAYMENT_IDS`
 
 ### Infrastructure (fixed 2026-05-16)
 - `backend/app/main.py`: `CORSMiddleware` for origins :3000/:3001/:3002 — required for browser API calls
@@ -269,6 +269,12 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 - `backend/alembic/versions/0002_audit_action_policy_attached.py`: `policy_attached` audit action (was only in `schema.sql`/proto, so attach-policy failed on migrated databases)
 - Dev DB: `amount_tolerance_auto` restored from 40 to 2 via the change-request rollback (#64, the "Testing the POC with Rama" change)
 - Tests: 26 stale/failing tests fixed and new ones added (452 total); `conftest.py` LLM patches now take effect
+
+### Bug fixes / demo data (2026-09-27)
+- `backend/scripts/seed.py`: seed fixture payments renamed from `PMT-ESC-001`/`PMT-H-001..009` to a uniform `PMT-900`/`PMT-901..909` (real `PMT-NNN` shape, just a reserved high block, so `_next_payment_id()` no longer needs to special-case skip non-numeric IDs); every seed date (payment dates, `policies.next_due_date`, the 6-month `payment_history`) is now relative to `now()`/`CURRENT_DATE` instead of a fixed calendar date, so a fresh seed always looks current instead of drifting further into the past every time nobody re-seeds. `seed_policies` uses `ON CONFLICT DO UPDATE` for `next_due_date` so a re-seed actually refreshes it. `seed_payment_history` deletes and re-inserts (dedup by exact timestamp doesn't work once dates are relative)
+- `backend/scripts/demo_restore.py` / `demo_actions.py`: updated for the `PMT-900`/`PMT-901..909` rename; `delete_demo_payment_history`'s cutoff is now `now() - interval '15 days'` instead of a fixed date
+- `backend/scripts/demo_governance.py`: governance review / anomaly `period_start`/`period_end` are relative to today, not `2026-05-01..15` — that range was already outside the Governance Dashboard's default 5-day filter
+- `frontend/e2e/03-payment-detail.spec.ts`, `04-investigations.spec.ts`: only had comments mentioning `PMT-ESC-001`, not a hardcoded locator (both already match `/^PMT-/`) — comments updated, no test-behavior change
 
 ### Evaluation harness (added 2026-09-18; extended 2026-09-26)
 - `backend/scripts/eval/`: `generate.py` (Gemini-generated synthetic world + scenario archetypes, independent checks, seeded noise) and `run_eval.py` (runs cases through the real ingest endpoint + pipeline against an isolated `ces_eval` database; refuses any database not ending in `_eval`)

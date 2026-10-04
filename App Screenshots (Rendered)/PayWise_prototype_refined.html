@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PayWise — AI Payment Resolution</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root {
+  --bg-primary:          #F8F9FA;
+  --bg-surface:          #FFFFFF;
+  --bg-surface-elevated: #F1F3F5;
+
+  --color-primary:        #7C4DFF;
+  --color-primary-hover:  #6A3FE8;
+  --color-secondary:      #00E5FF;
+  --gradient-brand: linear-gradient(135deg, #7C4DFF, #00E5FF);
+
+  --color-apply:          #10B981;
+  --color-apply-hover:    #059669;
+  --color-apply-tint:     rgba(16, 185, 129, 0.10);
+
+  --color-hold:           #F59E0B;
+  --color-hold-hover:     #D97706;
+  --color-hold-tint:      rgba(245, 158, 11, 0.10);
+
+  --color-escalate:       #EF4444;
+  --color-escalate-hover: #DC2626;
+  --color-escalate-tint:  rgba(239, 68, 68, 0.10);
+
+  --color-info:           #3B82F6;
+  --color-info-tint:      rgba(59, 130, 246, 0.10);
+
+  --text-primary:   #1E293B;
+  --text-secondary: #64748B;
+  --text-muted:     #94A3B8;
+
+  --border-color: #E2E8F0;
+  --border-focus: var(--color-primary);
+
+  --space-1:  4px; --space-2:  8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px; --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+  --shadow-xl: 0 20px 40px rgba(0,0,0,0.12);
+
+  --font-sans:    'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'DM Sans', -apple-system, sans-serif;
+
+  --text-xs: 11px; --text-sm: 12px; --text-base: 14px; --text-md: 16px; --text-lg: 20px; --text-xl: 24px;
+  --leading-base: 1.5;
+  --font-normal: 400; --font-medium: 500; --font-semibold: 600; --font-bold: 700;
+  --transition: all 160ms ease;
+  --nav-height: 56px; --footer-height: 30px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+html { overflow-x: hidden; }
+body {
+  overflow-x: hidden;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-base);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+button, input, textarea, select { font-family: var(--font-sans); }
+button { cursor: pointer; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: var(--radius-full); }
+
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.label-caps { font-size: var(--text-xs); font-weight: var(--font-semibold); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.07em; }
+
+.card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); }
+
+/* badges */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: var(--font-semibold); letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.badge-apply    { background: var(--color-apply-tint);    color: var(--color-apply); }
+.badge-hold     { background: var(--color-hold-tint);     color: var(--color-hold); }
+.badge-escalate { background: var(--color-escalate-tint); color: var(--color-escalate); }
+.badge-primary  { background: var(--color-primary); color: #fff; }
+.badge-neutral  { background: var(--bg-surface-elevated); color: var(--text-secondary); }
+.badge-flag     { background: var(--color-hold-tint); color: var(--color-hold); text-transform: none; font-weight: var(--font-medium); }
+.badge-count    { padding: 1px 8px; text-transform: none; letter-spacing: 0; font-weight: var(--font-semibold); }
+.badge-count.active { background: var(--color-primary); color: #fff; }
+.badge-count:not(.active) { background: var(--bg-surface-elevated); color: var(--text-secondary); }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 16px; border-radius: var(--radius-md); font-size: var(--text-base); font-weight: var(--font-semibold); cursor: pointer; transition: var(--transition); border: 1px solid transparent; line-height: 1; }
+.btn-primary  { background: var(--color-primary);  color: #fff; }
+.btn-primary:hover  { background: var(--color-primary-hover); }
+.btn-apply    { background: var(--color-apply);    color: #fff; }
+.btn-apply:hover    { background: var(--color-apply-hover); }
+.btn-hold     { background: var(--color-hold);     color: #fff; }
+.btn-hold:hover     { background: var(--color-hold-hover); }
+.btn-escalate { background: var(--color-escalate); color: #fff; }
+.btn-escalate:hover { background: var(--color-escalate-hover); }
+.btn-ghost { background: transparent; color: var(--text-primary); border-color: var(--border-color); }
+.btn-ghost:hover { background: var(--bg-surface-elevated); }
+.btn-outline-escalate { background: transparent; color: var(--color-escalate); border-color: var(--color-escalate); }
+.btn-outline-escalate:hover { background: var(--color-escalate-tint); }
+.btn-sm { padding: 5px 12px; font-size: var(--text-sm); border-radius: var(--radius-sm); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.view { animation: fadeUp .2s ease; }
+
+/* ---- layout shell ---- */
+#nav { height: var(--nav-height); background: var(--bg-surface); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; position: sticky; top: 0; z-index: 50; flex-shrink: 0; }
+#nav .left { display: flex; align-items: center; gap: 10px; }
+#nav .right { display: flex; align-items: center; gap: 14px; }
+.searchbox { display: flex; align-items: center; gap: 8px; background: var(--bg-surface-elevated); border-radius: var(--radius-md); padding: 7px 12px; width: 220px; color: var(--text-muted); }
+.searchbox input { background: none; border: none; outline: none; font-size: var(--text-sm); color: var(--text-primary); flex: 1; }
+.searchbox kbd { font-size: 10px; color: var(--text-muted); border: 1px solid var(--border-color); border-radius: 4px; padding: 1px 5px; font-family: var(--font-sans); }
+.icon-btn { width: 34px; height: 34px; border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); background: transparent; border: none; position: relative; }
+.icon-btn:hover { background: var(--bg-surface-elevated); }
+.dot-red { position: absolute; top: 6px; right: 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-escalate); border: 1.5px solid var(--bg-surface); }
+
+#main { max-width: 1360px; margin: 0 auto; padding: 28px 24px 60px; flex: 1; width: 100%; }
+.page-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+.page-head h1 { font-size: var(--text-xl); font-weight: var(--font-bold); color: var(--text-primary); letter-spacing: -0.3px; }
+.page-head .sub { font-size: var(--text-sm); color: var(--text-secondary); margin-top: 3px; }
+.page-head .meta-r { text-align: right; }
+.page-head .meta-r .top { font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.page-head .meta-r .date { font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--text-primary); margin-top: 2px; }
+
+.stat-row { display: flex; gap: 12px; margin-bottom: 20px; }
+.stat-card { flex: 1; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.stat-card .ic { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.stat-card .lbl { font-size: var(--text-xs); font-weight: var(--font-semibold); text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); margin-bottom: 3px; }
+.stat-card .val { font-size: 22px; font-weight: var(--font-bold); color: var(--text-primary); line-height: 1.1; }
+.stat-card .val .sub { font-size: var(--text-xs); font-weight: var(--font-medium); color: var(--text-secondary); margin-left: 5px; }
+
+.tabs { display: flex; align-items: center; gap: 22px; padding: 0 20px; border-bottom: 1px solid var(--border-color); }
+.tab { display: flex; align-items: center; gap: 7px; padding: 14px 0; font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--text-secondary); border-bottom: 2px solid transparent; cursor: pointer; }
+.tab.active { color: var(--text-primary); border-bottom-color: var(--color-primary); }
+.toolbar { margin-left: auto; display: flex; gap: 8px; padding: 10px 0; }
+.select-fake { display: flex; align-items: center; gap: 6px; font-size: var(--text-sm); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 6px 10px; color: var(--text-secondary); background: var(--bg-surface); }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; min-width: 760px; border-collapse: collapse; }
+thead th { text-align: left; font-size: 10.5px; font-weight: var(--font-semibold); text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); padding: 10px 20px; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+tbody td { padding: 13px 20px; font-size: var(--text-sm); border-bottom: 1px solid var(--border-color); color: var(--text-primary); }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr { cursor: pointer; transition: var(--transition); }
+tbody tr:hover td { background: var(--bg-surface-elevated); }
+.id-link { color: var(--color-primary); font-weight: var(--font-semibold); }
+.foot-note { padding: 12px 20px; font-size: var(--text-xs); color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 16px; }
+.back-btn { width: 34px; height: 34px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-surface); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); margin-bottom: 12px; }
+.back-btn:hover { background: var(--bg-surface-elevated); }
+
+.rec-box { border-radius: var(--radius-md); padding: 16px 18px; border: 1px solid; }
+.rec-box .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.rec-box .rk { font-size: var(--text-xs); font-weight: var(--font-bold); text-transform: uppercase; letter-spacing: .06em; display: flex; align-items: center; gap: 6px; }
+.rec-box .conf { font-size: 22px; font-weight: var(--font-bold); }
+.rec-box .title { font-size: 17px; font-weight: var(--font-bold); margin-bottom: 6px; }
+.rec-box .reason { font-size: var(--text-sm); line-height: 1.55; }
+
+.kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 24px; background: var(--bg-surface-elevated); border-radius: var(--radius-md); padding: 14px 16px; margin: 14px 0; }
+.kv-grid .k { font-size: 10.5px; font-weight: var(--font-semibold); text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); margin-bottom: 2px; }
+.kv-grid .v { font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--text-primary); }
+
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 28px; }
+.field { display: flex; align-items: flex-start; gap: 9px; }
+.field .fi { color: var(--text-muted); margin-top: 2px; flex-shrink: 0; }
+.field .fk { font-size: 10.5px; font-weight: var(--font-semibold); text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); margin-bottom: 2px; }
+.field .fv { font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--text-primary); }
+
+.section-card .sc-head { padding: 15px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+.section-card .sc-head h3 { font-size: var(--text-md); font-weight: var(--font-semibold); }
+.section-card .sc-body { padding: 16px 20px; }
+.section-card .sc-body.hidden { display: none; }
+.chev { transition: var(--transition); color: var(--text-secondary); }
+.chev.open { transform: rotate(180deg); }
+
+.side-card h3 { font-size: var(--text-base); font-weight: var(--font-semibold); padding: 15px 20px; border-bottom: 1px solid var(--border-color); }
+.side-card .rows { padding: 15px 20px; display: flex; flex-direction: column; gap: 13px; }
+.side-card .row .k { font-size: 10.5px; font-weight: var(--font-semibold); text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); margin-bottom: 2px; }
+.side-card .row .v { font-size: var(--text-sm); font-weight: var(--font-semibold); color: var(--text-primary); }
+.meta-card { background: var(--bg-surface-elevated); border-radius: var(--radius-lg); padding: 14px 16px; font-size: var(--text-xs); color: var(--text-secondary); line-height: 1.7; }
+.meta-card b { color: var(--text-primary); }
+
+.signal { margin-bottom: 12px; }
+.signal .sr { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.signal .sn { font-size: var(--text-sm); color: var(--text-secondary); }
+.signal .sl { font-size: var(--text-xs); color: var(--text-primary); font-weight: var(--font-medium); }
+.signal .track { height: 6px; background: var(--bg-surface-elevated); border-radius: 999px; overflow: hidden; }
+.signal .fill { height: 100%; border-radius: 999px; }
+
+.timeline { display: flex; flex-direction: column; gap: 0; }
+.tl-item { display: flex; gap: 12px; padding-bottom: 16px; position: relative; }
+.tl-item:not(:last-child)::before { content: ''; position: absolute; left: 4.5px; top: 14px; bottom: 0; width: 1.5px; background: var(--border-color); }
+.tl-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary); margin-top: 4px; flex-shrink: 0; z-index: 1; }
+.tl-item.system .tl-dot { background: var(--text-muted); }
+.tl-time { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); }
+.tl-txt { font-size: var(--text-sm); color: var(--text-primary); margin-top: 2px; }
+.tl-txt b { font-weight: var(--font-semibold); }
+
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: #0F172A; display: flex; align-items: center; justify-content: center; font-weight: var(--font-bold); color: #fff; font-size: 12px; flex-shrink: 0; }
+.avatar.lg { width: 40px; height: 40px; font-size: 14px; }
+
+.dropdown { position: absolute; top: 46px; right: 0; width: 268px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); box-shadow: var(--shadow-xl); z-index: 100; overflow: hidden; }
+.dropdown .who { display: flex; gap: 10px; align-items: center; padding: 14px 16px; }
+.dropdown .who .name { font-size: var(--text-sm); font-weight: var(--font-semibold); }
+.dropdown .who .email { font-size: 11px; color: var(--text-secondary); }
+.dropdown .who .role { font-size: 11px; color: var(--color-primary); font-weight: var(--font-medium); }
+.dropdown .grp-label { padding: 8px 16px 4px; font-size: 10px; font-weight: var(--font-semibold); text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); }
+.dropdown .item { display: flex; align-items: center; gap: 10px; padding: 9px 16px; font-size: var(--text-sm); color: var(--text-primary); cursor: pointer; }
+.dropdown .item:hover { background: var(--bg-surface-elevated); }
+.dropdown .item .em { font-size: 15px; width: 18px; text-align: center; }
+.dropdown .item.sel { color: var(--color-primary); font-weight: var(--font-semibold); }
+.dropdown hr { border: none; border-top: 1px solid var(--border-color); margin: 4px 0; }
+.dropdown .item.danger { color: var(--color-escalate); }
+
+#footer { height: var(--footer-height); border-top: 1px solid var(--border-color); background: var(--bg-surface); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+#footer .live { display: flex; align-items: center; gap: 6px; }
+#footer .live .d { width: 6px; height: 6px; border-radius: 50%; background: var(--color-apply); }
+kbd.k { font-size: 10px; border: 1px solid var(--border-color); border-radius: 4px; padding: 1px 5px; }
+
+.bars { display: flex; align-items: flex-end; gap: 14px; height: 110px; }
+.bars .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 2px; height: 100%; }
+.bars .seg { width: 100%; border-radius: 2px; }
+.bars .lbl { font-size: 10.5px; color: var(--text-secondary); margin-top: 6px; }
+.legend { display: flex; gap: 16px; margin-top: 14px; }
+.legend .li { display: flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: var(--text-secondary); }
+.legend .sw { width: 8px; height: 8px; border-radius: 2px; }
+
+.approval-row { display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-top: 1px solid var(--border-color); }
+.approval-row:first-child { border-top: none; }
+.approval-row .t { font-size: var(--text-sm); font-weight: var(--font-semibold); }
+.approval-row .d { font-size: 11.5px; color: var(--text-secondary); margin-top: 2px; }
+.approval-row .btns { display: flex; gap: 8px; flex-shrink: 0; }
+
+.threshold-card { margin-bottom: 16px; }
+.threshold-card .tags { display: flex; gap: 8px; margin-bottom: 10px; }
+.threshold-card h4 { font-size: var(--text-md); font-weight: var(--font-semibold); margin-bottom: 10px; }
+.threshold-card .vals { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.pillval { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--font-semibold); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 3px 10px; background: var(--bg-surface-elevated); color: var(--text-secondary); }
+.pillval.proposed { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.threshold-card .note { font-size: var(--text-sm); color: var(--text-primary); margin-bottom: 4px; }
+.threshold-card .impact { font-size: 11.5px; color: var(--text-muted); margin-bottom: 12px; }
+
+@media (max-width: 980px) {
+  .grid-2 { grid-template-columns: 1fr; }
+  .stat-row { flex-wrap: wrap; }
+  .stat-card { min-width: 45%; }
+}
+</style>
+</head>
+<body>
+<div id="nav"></div>
+<div id="main"></div>
+<div id="footer"></div>
+
+<script>
+/* ============================= ICONS (lucide-style, 1.75 stroke) ============================= */
+function ic(name, size, color) {
+  size = size || 18; color = color || 'currentColor';
+  const A = `width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"`;
+  const paths = {
+    search: `<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>`,
+    bell: `<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>`,
+    settings: `<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>`,
+    chevdown: `<polyline points="6 9 12 15 18 9"/>`,
+    chevup: `<polyline points="18 15 12 9 6 15"/>`,
+    arrowleft: `<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>`,
+    check: `<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>`,
+    clock: `<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>`,
+    pause: `<circle cx="12" cy="12" r="10"/><line x1="10" y1="9" x2="10" y2="15"/><line x1="14" y1="9" x2="14" y2="15"/>`,
+    alert: `<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>`,
+    filter: `<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>`,
+    download: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>`,
+    user: `<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>`,
+    dollar: `<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`,
+    calendar: `<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>`,
+    hash: `<line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>`,
+    creditcard: `<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>`,
+    shield: `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>`,
+    file: `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>`,
+    x: `<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>`,
+    signout: `<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>`,
+    help: `<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>`,
+    building: `<rect x="4" y="2" width="16" height="20" rx="1"/><line x1="9" y1="6" x2="9" y2="6.01"/><line x1="15" y1="6" x2="15" y2="6.01"/><line x1="9" y1="10" x2="9" y2="10.01"/><line x1="15" y1="10" x2="15" y2="10.01"/><line x1="9" y1="14" x2="9" y2="14.01"/><line x1="15" y1="14" x2="15" y2="14.01"/>`,
+    trend: `<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>`,
+    zap: `<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>`,
+  };
+  return `<svg ${A}>${paths[name]||''}</svg>`;
+}
+
+/* ============================= DATA ============================= */
+const OPEN_CASES = [
+  { id:'PMT-3001', sender:'Jennifer White', amount:2700, rec:'HOLD', conf:78, flag:'Amount Variance', age:'3d' },
+  { id:'PMT-2001', sender:'Robert Chen',    amount:3200, rec:'HOLD', conf:85, flag:'Multiple Policy Match', age:'2d' },
+  { id:'PMT-1002', sender:'Maria Rodriguez',amount:1850, rec:'APPLY',conf:96, flag:null, age:'1d' },
+  { id:'PMT-1001', sender:'John A. Smith',  amount:2500, rec:'APPLY',conf:98, flag:null, age:'1d' },
+];
+const CASE_DETAIL = {
+  'PMT-1001': { sender:'John A. Smith', amount:2500, date:'2026-03-28', received:'Payment received 2026-03-28, 8:42 AM', method:'ACH Transfer', ref:'POL-45678',
+    rec:'APPLY', conf:98, reasoning:'Perfect name match (100%), exact amount match, policy explicitly provided, no risk flags.',
+    signals:[ ['Name Similarity',100,'Exact match'], ['Amount Correlation',100,'Matches expected premium'], ['Duplicate Check',0,'No duplicates found'] ],
+    policy:{ num:'POL-45678', holder:'John A. Smith', type:'Health Insurance', status:'Active', premium:'$2,500.00 Monthly', due:'April 28, 2026', balance:'$0.00' },
+    audit:[ ['2026-03-28 08:42:17','System','Payment Received','Ingested via ACH · ref POL-45678'], ['2026-03-28 08:42:19','AI Agent','Analysis Complete','Recommendation: APPLY (98%)'] ] },
+  'PMT-3001': { sender:'Jennifer White', amount:2700, date:'2026-03-26', received:'Payment received 2026-03-26, 8:42 AM', method:'Wire Transfer', ref:'POL-78901',
+    rec:'HOLD', conf:78, reasoning:'Payment $2,700 is 8% higher than expected $2,500 — hold for review. Best name match is an inactive policy holder.',
+    signals:[ ['Name Similarity',78,'R. Wilson — inactive since 2023'], ['Amount Correlation',22,'8% above expected premium'], ['Duplicate Check',0,'No duplicates found'] ],
+    policy:{ num:'POL-78901', holder:'Jennifer White', type:'Commercial Property Insurance', status:'Active', premium:'$5,000.00 Quarterly', due:'March 31, 2026', balance:'$0.00' },
+    audit:[ ['2026-03-26 08:42:03','System','Payment Received','Ingested via Wire · ref POL-78901'], ['2026-03-26 08:42:06','AI Agent','Analysis Complete','Recommendation: HOLD (78%) — manual review required'] ] },
+};
+const INV_CASES = [
+  { id:'PMT-4001', sender:'Michael Thompson', amount:4500, risk:'medium', reason:'No matching customer found', status:'Pending Outreach', age:'4d' },
+  { id:'PMT-4002', sender:'ABC Corporation',  amount:8200, risk:'medium', reason:'Business entity payment with no policy match', status:'New', age:'5d' },
+  { id:'PMT-5001', sender:'Sarah Johnson',    amount:1950, risk:'high',   reason:'Duplicate payment detected within 72 hours', status:'Pending Outreach', age:'6d' },
+];
+const INV_DETAIL = {
+  'PMT-4001': { sender:'Michael Thompson', amount:4500, date:'2026-03-25', method:'Wire Transfer', ref:'Premium Payment - Q1 2026',
+    matches:[ {name:'R. Wilson', pol:'POL-34521', sim:72, last:'Dec 2022', status:'Inactive (2023)'}, {name:'Robert Williams', pol:'POL-98234', sim:65, last:'Mar 2026', status:'Active'} ] },
+};
+
+/* ============================= HELPERS ============================= */
+function fmt(n){ return '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function recColor(rec){ return rec==='APPLY' ? 'apply' : rec==='HOLD' ? 'hold' : 'escalate'; }
+function recBadge(rec){ return `<span class="badge badge-${recColor(rec)}">${rec}</span>`; }
+function confText(v, rec){ const c = getComputedStyle(document.documentElement).getPropertyValue('--color-'+recColor(rec)); return `<span class="mono" style="font-size:13px;font-weight:700;color:${c}">${v}%</span>`; }
+function flagBadge(f){ return f ? `<span class="badge badge-flag">${ic('alert',11)} ${f}</span>` : ''; }
+function riskBadge(level){ const cls = level==='high'?'escalate':level==='medium'?'hold':'apply'; return `<span class="badge badge-${cls}" style="text-transform:capitalize">${level}</span>`; }
+function statusBadge(s){ const map = {'New':'primary','Pending Outreach':'hold','Resolved':'apply'}; return `<span class="badge badge-${map[s]||'neutral'}" style="text-transform:none">${s}</span>`; }
+
+function statCard(label, val, sub, icon, colorVar){
+  return `<div class="stat-card">
+    <div class="ic" style="background:var(--color-${colorVar}-tint,rgba(59,130,246,.1));color:var(--color-${colorVar},#3B82F6)">${ic(icon,18)}</div>
+    <div><div class="lbl">${label}</div><div class="val">${val}${sub?`<span class="sub">${sub}</span>`:''}</div></div>
+  </div>`;
+}
+
+function signalBar(name, value, label, forceColor){
+  const color = forceColor || (value>=90?'apply':value>=70?'hold':'escalate');
+  return `<div class="signal">
+    <div class="sr"><span class="sn">${name}</span><span class="sl">${label}</span></div>
+    <div class="track"><div class="fill" style="width:${Math.max(4,value)}%;background:var(--color-${color})"></div></div>
+  </div>`;
+}
+
+function recBox(rec, conf, reasoning){
+  const c = recColor(rec);
+  const icon = rec==='APPLY' ? 'check' : rec==='HOLD' ? 'clock' : 'alert';
+  return `<div class="rec-box" style="background:var(--color-${c}-tint);border-color:var(--color-${c})">
+    <div class="top-row">
+      <span class="rk" style="color:var(--color-${c})">${ic(icon,14)} AI Recommendation</span>
+      <span class="conf" style="color:var(--color-${c})">${conf}%</span>
+    </div>
+    <div class="title" style="color:var(--color-${c})">${rec}</div>
+    <div class="reason">${reasoning}</div>
+  </div>`;
+}
+
+function sectionCard(id, title, bodyHtml, collapsible, open){
+  open = open !== false;
+  return `<div class="card section-card">
+    <div class="sc-head" onclick="${collapsible?`toggleSection('${id}')`:''}">
+      <h3>${title}</h3>
+      ${collapsible?`<span class="chev ${open?'open':''}" id="chev-${id}">${ic('chevdown',16)}</span>`:''}
+    </div>
+    <div class="sc-body ${open?'':'hidden'}" id="body-${id}">${bodyHtml}</div>
+  </div>`;
+}
+function toggleSection(id){
+  document.getElementById('body-'+id).classList.toggle('hidden');
+  document.getElementById('chev-'+id).classList.toggle('open');
+}
+
+function timeline(entries){
+  return `<div class="timeline">${entries.map(([t,user,action,detail],i)=>`
+    <div class="tl-item ${user==='System'?'system':''}">
+      <div class="tl-dot"></div>
+      <div style="flex:1">
+        <div class="tl-time">${t}</div>
+        <div class="tl-txt"><b>${user}:</b> ${action} — ${detail}</div>
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+/* ============================= NAV / FOOTER ============================= */
+const ROLES = [
+  { key:'analyst', label:'Payment Operations Analyst', em:'📊', name:'Priya Venkataraman', email:'priya.v@insuretech.com' },
+  { key:'investigator', label:'Payment Investigations Specialist', em:'🔍', name:'Priya Venkataraman', email:'priya.v@insuretech.com' },
+  { key:'director', label:'Operations Director / Compliance', em:'⚖️', name:'Priya Venkataraman', email:'priya.v@insuretech.com' },
+  { key:'admin', label:'System Admin / Data Analyst', em:'⚙️', name:'Priya Venkataraman', email:'priya.v@insuretech.com' },
+];
+
+function renderNav(){
+  const role = ROLES.find(r=>r.key===state.role);
+  document.getElementById('nav').innerHTML = `
+    <div class="left">
+      <svg width="30" height="30" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="7" fill="#0F172A"/><rect x="9" y="10" width="5" height="12" rx="2.5" fill="white"/><rect x="18" y="10" width="5" height="12" rx="2.5" fill="#7C4DFF"/><rect x="14" y="15.5" width="4" height="1.5" rx=".75" fill="rgba(255,255,255,0.4)"/></svg>
+      <span style="font-family:var(--font-display);font-weight:700;font-size:16px;letter-spacing:-0.2px">Pay<span style="color:var(--color-primary)">Wise</span></span>
+    </div>
+    <div class="right">
+      <div class="searchbox">${ic('search',15)}<input placeholder="Search..." readonly><kbd>⌘K</kbd></div>
+      <button class="icon-btn">${ic('bell',18)}<span class="dot-red"></span></button>
+      <button class="icon-btn">${ic('settings',18)}</button>
+      <div style="position:relative">
+        <button class="avatar" onclick="toggleDropdown(event)" id="avatarBtn">PV</button>
+        <div class="dropdown" id="dropdown" style="display:none">
+          <div class="who"><div class="avatar lg">PV</div><div><div class="name">${role.name}</div><div class="email">${role.email}</div><div class="role">${role.label}</div></div></div>
+          <hr>
+          <div class="grp-label">Switch Role</div>
+          ${ROLES.map(r=>`<div class="item ${r.key===state.role?'sel':''}" onclick="switchRole('${r.key}')"><span class="em">${r.em}</span>${r.label}${r.key===state.role?` ${ic('check',14)}`:''}</div>`).join('')}
+          <hr>
+          <div class="item">${ic('settings',15)} Settings</div>
+          <div class="item">${ic('hash',15)} Keyboard Shortcuts</div>
+          <div class="item">${ic('help',15)} Help</div>
+          <div class="item danger">${ic('signout',15)} Sign Out</div>
+        </div>
+      </div>
+    </div>`;
+}
+function toggleDropdown(e){ e.stopPropagation(); const d = document.getElementById('dropdown'); d.style.display = d.style.display==='none'?'block':'none'; }
+document.addEventListener('click', ()=>{ const d = document.getElementById('dropdown'); if(d) d.style.display='none'; });
+function switchRole(key){ state.role = key; state.view = 'dashboard'; state.caseId = null; render(); }
+
+function renderFooter(){
+  document.getElementById('footer').innerHTML = `
+    <div class="live"><span class="d"></span> Audit Active &nbsp;|&nbsp; User: Priya Venkataraman &nbsp;|&nbsp; Last sync: 2 minutes ago</div>
+    <div>Press <kbd class="k">?</kbd> for keyboard shortcuts</div>`;
+}
+
+/* ============================= VIEWS ============================= */
+function viewAnalystDashboard(){
+  const rows = OPEN_CASES.map(c=>`
+    <tr onclick="openCase('${c.id}')">
+      <td><span class="id-link mono">${c.id}</span></td>
+      <td>${c.sender}</td>
+      <td class="mono">${fmt(c.amount)}</td>
+      <td>${recBadge(c.rec)}</td>
+      <td>${confText(c.conf,c.rec)}</td>
+      <td>${flagBadge(c.flag)}</td>
+      <td class="mono" style="color:var(--text-secondary)">${c.age}</td>
+    </tr>`).join('');
+  return `<div class="view">
+    <div class="page-head">
+      <div><h1>Payment Operations Queue</h1><div class="sub">AI-triaged payments awaiting your decision</div></div>
+      <div class="meta-r"><div class="top">Today</div><div class="date">Tuesday, March 31, 2026</div></div>
+    </div>
+    <div class="stat-row">
+      ${statCard('Cases Closed Today','67',null,'check','apply')}
+      ${statCard('Auto-Applied','42','63%','zap','info')}
+      ${statCard('On Hold','15','22%','pause','hold')}
+      ${statCard('Escalated','10','15%','alert','escalate')}
+    </div>
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active">Open Cases <span class="badge badge-count active">4</span></div>
+        <div class="tab">Closed Cases <span class="badge badge-count">1</span></div>
+        <div class="toolbar">
+          <div class="select-fake">All Recommendations ${ic('chevdown',13)}</div>
+          <div class="select-fake">All Confidences ${ic('chevdown',13)}</div>
+        </div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>ID</th><th>Sender</th><th>Amount</th><th>Recommendation</th><th>Confidence</th><th>Flags</th><th>Age</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div class="foot-note"><span>Showing 4 of 5 cases</span></div>
+    </div>
+  </div>`;
+}
+
+function viewCaseDetail(){
+  const c = CASE_DETAIL[state.caseId];
+  const actLabel = c.rec==='APPLY' ? 'Accept APPLY' : c.rec==='HOLD' ? 'Accept HOLD' : 'Accept ESCALATE';
+  return `<div class="view">
+    <button class="back-btn" onclick="state.view='dashboard';render()">${ic('arrowleft',17)}</button>
+    <div class="page-head" style="margin-bottom:18px">
+      <div><h1>Case ${state.caseId}</h1><div class="sub">${c.received}</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="stack">
+        ${recBox(c.rec, c.conf, c.reasoning)}
+        <div class="card" style="padding:18px 20px">
+          <div class="label-caps" style="margin-bottom:10px">AI Signal Breakdown</div>
+          ${c.signals.map(s=>signalBar(...s)).join('')}
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-${recColor(c.rec)}">${ic('check',16)} ${actLabel}</button>
+          <button class="btn btn-ghost">Override Recommendation</button>
+          <button class="btn btn-outline-escalate">${ic('alert',15)} Escalate</button>
+        </div>
+        <div class="card" style="padding:18px 20px">
+          <h3 style="font-size:var(--text-md);font-weight:700;margin-bottom:14px">Payment Information</h3>
+          <div class="field-row">
+            <div class="field"><span class="fi">${ic('user',15)}</span><div><div class="fk">Sender Name</div><div class="fv">${c.sender}</div></div></div>
+            <div class="field"><span class="fi">${ic('dollar',15)}</span><div><div class="fk">Amount</div><div class="fv mono">${fmt(c.amount)}</div></div></div>
+            <div class="field"><span class="fi">${ic('calendar',15)}</span><div><div class="fk">Payment Date</div><div class="fv mono">${c.date}</div></div></div>
+            <div class="field"><span class="fi">${ic('creditcard',15)}</span><div><div class="fk">Payment Method</div><div class="fv">${c.method}</div></div></div>
+            <div class="field" style="grid-column:1/-1"><span class="fi">${ic('hash',15)}</span><div><div class="fk">Reference</div><div class="fv mono">${c.ref}</div></div></div>
+          </div>
+        </div>
+        ${sectionCard('audit','Audit Trail', timeline(c.audit), true, true)}
+      </div>
+      <div class="stack">
+        <div class="card side-card">
+          <h3>Matched Policy</h3>
+          <div class="rows">
+            <div class="row"><div class="k">Policy Number</div><div class="v mono">${c.policy.num}</div></div>
+            <div class="row"><div class="k">Policy Holder</div><div class="v">${c.policy.holder}</div></div>
+            <div class="row"><div class="k">Policy Type</div><div class="v">${c.policy.type}</div></div>
+            <div class="row"><div class="k">Status</div><div class="v">${statusBadge('Resolved') && `<span class="badge badge-apply">${c.policy.status}</span>`}</div></div>
+            <div class="row"><div class="k">Premium</div><div class="v mono">${c.policy.premium}</div></div>
+            <div class="row"><div class="k">Next Due</div><div class="v mono">${c.policy.due}</div></div>
+            <div class="row"><div class="k">Current Balance</div><div class="v mono">${c.policy.balance}</div></div>
+          </div>
+        </div>
+        <div class="meta-card">
+          <div><b>Case ID:</b> ${state.caseId}</div>
+          <div><b>Opened:</b> ${c.received.replace('Payment received ','')}</div>
+          <div><b>Status:</b> Open — Awaiting Decision</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function viewInvestigatorDashboard(){
+  const rows = INV_CASES.map(c=>`
+    <tr onclick="openInvCase('${c.id}')">
+      <td><span class="id-link mono">${c.id}</span></td>
+      <td>${c.sender}</td>
+      <td class="mono">${fmt(c.amount)}</td>
+      <td>${riskBadge(c.risk)}</td>
+      <td style="color:var(--text-secondary)">${c.reason}</td>
+      <td>${statusBadge(c.status)}</td>
+      <td class="mono" style="color:var(--text-secondary)">${c.age}</td>
+    </tr>`).join('');
+  return `<div class="view">
+    <div class="page-head">
+      <div><h1>Investigation Queue</h1><div class="sub">Escalated cases requiring specialist investigation</div></div>
+      <div class="meta-r"><div class="top">Today</div><div class="date">Tuesday, March 31, 2026</div></div>
+    </div>
+    <div class="stat-row">
+      ${statCard('Open Investigations','12',null,'search','info')}
+      ${statCard('Fraud Flagged','3',null,'shield','escalate')}
+      ${statCard('Pending Outreach','5',null,'pause','hold')}
+      ${statCard('Cases Closed Today','8',null,'check','apply')}
+    </div>
+    <div class="card">
+      <div class="tabs">
+        <div class="tab active">Escalated Cases</div>
+        <div class="toolbar">
+          <div class="select-fake">All Risk Levels ${ic('chevdown',13)}</div>
+          <div class="select-fake">All Statuses ${ic('chevdown',13)}</div>
+        </div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Case ID</th><th>Sender</th><th>Amount</th><th>Risk</th><th>Reason</th><th>Status</th><th>Age</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div class="foot-note">
+        <span>Sorted by risk level (highest first)</span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm">View SLA Report</button>
+          <button class="btn btn-primary btn-sm">${ic('download',13)} Export Case List</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function viewInvCaseDetail(){
+  const c = INV_DETAIL[state.caseId] || INV_DETAIL['PMT-4001'];
+  return `<div class="view">
+    <button class="back-btn" onclick="state.view='dashboard';render()">${ic('arrowleft',17)}</button>
+    <div class="page-head" style="margin-bottom:18px"><div><h1>Case ${state.caseId}</h1><div class="sub">Under specialist investigation</div></div></div>
+    <div class="grid-2">
+      <div class="stack">
+        <div class="card" style="padding:18px 20px">
+          <h3 style="font-size:var(--text-md);font-weight:700;margin-bottom:14px">Payment Information</h3>
+          <div class="field-row">
+            <div class="field"><span class="fi">${ic('user',15)}</span><div><div class="fk">Sender Name</div><div class="fv">${c.sender}</div></div></div>
+            <div class="field"><span class="fi">${ic('dollar',15)}</span><div><div class="fk">Amount</div><div class="fv mono">${fmt(c.amount)}</div></div></div>
+            <div class="field"><span class="fi">${ic('calendar',15)}</span><div><div class="fk">Payment Date</div><div class="fv mono">${c.date}</div></div></div>
+            <div class="field"><span class="fi">${ic('creditcard',15)}</span><div><div class="fk">Payment Method</div><div class="fv">${c.method}</div></div></div>
+            <div class="field" style="grid-column:1/-1"><span class="fi">${ic('hash',15)}</span><div><div class="fk">Reference</div><div class="fv">${c.ref}</div></div></div>
+          </div>
+        </div>
+        <div class="card" style="padding:18px 20px">
+          <h3 style="font-size:var(--text-md);font-weight:700;margin-bottom:14px">Potential Matches</h3>
+          <div class="stack" style="gap:10px">
+            ${c.matches.map(m=>`
+            <div style="border:1px solid var(--border-color);border-radius:var(--radius-md);padding:12px 14px;display:flex;justify-content:space-between;align-items:center">
+              <div><div style="font-weight:600;font-size:var(--text-sm)">${m.name}</div><div class="mono" style="font-size:11.5px;color:var(--color-primary)">${m.pol}</div>
+                <div style="font-size:11.5px;color:var(--text-secondary);margin-top:2px">Similarity: <b style="color:var(--text-primary)">${m.sim}%</b> &nbsp; Last Payment: ${m.last}</div></div>
+              <span class="badge ${m.status.includes('Active')?'badge-apply':'badge-neutral'}" style="text-transform:none">${m.status}</span>
+            </div>`).join('')}
+          </div>
+        </div>
+        ${sectionCard('audit2','Audit Trail', timeline([['2026-03-25 08:42:17','System','Payment Received','Ingested via Wire · no policy reference']]), true, true)}
+      </div>
+      <div class="stack">
+        <div class="card side-card">
+          <h3>Decision Actions</h3>
+          <div class="rows">
+            <div class="row"><div class="k">Resolution Action</div><div class="select-fake" style="margin-top:4px;width:100%;justify-content:space-between">Select action... ${ic('chevdown',13)}</div></div>
+            <div class="row"><div class="k">Investigation Summary</div>
+              <textarea placeholder="Summarize investigation findings and rationale" style="width:100%;margin-top:4px;border:1px solid var(--border-color);border-radius:var(--radius-md);padding:8px 10px;font-size:var(--text-sm);min-height:70px;resize:vertical;font-family:var(--font-sans)"></textarea>
+            </div>
+            <button class="btn btn-primary" disabled>Submit &amp; Close Case</button>
+          </div>
+        </div>
+        <div class="meta-card"><div><b>Case ID:</b> ${state.caseId}</div><div><b>Opened:</b> March 31, 2026, 8:42 AM</div><div><b>Status:</b> Open — Awaiting Decision</div></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function bar3(apply, hold, escalate){
+  const cA = 'var(--color-apply)', cH='var(--color-hold)', cE='var(--color-escalate)';
+  return `<div class="stack" style="gap:12px">
+    ${[['APPLY',apply,cA],['HOLD',hold,cH],['ESCALATE',escalate,cE]].map(([l,v,c])=>`
+    <div>
+      <div style="display:flex;justify-content:space-between;font-size:var(--text-sm);margin-bottom:5px">
+        <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:2px;background:${c}"></span>${l}</span>
+        <span class="mono" style="color:var(--text-secondary)">${v.n} cases <b style="color:var(--text-primary);margin-left:6px">${v.p}%</b></span>
+      </div>
+      <div class="track" style="height:8px"><div class="fill" style="width:${v.p}%;background:${c}"></div></div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function viewDirectorDashboard(){
+  const days = [['Mon',60,25,15],['Tue',58,27,15],['Wed',62,24,14],['Thu',59,26,15],['Fri',61,25,14]];
+  const barsHtml = days.map(([d,a,h,e])=>`
+    <div class="col">
+      <div style="width:100%;display:flex;flex-direction:column;justify-content:flex-end;height:90px">
+        <div class="seg" style="height:${e*1.2}px;background:var(--color-escalate)"></div>
+        <div class="seg" style="height:${h*1.2}px;background:var(--color-hold)"></div>
+        <div class="seg" style="height:${a*1.2}px;background:var(--color-apply);border-radius:0 0 2px 2px"></div>
+      </div>
+      <div class="lbl">${d}</div>
+    </div>`).join('');
+  return `<div class="view">
+    <div class="page-head">
+      <div><h1>Compliance Dashboard</h1><div class="sub">Performance metrics, SLA tracking &amp; audit exports</div></div>
+      <button class="btn btn-primary">${ic('download',15)} Export Audit Report</button>
+    </div>
+    <div class="stat-row">
+      ${statCard('Total Processed','1,247','this month','file','info')}
+      ${statCard('Auto-Applied Rate','68%','↑ 3% vs last month','zap','apply')}
+      ${statCard('Override Rate','7.2%','↓ 1.1% vs last month','trend','hold')}
+      ${statCard('Avg Resolution','1.4d','SLA: 2 days','clock','info')}
+    </div>
+    <div class="grid-2" style="grid-template-columns:1fr 1fr">
+      <div class="card" style="padding:20px">
+        <h3 style="font-size:var(--text-md);font-weight:700;margin-bottom:16px">Decision Distribution</h3>
+        ${bar3({n:848,p:68},{n:274,p:22},{n:125,p:10})}
+      </div>
+      <div class="card" style="padding:20px">
+        <h3 style="font-size:var(--text-md);font-weight:700;margin-bottom:14px">SLA Status</h3>
+        <div class="stack" style="gap:12px">
+          ${[['Within SLA','1176 cases','94.3%','apply'],['At Risk (approaching SLA)','47 cases','3.8%','hold'],['SLA Exceeded','24 cases','1.9%','escalate']].map(([l,n,p,c])=>`
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="display:flex;align-items:center;gap:8px;font-size:var(--text-sm)"><span style="width:8px;height:8px;border-radius:50%;background:var(--color-${c})"></span>${l}</span>
+            <span style="font-size:var(--text-sm)"><span class="mono" style="color:var(--text-secondary)">${n}</span> <b style="color:var(--color-${c});margin-left:8px">${p}</b></span>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="card" style="padding:20px">
+        <h3 style="font-size:var(--text-md);font-weight:700;margin-bottom:16px">This Week — Daily Volume</h3>
+        <div class="bars">${barsHtml}</div>
+        <div class="legend">
+          <div class="li"><span class="sw" style="background:var(--color-apply)"></span>Apply</div>
+          <div class="li"><span class="sw" style="background:var(--color-hold)"></span>Hold</div>
+          <div class="li"><span class="sw" style="background:var(--color-escalate)"></span>Escalate</div>
+        </div>
+      </div>
+      <div class="card" style="padding:20px 20px 6px">
+        <h3 style="font-size:var(--text-md);font-weight:700;margin-bottom:4px">Pending Config Approvals</h3>
+        <div class="approval-row">
+          <div><div class="t">Auto-apply threshold → 93%</div><div class="d">Proposed by Marcus Sundaram · 2026-03-29</div></div>
+          <div class="btns"><button class="btn btn-apply btn-sm">Approve</button><button class="btn btn-ghost btn-sm">Reject</button></div>
+        </div>
+        <div class="approval-row">
+          <div><div class="t">Fraud risk sensitivity → HIGH</div><div class="d">Proposed by Marcus Sundaram · 2026-03-28</div></div>
+          <div class="btns"><button class="btn btn-apply btn-sm">Approve</button><button class="btn btn-ghost btn-sm">Reject</button></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function viewAdminDashboard(){
+  const cards = [
+    { tag:'AI Thresholds', status:'PENDING', title:'Auto-apply Confidence Threshold', cur:'90%', prop:'93%', note:'Override rate in 90–92% band increased from 3% to 11% over 4 weeks.', impact:'Est. 8% reduction in auto-apply volume · Proposed by Marcus Sundaram', showBtns:true },
+    { tag:'Detection Rules', status:'APPROVED', title:'Duplicate Detection Window', cur:'72 hours', prop:'96 hours', note:'4 duplicate payments occurred just outside the 72-hour window last quarter.', impact:'Est. 12% increase in duplicate detection · Proposed by Marcus Sundaram', showBtns:false },
+    { tag:'Risk Controls', status:'PENDING', title:'Fraud Risk Sensitivity', cur:'MEDIUM', prop:'HIGH', note:'Recent uptick in suspicious transactions flagged post-processing.', impact:'Est. 5% increase in hold rate · Proposed by Marcus Sundaram', showBtns:true },
+  ];
+  const cardsHtml = cards.map(c=>`
+    <div class="card threshold-card" style="padding:18px 20px">
+      <div class="tags"><span class="badge badge-neutral" style="text-transform:none">${c.tag}</span><span class="badge ${c.status==='PENDING'?'badge-hold':'badge-apply'}">${c.status}</span></div>
+      <h4>${c.title}</h4>
+      <div class="vals"><span class="pillval">Current: ${c.cur}</span>${ic('chevdown',14)}<span class="pillval proposed">Proposed: ${c.prop}</span></div>
+      <div class="note">${c.note}</div>
+      <div class="impact">Impact: ${c.impact}</div>
+      ${c.showBtns?`<div style="display:flex;gap:8px"><button class="btn btn-apply btn-sm">Approve Change</button><button class="btn btn-ghost btn-sm">Reject</button></div>`:''}
+    </div>`).join('');
+  return `<div class="view">
+    <div class="page-head">
+      <div><h1>System Configuration</h1><div class="sub">AI thresholds, detection rules &amp; simulation mode</div></div>
+      <div class="select-fake"><span style="width:6px;height:6px;border-radius:50%;background:var(--text-muted);display:inline-block"></span> Simulation Mode</div>
+    </div>
+    <div class="stat-row">
+      ${statCard('Total Cases Processed','12,847','+8.3%','file','info')}
+      ${statCard('AI Accuracy Rate','94.2%','+2.1%','check','apply')}
+      ${statCard('Avg Processing Time','0.8s','-12%','zap','hold')}
+      ${statCard('Cost per Resolution','$0.023','-5.4%','dollar','apply')}
+    </div>
+    ${cardsHtml}
+  </div>`;
+}
+
+/* ============================= ROUTER ============================= */
+const state = { role:'analyst', view:'dashboard', caseId:null };
+function openCase(id){ state.view='case'; state.caseId=id; render(); }
+function openInvCase(id){ state.view='invcase'; state.caseId=id; render(); }
+
+function render(){
+  renderNav();
+  renderFooter();
+  let html = '';
+  if (state.role==='analyst')      html = state.view==='case' ? viewCaseDetail() : viewAnalystDashboard();
+  if (state.role==='investigator') html = state.view==='invcase' ? viewInvCaseDetail() : viewInvestigatorDashboard();
+  if (state.role==='director')     html = viewDirectorDashboard();
+  if (state.role==='admin')        html = viewAdminDashboard();
+  document.getElementById('main').innerHTML = html;
+  window.scrollTo(0,0);
+}
+render();
+</script>
+</body>
+</html>

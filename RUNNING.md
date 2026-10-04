@@ -87,7 +87,7 @@ The login page shows clickable user cards — no password needed.
 |-----|-----|------|
 | `http://localhost:3001/` | Priya | Payment queue — apply/escalate held payments |
 | `http://localhost:3001/investigations` | Damien | Escalated cases — contact sender, apply or return |
-| `http://localhost:3001/payments/PMT-ESC-001` | Damien | Pre-seeded escalated case for testing investigator workflow |
+| `http://localhost:3001/payments/PMT-900` | Damien | Pre-seeded escalated case for testing investigator workflow |
 | `http://localhost:3001/governance` | Lorraine | Governance metrics + Exception Dashboard button |
 | `http://localhost:3001/governance/exceptions` | Lorraine | Config change approvals, SLA breaches, anomaly flags |
 | `http://localhost:3001/admin/config` | Marcus | Propose threshold changes, deploy approved ones, rollback |

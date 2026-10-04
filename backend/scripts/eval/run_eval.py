@@ -16,10 +16,12 @@ apply_llm_mode); pair it with --out so a live result file is not overwritten.
 """
 import argparse
 import asyncio
+import copy
 import importlib
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from collections import Counter, defaultdict
@@ -67,8 +69,59 @@ def cents(usd: float) -> int:
 # call sites swallow exceptions and fall back, so a failure alone would be invisible); the count must be 0.
 # Result files from before that date were produced with an LLM (or a harness-side regex) parser; see
 # docs/Evaluation_Harness.md.
+#
+# Every call site that IS live in an arm is wrapped by a usage recorder (tokens, reasoning tokens, wall time per call),
+# so cost and latency can be reported per call site for every arm.
 
 LLM_CALLS_ATTEMPTED = 0
+LLM_MODES = ["live", "regex", "defaults", "name-llm", "name-llm+explain", "parse-llm", "parse-fallback",
+             "ai-rules", "ai-open", "ai-tight"]
+
+USAGE: dict[str, dict] = {}          # call site -> totals
+EXPLANATIONS: list[dict] = []        # (input, output) of every reasoning call, for the faithfulness check
+CURRENT_CASE: dict = {"id": None, "pass": 0}
+
+
+def _site(name: str) -> dict:
+    return USAGE.setdefault(name, {"calls": 0, "failures": 0, "prompt_tokens": 0, "completion_tokens": 0,
+                                   "reasoning_tokens": 0, "visible_chars": 0, "seconds": 0.0, "latencies": []})
+
+
+class _UsageClient:
+    """Wraps a real client and records tokens, reasoning tokens and wall time per call site."""
+
+    def __init__(self, site: str, real) -> None:
+        self.site, self.real = site, real
+        self.chat = self
+        self.completions = self
+
+    async def create(self, *args, **kwargs):
+        s = _site(self.site)
+        started = time.monotonic()
+        try:
+            response = await self.real.chat.completions.create(*args, **kwargs)
+        except Exception:
+            s["failures"] += 1
+            raise
+        elapsed = time.monotonic() - started
+        usage = response.usage
+        details = getattr(usage, "completion_tokens_details", None) if usage else None
+        s["calls"] += 1
+        s["seconds"] += elapsed
+        s["latencies"].append(round(elapsed, 3))
+        s["prompt_tokens"] += (usage.prompt_tokens or 0) if usage else 0
+        s["completion_tokens"] += (usage.completion_tokens or 0) if usage else 0
+        s["reasoning_tokens"] += (getattr(details, "reasoning_tokens", 0) or 0) if details else 0
+        try:
+            s["visible_chars"] += len(response.choices[0].message.content or "")
+        except Exception:  # noqa: BLE001
+            pass
+        return response
+
+
+def install_usage(module, site: str) -> None:
+    original = module._get_client
+    module._get_client = lambda: _UsageClient(site, original())
 
 
 class _TripwireClient:
@@ -83,21 +136,29 @@ class _TripwireClient:
 
 
 def apply_llm_mode(mode: str) -> None:
-    """live: unchanged (name scoring and reasoning text use the LLM). regex: the app's own deterministic reference
-    parser, deterministic name score, fallback reasoning text: no LLM anywhere.
-    defaults: as regex, but the reference parser returns no policy number (a total parse failure, for stress-testing
-    the no-policy paths).
+    """
+    live (= name-llm+explain, since parsing became regex): the gray-zone name LLM and the LLM explanation are live.
+    regex: the app's own deterministic parser, deterministic name score, template explanations: no LLM anywhere.
+    name-llm: as regex, except the gray-zone name score is live. ("Optimised" configuration: LLM only where it earns it.)
+    name-llm+explain: name-llm plus the live LLM explanation call. Identical to live on today's code (the alias exists
+        so the arm can be reported under both names and its explanation cost priced separately).
+    parse-llm: experiment-only. The LLM reference parser production used until 2026-09-26 (legacy_parser.llm_parse),
+        name LLM live, template explanations.
+    parse-fallback: experiment-only. Regex parser first, the LLM only when the regex finds nothing (the "keep an LLM
+        fallback" design), name LLM live, template explanations.
+    defaults: as regex, but the reference parser returns no policy number (a total parse failure).
     ai-rules / ai-open / ai-tight: as regex, and the scenario handlers are replaced so an LLM makes the final
-    recommendation (see ai_decider.py). The tripwire only covers the three original call sites, which stay off in
-    these arms.
-    name-llm: as regex, except the gray-zone name score stays live (real LLM calls). Isolates the name LLM's effect:
-    compare it with a regex run on the same cases and the only difference is that one call site."""
-    if mode == "live":
-        return
+        recommendation (see ai_decider.py).
+    """
+    if mode == "name-llm+explain":
+        mode = "live"
     from app.routers import payments as payments_router
     from app.services import ingest, pipeline
     from app.services.agent import reasoning
     from app.services.signals import matching
+
+    name_live = mode in ("live", "name-llm", "parse-llm", "parse-fallback")
+    explain_live = mode == "live"
 
     async def parse_defaults(ref1, ref2):
         return {"extracted_policy_number": None, "payment_intent": "unknown", "period_count": 1}
@@ -111,13 +172,41 @@ def apply_llm_mode(mode: str) -> None:
     if mode == "defaults":
         for module in (ingest, pipeline, payments_router):  # pipeline and the router import the parser by name
             module.parse_reference_fields = parse_defaults
-    if mode != "name-llm":
+    if mode in ("parse-llm", "parse-fallback"):
+        import legacy_parser  # sits next to this script
+
+        parser_fn = legacy_parser.llm_parse if mode == "parse-llm" else legacy_parser.regex_then_llm
+        for module in (ingest, pipeline, payments_router):
+            module.parse_reference_fields = parser_fn
+        install_usage(legacy_parser, "reference_parse")
+
+    if name_live:
+        install_usage(matching, "name_gray_zone")
+    else:
         matching._llm_score = no_llm_name_score
-    reasoning.get_reasoning = reasoning_fallback
-    for n in range(1, 6):  # each scenario handler imports get_reasoning by name
-        importlib.import_module(f"app.services.agent.scenarios.sc{n}").get_reasoning = reasoning_fallback
-    for module in ((reasoning,) if mode == "name-llm" else (matching, reasoning)):  # ingest no longer has a client
-        module._get_client = _TripwireClient
+        matching._get_client = _TripwireClient
+
+    if explain_live:
+        install_usage(reasoning, "reasoning_text")
+        real_reasoning = reasoning.get_reasoning
+
+        async def logged_reasoning(scenario_num, recommendation, context_summary, fallback_reasoning, fallback_action):
+            out = await real_reasoning(scenario_num, recommendation, context_summary, fallback_reasoning, fallback_action)
+            EXPLANATIONS.append({"case_id": CURRENT_CASE["id"], "pass": CURRENT_CASE["pass"], "scenario": scenario_num,
+                                 "recommendation": recommendation, "context_summary": context_summary,
+                                 "reasoning": out[0], "suggested_action": out[1],
+                                 "used_fallback": out[0] == fallback_reasoning})
+            return out
+
+        reasoning.get_reasoning = logged_reasoning
+        for n in range(1, 6):  # each scenario handler imports get_reasoning by name
+            importlib.import_module(f"app.services.agent.scenarios.sc{n}").get_reasoning = logged_reasoning
+    else:
+        reasoning.get_reasoning = reasoning_fallback
+        for n in range(1, 6):
+            importlib.import_module(f"app.services.agent.scenarios.sc{n}").get_reasoning = reasoning_fallback
+        reasoning._get_client = _TripwireClient
+
     if mode in ("ai-rules", "ai-open", "ai-tight"):
         import ai_decider  # sits next to this script
 
@@ -168,6 +257,7 @@ def ingest_body(p: dict, now: datetime) -> dict:
 
 async def run_case(client: httpx.AsyncClient, db, case: dict, now: datetime) -> dict:
     await clear(db, PAYMENT_TABLES)
+    CURRENT_CASE["id"] = case.get("case_id", case["archetype_id"])
     ingests = [*case["prior_payments"], case["payment"]]  # the prior payment first
     started = time.monotonic()
     for p in ingests:
@@ -312,6 +402,18 @@ def report(results: list[dict], stability: dict[str, list[dict]]) -> None:
               f"name={r['name_similarity']}  var={r['amount_variance_pct']}  dup={r['is_duplicate']}  path={r['decision_path']}")
 
 
+def _provenance(data_path: Path, llm_mode: str) -> dict:
+    """What produced this file: enough to reproduce or to discard it later."""
+    def git(*args: str) -> str:
+        try:
+            return subprocess.run(["git", *args], cwd=BACKEND, capture_output=True, text=True, timeout=20).stdout.strip()
+        except Exception:  # noqa: BLE001
+            return ""
+    return {"commit": git("rev-parse", "HEAD"), "app_dirty": bool(git("status", "--porcelain", "--", "app")),
+            "model": "google/gemini-2.5-flash", "llm_mode": llm_mode, "data": data_path.name,
+            "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+
+
 async def main(data_path: Path, out: Path, repeat_gray: int, limit: int | None, llm_mode: str = "live") -> None:
     data = json.loads(data_path.read_text())
     cases = [c for c in data["cases"] if not c["checks"]["failures"]][:limit]
@@ -319,31 +421,45 @@ async def main(data_path: Path, out: Path, repeat_gray: int, limit: int | None, 
     apply_llm_mode(llm_mode)
     print(f"Target DB: {EVAL_URL.rsplit('@', 1)[-1]}   cases: {len(cases)}   gray-zone repeats: {repeat_gray}   llm: {llm_mode}", flush=True)
 
+    meta = _provenance(data_path, llm_mode)
     results: list[dict] = []
     stability: dict[str, list[dict]] = {}
+    main_pass: dict = {}                   # usage snapshot taken when the main pass ends (repeat passes excluded)
     started = time.monotonic()
+    payments_main = sum(1 + len(c["prior_payments"]) for c in cases)
 
     def save() -> None:
-        ai_stats = sys.modules["ai_decider"].STATS if "ai_decider" in sys.modules else None
-        out.write_text(json.dumps({"target_db": EVAL_URL.rsplit("/", 1)[-1], "llm_mode": llm_mode,
-                                   "llm_calls_attempted": LLM_CALLS_ATTEMPTED, "ai_decider_stats": ai_stats,
-                                   "results": results, "stability": stability}, indent=2, default=str))
+        ai = sys.modules["ai_decider"].STATS if "ai_decider" in sys.modules else None
+        out.write_text(json.dumps({
+            "target_db": EVAL_URL.rsplit("/", 1)[-1], "llm_mode": llm_mode, "meta": meta,
+            "llm_calls_attempted": LLM_CALLS_ATTEMPTED,
+            "payments_ingested_main_pass": payments_main,
+            "usage_main_pass": main_pass.get("usage", copy.deepcopy(USAGE)),
+            "usage_all_passes": USAGE,
+            "ai_decider_stats": ai, "ai_decider_stats_main_pass": main_pass.get("ai", copy.deepcopy(ai)),
+            "explanations": EXPLANATIONS,
+            "results": results, "stability": stability}, indent=2, default=str))
 
     async with AsyncSessionLocal() as db:
         await load_world(db, data["world"], now)
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://eval", timeout=180) as client:
+            CURRENT_CASE["pass"] = 0
             for i, case in enumerate(cases, 1):
                 results.append(await run_case(client, db, case, now))
                 if i % 10 == 0 or i == len(cases):
                     elapsed = time.monotonic() - started
                     print(f"  [{i:>3}/{len(cases)}] {elapsed:>4.0f}s elapsed, ~{elapsed / i * (len(cases) - i):.0f}s left", flush=True)
                     save()
+            main_pass["usage"] = copy.deepcopy(USAGE)
+            if "ai_decider" in sys.modules:
+                main_pass["ai"] = copy.deepcopy(sys.modules["ai_decider"].STATS)
 
             gray = [(c, r) for c, r in zip(cases, results) if r["used_llm"]]
             print(f"Gray-zone repeats: {len(gray)} cases × {repeat_gray} extra runs", flush=True)
             for case, first in gray:
                 stability[first["case_id"]] = [{k: first[k] for k in ("scenario", "recommendation", "name_similarity", "llm_score")}]
             for rep in range(repeat_gray):
+                CURRENT_CASE["pass"] = rep + 1
                 for case, first in gray:
                     again = await run_case(client, db, case, now)
                     stability[first["case_id"]].append({k: again[k] for k in ("scenario", "recommendation", "name_similarity", "llm_score")})
@@ -352,12 +468,16 @@ async def main(data_path: Path, out: Path, repeat_gray: int, limit: int | None, 
 
     save()
     report(results, stability)
-    if llm_mode != "live":
+    if llm_mode not in ("live", "name-llm+explain"):
         print(f"\nLLM requests attempted at the call sites meant to be off in this arm: {LLM_CALLS_ATTEMPTED} (must be 0)")
+    for site, u in main_pass.get("usage", {}).items():
+        print(f"LLM site {site}: {u['calls']} calls ({u['failures']} failed), {u['prompt_tokens']:,} prompt + {u['completion_tokens']:,} completion "
+              f"tokens ({u['reasoning_tokens']:,} reasoning), {u['seconds'] / max(u['calls'], 1):.2f}s avg  [main pass, {payments_main} payments]")
     if "ai_decider" in sys.modules:
-        s = sys.modules["ai_decider"].STATS
-        print(f"AI decider: {s['calls']} calls, {s['retries']} retries, {s['failures']} failed decisions (counted as ESCALATE), "
-              f"{s['seconds'] / max(s['calls'], 1):.1f}s avg, {s['prompt_tokens']:,} prompt + {s['completion_tokens']:,} completion tokens")
+        s_ = main_pass.get("ai", sys.modules["ai_decider"].STATS)
+        print(f"AI decider: {s_['calls']} calls, {s_['retries']} retries, {s_['failures']} failed decisions (counted as ESCALATE), "
+              f"{s_['seconds'] / max(s_['calls'], 1):.1f}s avg, {s_['prompt_tokens']:,} prompt + {s_['completion_tokens']:,} completion tokens "
+              f"({s_.get('reasoning_tokens', 0):,} reasoning)")
     print(f"\nWrote {out}   total {time.monotonic() - started:.0f}s")
 
 
@@ -366,9 +486,10 @@ if __name__ == "__main__":
     parser.add_argument("--data", type=Path, default=Path(__file__).parent / "data" / "full.json")
     parser.add_argument("--repeat-gray", type=int, default=4)
     parser.add_argument("--limit", type=int, default=None, help="only run the first N cases (debugging)")
-    parser.add_argument("--llm", choices=["live", "regex", "defaults", "name-llm", "ai-rules", "ai-open", "ai-tight"], default="live",
-                        help="live = real LLM calls (default); regex / defaults = no-LLM ablation arms; "
-                             "name-llm = regex arm with only the gray-zone name LLM live; "
+    parser.add_argument("--llm", choices=LLM_MODES, default="live",
+                        help="live (= name-llm+explain) = gray-zone name LLM and LLM explanations live (default); "
+                             "regex / defaults = no-LLM arms; name-llm = only the gray-zone name LLM live; "
+                             "parse-llm / parse-fallback = experiment-only LLM reference parsers (legacy_parser.py); "
                              "ai-rules / ai-open / ai-tight = an LLM makes the final recommendation (see ai_decider.py)")
     parser.add_argument("--out", type=Path, default=None, help="result file (default: <data>_results.json, which overwrites)")
     args = parser.parse_args()

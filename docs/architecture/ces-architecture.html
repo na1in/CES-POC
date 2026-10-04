@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CES - Architecture Overview</title>
+<style>
+  :root{
+    --data:#4299e1; --proc:#ed8936; --ai:#9f7aea; --ok:#48bb78;
+    --ink:#1a202c; --muted:#4a5568; --line:#e2e8f0; --bg:#f7fafc;
+  }
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;max-width:1200px;
+       margin:0 auto;padding:0 20px 60px;color:var(--ink);line-height:1.6;background:#fff}
+  h1{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:34px 30px;
+     margin:0 -20px 8px;border-radius:0 0 10px 10px;font-size:30px;letter-spacing:-.02em}
+  h1 span{display:block;font-size:15px;font-weight:400;opacity:.9;margin-top:8px;letter-spacing:0}
+  .section{margin:44px 0}
+  .section-title{font-size:20px;border-bottom:2px solid var(--line);padding-bottom:8px;
+                 margin-bottom:18px;letter-spacing:-.01em}
+  .metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:22px 0}
+  .metric{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+  .metric b{display:block;font-size:24px;line-height:1.2;color:#2d3748}
+  .metric span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+  .card{border:1px solid var(--line);border-left:4px solid var(--data);border-radius:6px;
+        padding:14px 16px;background:#fff}
+  .card.proc{border-left-color:var(--proc)} .card.ai{border-left-color:var(--ai)}
+  .card.ok{border-left-color:var(--ok)}
+  .card h4{margin:0 0 6px;font-size:14px}
+  .card p{margin:0;font-size:13px;color:var(--muted)}
+  .diagram-container{border:1px solid var(--line);border-radius:10px;padding:18px;
+                     background:var(--bg);overflow-x:auto}
+  svg{max-width:100%;height:auto;display:block;margin:0 auto}
+  .layer{display:flex;align-items:center;gap:14px;border-radius:8px;padding:12px 16px;margin:10px 0;
+         border:1px solid var(--line);background:#fff}
+  .layer-name{flex:0 0 150px;font-weight:600;font-size:13px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:20px;
+        padding:3px 11px;white-space:nowrap}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--bg);font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:.9em}
+  .note{border-left:4px solid var(--ai);background:#faf5ff;padding:12px 16px;border-radius:0 6px 6px 0;
+        font-size:14px;margin:18px 0}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:14px;
+          justify-content:center}
+  .legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+</style>
+</head>
+<body>
+
+<h1>CES &mdash; Customer Exception System
+  <span>AI-assisted resolution of unidentified insurance payments &middot; architecture overview</span></h1>
+
+<!-- ══ 1. BUSINESS CONTEXT ══════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">1 &middot; Business Context</h2>
+
+  <p><strong>The problem.</strong> Payments arrive that the ledger cannot automatically apply &mdash; a
+  misspelled sender, a missing policy number, an amount that doesn't match the premium. These land in a
+  suspense account and reach an analyst as a <em>flat, arrival-ordered list with no supporting context</em>.
+  For each case the analyst opens customer records, policy data and payment history in separate screens and
+  reconstructs the evidence by hand. Triage quality depends on individual experience, two analysts can reach
+  different conclusions on the same payment, and the reasoning behind a decision is never captured.</p>
+
+  <p><strong>What CES changes.</strong> Every payment is scored against 19 engineered signals, classified
+  into one of 5 exception scenarios, and delivered to a queue <em>ranked by confidence</em> where each case
+  opens as a pre-built dossier &mdash; signal bars, algorithm-level match breakdown, written rationale and a
+  full audit trail. The analyst's work shifts from <em>assembling</em> evidence to <em>judging</em> it.</p>
+
+  <div class="metric-grid">
+    <div class="metric"><b>19</b><span>Signals / payment</span></div>
+    <div class="metric"><b>5</b><span>Exception scenarios</span></div>
+    <div class="metric"><b>33</b><span>REST endpoints</span></div>
+    <div class="metric"><b>16</b><span>Database tables</span></div>
+    <div class="metric"><b>431</b><span>Automated tests</span></div>
+    <div class="metric"><b>9</b><span>Tunable thresholds</span></div>
+  </div>
+
+  <h3 style="font-size:15px;margin-top:26px">Users and what each one needs</h3>
+  <table>
+    <tr><th>Role</th><th>Persona</th><th>Needs from the system</th></tr>
+    <tr><td><strong>Analyst</strong></td><td>Priya</td>
+        <td>A ranked queue where the clear cases clear fast; enough evidence on screen to apply or escalate without leaving the page</td></tr>
+    <tr><td><strong>Investigator</strong></td><td>Damien</td>
+        <td>Escalated cases arriving with their full history intact; sender outreach tracking and SLA visibility</td></tr>
+    <tr><td><strong>Director</strong></td><td>Lorraine</td>
+        <td>Decision attribution (AI vs. human), override rates, SLA adherence, and an audit-ready export</td></tr>
+    <tr><td><strong>Admin</strong></td><td>Marcus</td>
+        <td>Per-scenario analytics and the ability to retune decision thresholds without an engineering release</td></tr>
+  </table>
+
+  <div class="note"><strong>The governing constraint:</strong> a deterministic rule engine owns every
+  decision and the LLM only explains it. Nothing auto-applies money &mdash; every payment lands in a human
+  review queue regardless of confidence.</div>
+</div>
+
+<!-- ══ 2. DATA FLOW ═════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">2 &middot; Data Flow</h2>
+  <p>Grouped regions mark process and trust boundaries. The nested purple region is the important one:
+  the LLM sits <em>beside</em> the decision path, never on it.</p>
+
+  <div class="diagram-container">
+  <svg viewBox="0 0 920 370" role="img" aria-label="CES data flow from inputs through the deterministic core to human decision">
+    <defs>
+      <marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L9,3 z" fill="#718096"/></marker>
+      <marker id="arp" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L9,3 z" fill="#9f7aea"/></marker>
+    </defs>
+
+    <!-- LLM advisory region (nested boundary) -->
+    <rect x="250" y="12" width="400" height="92" rx="8" fill="#faf5ff" stroke="#9f7aea"
+          stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="262" y="30" font-size="11" font-weight="700" fill="#9f7aea" letter-spacing=".06em">LLM ADVISORY &mdash; EXPLANATION ONLY</text>
+    <rect x="268" y="42" width="172" height="50" rx="6" fill="#9f7aea"/>
+    <text x="354" y="63" font-size="12.5" font-weight="600" fill="#fff" text-anchor="middle">Reference Parser</text>
+    <text x="354" y="79" font-size="10.5" fill="#e9d8fd" text-anchor="middle">free-text &rarr; structured</text>
+    <rect x="458" y="42" width="172" height="50" rx="6" fill="#9f7aea"/>
+    <text x="544" y="63" font-size="12.5" font-weight="600" fill="#fff" text-anchor="middle">Rationale Writer</text>
+    <text x="544" y="79" font-size="10.5" fill="#e9d8fd" text-anchor="middle">explains a decided outcome</text>
+
+    <!-- Inputs region -->
+    <rect x="12" y="140" width="178" height="205" rx="8" fill="#ebf8ff" stroke="#4299e1"
+          stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="24" y="159" font-size="11" font-weight="700" fill="#2b6cb0" letter-spacing=".06em">INPUTS</text>
+    <rect x="26" y="168" width="150" height="50" rx="6" fill="#4299e1"/>
+    <text x="101" y="188" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Unidentified</text>
+    <text x="101" y="203" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Payment</text>
+    <rect x="26" y="230" width="150" height="50" rx="6" fill="#4299e1"/>
+    <text x="101" y="250" font-size="11.5" font-weight="600" fill="#fff" text-anchor="middle">Customer &middot; Policy</text>
+    <text x="101" y="265" font-size="11.5" font-weight="600" fill="#fff" text-anchor="middle">Payment History</text>
+    <rect x="26" y="292" width="150" height="42" rx="6" fill="#4299e1" opacity=".82"/>
+    <text x="101" y="318" font-size="11.5" font-weight="600" fill="#fff" text-anchor="middle">9 Config Thresholds</text>
+
+    <!-- Deterministic core region -->
+    <rect x="218" y="140" width="448" height="205" rx="8" fill="#fffaf0" stroke="#ed8936" stroke-width="2"/>
+    <text x="230" y="159" font-size="11" font-weight="700" fill="#c05621" letter-spacing=".06em">DETERMINISTIC CORE &mdash; OWNS EVERY DECISION</text>
+    <rect x="232" y="196" width="98" height="64" rx="6" fill="#ed8936"/>
+    <text x="281" y="222" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Ingest</text>
+    <text x="281" y="238" font-size="10" fill="#fffaf0" text-anchor="middle">validate</text>
+    <rect x="340" y="196" width="98" height="64" rx="6" fill="#ed8936"/>
+    <text x="389" y="218" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Signal</text>
+    <text x="389" y="232" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Engine</text>
+    <text x="389" y="247" font-size="10" fill="#fffaf0" text-anchor="middle">19 &middot; 3 waves</text>
+    <rect x="448" y="196" width="98" height="64" rx="6" fill="#ed8936"/>
+    <text x="497" y="218" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Scenario</text>
+    <text x="497" y="232" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Router</text>
+    <text x="497" y="247" font-size="10" fill="#fffaf0" text-anchor="middle">5 scenarios</text>
+    <rect x="556" y="196" width="98" height="64" rx="6" fill="#ed8936"/>
+    <text x="605" y="222" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Persist</text>
+    <text x="605" y="238" font-size="10" fill="#fffaf0" text-anchor="middle">1 transaction</text>
+    <text x="442" y="296" font-size="11" fill="#c05621" text-anchor="middle">rule-authored &middot; reproducible &middot; snapshotted before routing</text>
+    <text x="442" y="314" font-size="11" fill="#c05621" text-anchor="middle">3 retries (1s / 3s) &middot; transient vs. permanent error classification</text>
+
+    <!-- Human decision region -->
+    <rect x="694" y="140" width="214" height="205" rx="8" fill="#f0fff4" stroke="#48bb78"
+          stroke-width="1.5" stroke-dasharray="6 4"/>
+    <text x="706" y="159" font-size="11" font-weight="700" fill="#276749" letter-spacing=".06em">HUMAN DECISION</text>
+    <rect x="706" y="168" width="190" height="50" rx="6" fill="#48bb78"/>
+    <text x="801" y="188" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Analyst Queue</text>
+    <text x="801" y="203" font-size="10.5" fill="#f0fff4" text-anchor="middle">ranked by confidence</text>
+    <rect x="706" y="230" width="190" height="50" rx="6" fill="#48bb78"/>
+    <text x="801" y="250" font-size="12" font-weight="600" fill="#fff" text-anchor="middle">Investigation Queue</text>
+    <text x="801" y="265" font-size="10.5" fill="#f0fff4" text-anchor="middle">escalations &middot; SLA</text>
+    <rect x="706" y="292" width="190" height="42" rx="6" fill="#48bb78" opacity=".82"/>
+    <text x="801" y="318" font-size="11.5" font-weight="600" fill="#fff" text-anchor="middle">Governance &amp; Audit</text>
+
+    <!-- arrows: inputs -> core -->
+    <path d="M178,193 L228,208" stroke="#718096" stroke-width="1.8" fill="none" marker-end="url(#ar)"/>
+    <path d="M178,255 L228,232" stroke="#718096" stroke-width="1.8" fill="none" marker-end="url(#ar)"/>
+    <path d="M178,313 L214,272" stroke="#718096" stroke-width="1.8" fill="none"
+          stroke-dasharray="5 3" marker-end="url(#ar)"/>
+    <!-- core internal -->
+    <path d="M330,228 L336,228" stroke="#718096" stroke-width="2" marker-end="url(#ar)"/>
+    <path d="M438,228 L444,228" stroke="#718096" stroke-width="2" marker-end="url(#ar)"/>
+    <path d="M546,228 L552,228" stroke="#718096" stroke-width="2" marker-end="url(#ar)"/>
+    <!-- core -> human -->
+    <path d="M656,220 L702,196" stroke="#718096" stroke-width="1.8" fill="none" marker-end="url(#ar)"/>
+    <!-- core <-> llm (advisory, dashed) -->
+    <path d="M281,194 Q290,140 338,96" stroke="#9f7aea" stroke-width="1.6" fill="none"
+          stroke-dasharray="5 3" marker-end="url(#arp)"/>
+    <path d="M497,194 Q505,140 540,96" stroke="#9f7aea" stroke-width="1.6" fill="none"
+          stroke-dasharray="5 3" marker-end="url(#arp)"/>
+  </svg>
+  <div class="legend">
+    <span><i style="background:#4299e1"></i>Data sources</span>
+    <span><i style="background:#ed8936"></i>Deterministic processing</span>
+    <span><i style="background:#9f7aea"></i>LLM (advisory only)</span>
+    <span><i style="background:#48bb78"></i>Human decision</span>
+  </div>
+  </div>
+</div>
+
+<!-- ══ 3. PROCESSING PIPELINE ═══════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">3 &middot; Processing Pipeline</h2>
+  <p>Five stages. Stage 1 always succeeds &mdash; the payment is persisted as <code>RECEIVED</code> before
+  any processing is attempted &mdash; so a pipeline failure is never data loss.</p>
+
+  <div class="diagram-container">
+  <svg viewBox="0 0 920 220" role="img" aria-label="Five stage processing pipeline">
+    <defs><marker id="ar2" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#718096"/></marker></defs>
+
+    <rect x="28" y="40" width="152" height="92" rx="8" fill="#4299e1"/>
+    <text x="104" y="66" font-size="11" fill="#bee3f8" text-anchor="middle">STAGE 1</text>
+    <text x="104" y="88" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Ingest</text>
+    <text x="104" y="107" font-size="10.5" fill="#ebf8ff" text-anchor="middle">validate &middot; parse refs</text>
+    <text x="104" y="121" font-size="10.5" fill="#ebf8ff" text-anchor="middle">persist RECEIVED</text>
+
+    <rect x="206" y="40" width="152" height="92" rx="8" fill="#ed8936"/>
+    <text x="282" y="66" font-size="11" fill="#feebc8" text-anchor="middle">STAGE 2</text>
+    <text x="282" y="88" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Compute Signals</text>
+    <text x="282" y="107" font-size="10.5" fill="#fffaf0" text-anchor="middle">19 signals &middot; 3 waves</text>
+    <text x="282" y="121" font-size="10.5" fill="#fffaf0" text-anchor="middle">parallel fan-out</text>
+
+    <rect x="384" y="40" width="152" height="92" rx="8" fill="#9f7aea"/>
+    <text x="460" y="66" font-size="11" fill="#e9d8fd" text-anchor="middle">STAGE 3</text>
+    <text x="460" y="88" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">AI Agent</text>
+    <text x="460" y="107" font-size="10.5" fill="#faf5ff" text-anchor="middle">route (code) then</text>
+    <text x="460" y="121" font-size="10.5" fill="#faf5ff" text-anchor="middle">explain (LLM)</text>
+
+    <rect x="562" y="40" width="152" height="92" rx="8" fill="#ed8936"/>
+    <text x="638" y="66" font-size="11" fill="#feebc8" text-anchor="middle">STAGE 4</text>
+    <text x="638" y="88" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Persist</text>
+    <text x="638" y="107" font-size="10.5" fill="#fffaf0" text-anchor="middle">single transaction</text>
+    <text x="638" y="121" font-size="10.5" fill="#fffaf0" text-anchor="middle">+ audit entry</text>
+
+    <rect x="740" y="40" width="152" height="92" rx="8" fill="#48bb78"/>
+    <text x="816" y="66" font-size="11" fill="#c6f6d5" text-anchor="middle">STAGE 5</text>
+    <text x="816" y="88" font-size="14" font-weight="700" fill="#fff" text-anchor="middle">Human Queue</text>
+    <text x="816" y="107" font-size="10.5" fill="#f0fff4" text-anchor="middle">every payment</text>
+    <text x="816" y="121" font-size="10.5" fill="#f0fff4" text-anchor="middle">lands HELD</text>
+
+    <path d="M180,86 L202,86" stroke="#718096" stroke-width="2" marker-end="url(#ar2)"/>
+    <path d="M358,86 L380,86" stroke="#718096" stroke-width="2" marker-end="url(#ar2)"/>
+    <path d="M536,86 L558,86" stroke="#718096" stroke-width="2" marker-end="url(#ar2)"/>
+    <path d="M714,86 L736,86" stroke="#718096" stroke-width="2" marker-end="url(#ar2)"/>
+
+    <text x="104" y="160" font-size="10.5" fill="#4a5568" text-anchor="middle">always succeeds</text>
+    <text x="282" y="160" font-size="10.5" fill="#4a5568" text-anchor="middle">snapshot &rarr; payment_signals</text>
+    <text x="460" y="160" font-size="10.5" fill="#4a5568" text-anchor="middle">scenario 5 evaluated first</text>
+    <text x="638" y="160" font-size="10.5" fill="#4a5568" text-anchor="middle">3 retries, 1s / 3s backoff</text>
+    <text x="816" y="160" font-size="10.5" fill="#4a5568" text-anchor="middle">no auto-apply, ever</text>
+
+    <rect x="28" y="182" width="864" height="1" fill="#e2e8f0"/>
+    <text x="460" y="205" font-size="11" fill="#718096" text-anchor="middle">RECEIVED &rarr; PROCESSING &rarr; HELD &rarr; APPLIED | ESCALATED &rarr; PENDING_SENDER_RESPONSE &rarr; RETURNED &nbsp;&middot;&nbsp; failure path: PROCESSING_FAILED (reprocessable)</text>
+  </svg>
+  </div>
+
+  <h3 style="font-size:15px;margin-top:26px">The five exception scenarios</h3>
+  <table>
+    <tr><th>#</th><th>Scenario</th><th>Trigger</th><th>Outcome</th></tr>
+    <tr><td><strong>5</strong></td><td>Duplicate Payment</td>
+        <td>Evaluated <em>first on every payment</em>. 3 exact fields + $2 tolerance, 72-hour window</td>
+        <td>Balance &gt; 0 &rarr; HOLD; balance = 0 &rarr; ESCALATE</td></tr>
+    <tr><td><strong>1</strong></td><td>Strong Policy Match</td>
+        <td>Policy number present, name &ge; 75%, variance &le; 2%</td>
+        <td>HOLD; recommends APPLY when name &gt; 90% and no risk flags</td></tr>
+    <tr><td><strong>2</strong></td><td>Customer Match, No Policy</td>
+        <td>Customer match &ge; 90%, or &lt; 90% with 2+ supporting signals</td>
+        <td>Always requires human approval</td></tr>
+    <tr><td><strong>3</strong></td><td>High Amount Variance</td>
+        <td>Match found but variance &gt; 2%</td>
+        <td>Tiered: 2&ndash;15% HOLD; 15&ndash;50% special cases; &gt; 100% ESCALATE</td></tr>
+    <tr><td><strong>4</strong></td><td>No Matching Customer</td>
+        <td>All matching failed</td>
+        <td>Third-party check first, otherwise ESCALATE</td></tr>
+  </table>
+</div>
+
+<!-- ══ 4. SYSTEM ARCHITECTURE ═══════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">4 &middot; System Architecture</h2>
+
+  <div class="layer" style="border-left:4px solid var(--ok)">
+    <div class="layer-name">Presentation<br><span style="font-weight:400;color:#718096">Next.js &middot; TypeScript</span></div>
+    <div class="chips">
+      <span class="chip">Queue Dashboard</span><span class="chip">Payment Detail</span>
+      <span class="chip">Investigations</span><span class="chip">Governance</span>
+      <span class="chip">Exception Dashboard</span><span class="chip">Compliance Export</span>
+      <span class="chip">Admin Analytics</span><span class="chip">Override Analysis</span>
+      <span class="chip">Config Management</span><span class="chip">Settings</span>
+      <span class="chip">RouteGuard (RBAC)</span>
+    </div>
+  </div>
+
+  <div class="layer" style="border-left:4px solid var(--data)">
+    <div class="layer-name">Service / API<br><span style="font-weight:400;color:#718096">FastAPI &middot; 33 endpoints</span></div>
+    <div class="chips">
+      <span class="chip">payments (3)</span><span class="chip">approvals (7)</span>
+      <span class="chip">config (8)</span><span class="chip">governance (6)</span>
+      <span class="chip">documents (4)</span><span class="chip">analytics (2)</span>
+      <span class="chip">annotations (2)</span><span class="chip">policies (1)</span>
+      <span class="chip">auth &middot; role guards</span>
+    </div>
+  </div>
+
+  <div class="layer" style="border-left:4px solid var(--proc)">
+    <div class="layer-name">Domain / Pipeline<br><span style="font-weight:400;color:#718096">deterministic core</span></div>
+    <div class="chips">
+      <span class="chip">signal_engine</span><span class="chip">signals/matching</span>
+      <span class="chip">signals/amount</span><span class="chip">signals/temporal</span>
+      <span class="chip">signals/risk</span><span class="chip">signals/duplicate</span>
+      <span class="chip">agent/router</span><span class="chip">agent/scenarios sc1&ndash;5</span>
+      <span class="chip">persist</span><span class="chip">pipeline (retry)</span>
+      <span class="chip">sla</span><span class="chip">storage</span>
+    </div>
+  </div>
+
+  <div class="layer" style="border-left:4px solid var(--ai)">
+    <div class="layer-name">AI (advisory)<br><span style="font-weight:400;color:#718096">Gemini 2.5 Flash</span></div>
+    <div class="chips">
+      <span class="chip">parse_reference_fields &middot; 256 tok</span>
+      <span class="chip">name gray-zone adjudication &middot; 128 tok</span>
+      <span class="chip">get_reasoning &middot; 512 tok</span>
+      <span class="chip">OpenRouter (OpenAI-compatible)</span>
+      <span class="chip">10s timeout &middot; deterministic fallback</span>
+    </div>
+  </div>
+
+  <div class="layer" style="border-left:4px solid #718096">
+    <div class="layer-name">Data<br><span style="font-weight:400;color:#718096">PostgreSQL 16 tables</span></div>
+    <div class="chips">
+      <span class="chip">payments</span><span class="chip">payment_signals</span>
+      <span class="chip">payment_recommendations</span><span class="chip">customers</span>
+      <span class="chip">policies</span><span class="chip">payment_history</span>
+      <span class="chip">risk_flags</span><span class="chip">audit_log</span>
+      <span class="chip">case_annotations</span><span class="chip">case_documents</span>
+      <span class="chip">configuration_thresholds</span><span class="chip">…_change_requests</span>
+      <span class="chip">…_threshold_history</span><span class="chip">governance_reviews</span>
+      <span class="chip">anomaly_flags</span><span class="chip">users</span>
+    </div>
+  </div>
+
+  <div class="note"><strong>Contract source of truth:</strong> 11 protobuf definitions (866 lines) generate
+  the application models, and the 16-table schema &mdash; 24 indexes, 18 enum types, 21 foreign keys &mdash;
+  derives from them. Change order is always protos &rarr; schema &rarr; scenario docs &rarr; architecture docs.</div>
+</div>
+
+<!-- ══ 5. FEATURES ══════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">5 &middot; Features</h2>
+
+  <h3 style="font-size:15px">Functional</h3>
+  <div class="feature-grid">
+    <div class="card"><h4>Hybrid name matching</h4>
+      <p>Jaro-Winkler (50%) + Levenshtein (30%) + Soundex bonus (10%). Below 70% or above 92% resolves
+      deterministically with no model call; only the gray zone is adjudicated by the LLM.</p></div>
+    <div class="card proc"><h4>19 signals, 3 dependency waves</h4>
+      <p>Matching, amount &amp; variance, temporal, risk &amp; fraud, duplicate detection &mdash; with
+      parallel fan-out inside each wave and a full snapshot written before routing.</p></div>
+    <div class="card proc"><h4>Deterministic scenario routing</h4>
+      <p>Scenario 5 short-circuits first; scenarios 1&ndash;4 follow an explicit if/else ladder. No model
+      involvement in the decision itself.</p></div>
+    <div class="card ok"><h4>Ranked approval queue</h4>
+      <p>Sorted by confidence descending, filterable by band, scenario, recommendation and method. Stat
+      tiles double as filters.</p></div>
+    <div class="card ok"><h4>Escalation &amp; SLA tracking</h4>
+      <p>Analyst &rarr; investigator handoff preserves full case history; sender outreach starts an SLA
+      timer whose breach surfaces on the director's exception dashboard.</p></div>
+    <div class="card ai"><h4>Threshold governance</h4>
+      <p>Change request &rarr; staged simulation &rarr; director approval &rarr; deploy &rarr; rollback,
+      with full version history. Thresholds are read at decision time, never hardcoded.</p></div>
+    <div class="card"><h4>Case annotations &amp; documents</h4>
+      <p>Case notes, override reasons and investigation notes; document upload with soft-delete only.</p></div>
+    <div class="card ai"><h4>Decision attribution &amp; analytics</h4>
+      <p>Every closure records AI-vs-human attribution, feeding override rate by confidence band and the
+      audit-ready compliance export.</p></div>
+  </div>
+
+  <h3 style="font-size:15px;margin-top:28px">Non-functional</h3>
+  <div class="feature-grid">
+    <div class="card proc"><h4>Financial correctness</h4>
+      <p>All monetary values as integer cents. Every state transition in a single transaction against an
+      append-only audit log.</p></div>
+    <div class="card proc"><h4>Fault tolerance</h4>
+      <p>3 attempts with 1s/3s backoff. Retryable: DB timeouts, deadlocks, LLM rate limits. Non-retryable:
+      constraint and validation errors. Exhausted &rarr; <code>PROCESSING_FAILED</code>, reprocessable via API.</p></div>
+    <div class="card ai"><h4>Graceful model degradation</h4>
+      <p>All three LLM touchpoints fall back to deterministic output, so no provider outage can fail a
+      request.</p></div>
+    <div class="card"><h4>Auditability</h4>
+      <p>Immutable per-payment signal snapshot means any recommendation replays against the exact feature
+      state that produced it &mdash; which is also what makes threshold simulation possible.</p></div>
+    <div class="card ok"><h4>Test coverage</h4>
+      <p>393 pytest (rollback-only DB fixtures, <code>--live-llm</code> toggle) and 38 Playwright E2E across
+      6 spec files.</p></div>
+    <div class="card"><h4>Role-based access</h4>
+      <p>Four roles with server-side guards; UI affordances gated to match, so no role sees an action the
+      API would reject.</p></div>
+  </div>
+</div>
+
+<!-- ══ 6. DEPLOYMENT ════════════════════════════════════════════════ -->
+<div class="section">
+  <h2 class="section-title">6 &middot; Deployment</h2>
+
+  <table>
+    <tr><th>Service</th><th>Stack</th><th>Port</th><th>Notes</th></tr>
+    <tr><td><strong>db</strong></td><td>PostgreSQL (Docker)</td><td>5432</td>
+        <td>Schema from <code>db/schema.sql</code>; must be up before the backend starts</td></tr>
+    <tr><td><strong>backend</strong></td><td>FastAPI, Python 3.12+, uvicorn</td><td>8000</td>
+        <td>Async SQLAlchemy + asyncpg; CORS for :3000/:3001/:3002</td></tr>
+    <tr><td><strong>frontend</strong></td><td>Next.js, React, TypeScript</td><td>3000 / 3001</td>
+        <td>3000 under full Docker stack; 3001 for local dev</td></tr>
+  </table>
+
+  <h3 style="font-size:15px;margin-top:24px">Prerequisites</h3>
+  <div class="chips" style="margin-bottom:18px">
+    <span class="chip">Git</span><span class="chip">Docker Desktop 4.x</span>
+    <span class="chip">Python 3.12+</span><span class="chip">Node.js 18+</span>
+    <span class="chip">OPENROUTER_API_KEY</span>
+  </div>
+
+  <h3 style="font-size:15px">Workflows</h3>
+  <table>
+    <tr><th>Task</th><th>Command</th></tr>
+    <tr><td>Full stack</td><td><code>docker compose up -d</code></td></tr>
+    <tr><td>Database only</td><td><code>docker compose up -d db</code></td></tr>
+    <tr><td>Backend (dev)</td><td><code>python -m uvicorn app.main:app --port 8000 --reload</code></td></tr>
+    <tr><td>Frontend (dev)</td><td><code>npx next dev -p 3001</code></td></tr>
+    <tr><td>Backend tests</td><td><code>python -m pytest tests/ -v</code> &nbsp;(add <code>--live-llm</code> for real model calls)</td></tr>
+    <tr><td>E2E tests</td><td><code>npx playwright test</code> &nbsp;(backend :8000 + frontend :3001 running)</td></tr>
+  </table>
+
+  <div class="note" style="border-left-color:#4299e1;background:#ebf8ff">
+    <strong>Environment:</strong> copy <code>backend/.env.example</code> to <code>backend/.env</code> and
+    supply <code>OPENROUTER_API_KEY</code>. Onboarding walkthrough with troubleshooting lives in
+    <code>SETUP.md</code> at the repository root.</div>
+</div>
+
+<p style="text-align:center;color:#a0aec0;font-size:12px;margin-top:48px">
+  CES &mdash; Customer Exception System &middot; architecture overview &middot;
+  companion to the interactive <code>pipeline-diagram.html</code></p>
+
+</body>
+</html>

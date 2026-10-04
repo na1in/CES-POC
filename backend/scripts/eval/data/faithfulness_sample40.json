@@ -1,0 +1,657 @@
+[
+ {
+  "case_id": "S1-hold-name-0123",
+  "pass": 0,
+  "scenario": 1,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Dan Lovato vs policyholder: Daniel Lovato (similarity: 95%)\n- Policy reference: POL-13305\n- Amount variance: 0.0%\n- Risk flags: False\n- Account status: active\n- Payment method risk: low",
+  "reasoning": [
+   "High sender-policyholder name similarity (95%) indicates a likely match.",
+   "The payment amount variance is 0.0%, suggesting the correct amount was paid.",
+   "No risk flags were triggered, and the payment method risk is low.",
+   "The associated policy is active, indicating it's ready to receive payments."
+  ],
+  "suggested_action": "Verify the payment details and apply the payment to POL-13305.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S1-apply-a-0508",
+  "pass": 0,
+  "scenario": 1,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Kalina N. Markiel vs policyholder: Kalina Markiel (similarity: 100%)\n- Policy reference: POL-13452\n- Amount variance: 0.0%\n- Risk flags: False\n- Account status: active\n- Payment method risk: low",
+  "reasoning": [
+   "Sender name 'Kalina N. Markiel' is an exact match for policyholder 'Kalina Markiel' (100% similarity).",
+   "No variance in payment amount (0.0% variance).",
+   "No risk flags detected.",
+   "Policy account is active.",
+   "Low payment method risk."
+  ],
+  "suggested_action": "Proceed with automatic application of the payment to policy POL-13452.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S1-apply-a-0747",
+  "pass": 0,
+  "scenario": 1,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Kevin A. Cavazos vs policyholder: Kevin Cavazos (similarity: 100%)\n- Policy reference: POL-12164\n- Amount variance: 0.0%\n- Risk flags: False\n- Account status: active\n- Payment method risk: low",
+  "reasoning": [
+   "Sender and policyholder names are an exact match, indicating high certainty of payer identity.",
+   "The payment amount has no variance, matching the expected payment exactly.",
+   "No risk flags were identified for this payment.",
+   "The associated account is currently active.",
+   "The payment method is assessed as low risk."
+  ],
+  "suggested_action": "Proceed with applying the payment to POL-12164 as recommended.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S1-apply-a-1098",
+  "pass": 0,
+  "scenario": 1,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Gunebakan R. Black vs policyholder: Gunebakan Black (similarity: 100%)\n- Policy reference: POL-10876\n- Amount variance: 0.0%\n- Risk flags: False\n- Account status: active\n- Payment method risk: low",
+  "reasoning": [
+   "Policyholder name matches the sender exactly.",
+   "Policy reference POL-10876 is present.",
+   "Payment amount matches the expected amount (0.0% variance).",
+   "No risk flags are present.",
+   "Account status is active and payment method risk is low."
+  ],
+  "suggested_action": "Apply the payment to policy POL-10876.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S5-near-dup-control-0080",
+  "pass": 0,
+  "scenario": 1,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Jacqueline Parsa vs policyholder: Jacqueline Parsa (similarity: 100%)\n- Policy reference: POL-10456\n- Amount variance: 0.0%\n- Risk flags: False\n- Account status: active\n- Payment method risk: low",
+  "reasoning": [
+   "Sender name matches policyholder name exactly.",
+   "Policy reference 'POL-10456' is provided.",
+   "Payment amount matches expected amount (0.0% variance).",
+   "No risk flags were identified.",
+   "Policy account is active and payment method risk is low."
+  ],
+  "suggested_action": "Apply the payment to policy POL-10456.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S1-apply-b-0351",
+  "pass": 0,
+  "scenario": 1,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Hellena Pachla vs policyholder: Hellena Pachla (similarity: 100%)\n- Policy reference: POL-12360\n- Amount variance: 0.0%\n- Risk flags: False\n- Account status: active\n- Payment method risk: low",
+  "reasoning": [
+   "The sender and policyholder names match exactly, indicating the payment is from the correct individual.",
+   "The policy reference 'POL-12360' is present and likely matches an active policy.",
+   "There is no variance in the payment amount, confirming the correct payment has been made.",
+   "No risk flags were triggered, suggesting a routine and legitimate transaction.",
+   "The account is active, indicating the policy is in good standing.",
+   "The payment method poses a low risk, further supporting a straightforward application."
+  ],
+  "suggested_action": "Apply the payment to policy POL-12360 for Hellena Pachla.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S1-apply-a-0618",
+  "pass": 0,
+  "scenario": 1,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Krystyna J. Woods vs policyholder: Krystyna Woods (similarity: 100%)\n- Policy reference: POL-11030\n- Amount variance: 0.0%\n- Risk flags: False\n- Account status: active\n- Payment method risk: low",
+  "reasoning": [
+   "The sender name 'Krystyna J. Woods' is a 100% match to the policyholder 'Krystyna Woods'.",
+   "There is no variance in the payment amount.",
+   "No risk flags were identified for this payment.",
+   "The policy account is currently active.",
+   "The payment method poses a low risk."
+  ],
+  "suggested_action": "Apply the payment to policy POL-11030.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S1-apply-a-0205",
+  "pass": 0,
+  "scenario": 1,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Boris P. Ulker vs policyholder: Boris Ulker (similarity: 100%)\n- Policy reference: POL-10302\n- Amount variance: 0.0%\n- Risk flags: False\n- Account status: active\n- Payment method risk: low",
+  "reasoning": [
+   "Sender name (Boris P. Ulker) is a 100% match to the policyholder name (Boris Ulker).",
+   "No amount variance was detected between the payment and expected amount.",
+   "No risk flags were triggered for this payment.",
+   "The associated policy account is currently active.",
+   "The payment method poses a low risk."
+  ],
+  "suggested_action": "Apply the payment to policy POL-10302.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S2-apply-multi-unique-0237",
+  "pass": 0,
+  "scenario": 2,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Matthew Estevez vs customer: Matthew Estevez (name similarity: 100%)\n- No policy reference in payment\n- Customer has 2 active policies\n- Amount variance: n/a (no policy identified)\n- Risk flags: False\n- Supporting signals: account_match=True, amount_match=False, historical_match=True",
+  "reasoning": [
+   "Sender and customer names are an exact match (Matthew Estevez).",
+   "Customer has an account match, indicating a high likelihood of payment belonging to them.",
+   "Historical payment patterns suggest this customer frequently makes payments.",
+   "Two active policies for the customer increase the probability of this being a legitimate payment for one of them."
+  ],
+  "suggested_action": "Manually review the customer's active policies to allocate the payment based on the customer's payment history or typical premium amounts.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S2-apply-single-02",
+  "pass": 0,
+  "scenario": 2,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Emily Chen vs customer: Emily Chen (name similarity: 100%)\n- No policy reference in payment\n- Customer has 1 active policies\n- Amount variance: n/a (no policy identified)\n- Risk flags: False\n- Supporting signals: account_match=True, amount_match=False, historical_match=True",
+  "reasoning": [
+   "Sender and customer names match perfectly (Emily Chen).",
+   "An active policy exists for the customer, increasing the likelihood of a legitimate payment.",
+   "The payment matches a historical payment pattern (historical_match=True).",
+   "No risk flags were triggered, indicating a low-risk transaction.",
+   "Despite no policy reference in the payment, the strong customer and historical matches suggest it is intended for this customer."
+  ],
+  "suggested_action": "Manually apply the payment to Emily Chen's active policy, investigating any discrepancy in the expected amount.",
+  "used_fallback": false,
+  "corpus": "full"
+ },
+ {
+  "case_id": "S2-apply-single-04",
+  "pass": 0,
+  "scenario": 2,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Liam Murphy vs customer: Liam Murphy (name similarity: 100%)\n- No policy reference in payment\n- Customer has 1 active policies\n- Amount variance: n/a (no policy identified)\n- Risk flags: False\n- Supporting signals: account_match=True, amount_match=False, historical_match=True",
+  "reasoning": [
+   "Sender and customer names match exactly, indicating a strong likelihood of the payment belonging to the customer.",
+   "A historical payment match suggests a recurring payment pattern from this sender to this customer.",
+   "The 'account_match=True' signal confirms the sender is linked to the customer's account.",
+   "Despite no policy reference or amount match, the strong identity and historical connection support direct application."
+  ],
+  "suggested_action": "Apply the payment directly to Liam Murphy's account.",
+  "used_fallback": false,
+  "corpus": "heldout"
+ },
+ {
+  "case_id": "S2-apply-single-card-0129",
+  "pass": 0,
+  "scenario": 2,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Ramon Babu vs customer: Ramon Babu (name similarity: 100%)\n- No policy reference in payment\n- Customer has 1 active policies\n- Amount variance: n/a (no policy identified)\n- Risk flags: False\n- Supporting signals: account_match=True, amount_match=False, historical_match=True",
+  "reasoning": [
+   "Sender and customer names are an exact match (Ramon Babu).",
+   "Customer has an active policy.",
+   "Payment has a historical match, indicating previous successful payments from this sender.",
+   "Account match signal is true, confirming a link to an existing customer account."
+  ],
+  "suggested_action": "Apply the payment to Ramon Babu's active policy, considering the strong name match and historical payment patterns.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S2-apply-multi-unique-0146",
+  "pass": 0,
+  "scenario": 2,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Ronald Morris vs customer: Ronald Morris (name similarity: 100%)\n- No policy reference in payment\n- Customer has 2 active policies\n- Amount variance: n/a (no policy identified)\n- Risk flags: False\n- Supporting signals: account_match=True, amount_match=False, historical_match=True",
+  "reasoning": [
+   "100% name match between sender and customer.",
+   "Customer has two active policies, indicating an existing relationship.",
+   "The payment matches an existing account (account_match=True).",
+   "There is a historical match for this type of payment/sender (historical_match=True).",
+   "No risk flags were identified."
+  ],
+  "suggested_action": "Review the customer's active policies and historical payment patterns to determine the correct policy for application.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S2-apply-multi-unique-05",
+  "pass": 0,
+  "scenario": 2,
+  "recommendation": "APPLY",
+  "context_summary": "- Sender: Diego Ramirez vs customer: Diego Ramirez (name similarity: 100%)\n- No policy reference in payment\n- Customer has 2 active policies\n- Amount variance: n/a (no policy identified)\n- Risk flags: False\n- Supporting signals: account_match=True, amount_match=False, historical_match=True",
+  "reasoning": [
+   "The sender and customer names match exactly (Diego Ramirez).",
+   "Customer 'Diego Ramirez' has two active policies.",
+   "The payment successfully matched to a customer account (account_match=True).",
+   "Historical payment patterns indicate a match for this customer (historical_match=True).",
+   "No risk flags were identified for this payment."
+  ],
+  "suggested_action": "Manually apply the payment to one of Diego Ramirez's active policies after confirming the intended policy with the customer.",
+  "used_fallback": false,
+  "corpus": "full"
+ },
+ {
+  "case_id": "S2-hold-multi-ambiguous-0082",
+  "pass": 0,
+  "scenario": 2,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: Ranveer Barber vs customer: Ranveer Barber (name similarity: 100%)\n- No policy reference in payment\n- Customer has 2 active policies\n- Amount variance: n/a (no policy identified)\n- Risk flags: False\n- Supporting signals: account_match=True, amount_match=False, historical_match=True",
+  "reasoning": [
+   "Sender name (Ranveer Barber) matches customer name (Ranveer Barber) 100%.",
+   "No policy reference was provided in the payment details.",
+   "Customer has 2 active policies, but no specific policy was identified for the payment.",
+   "System detected an account match and historical match, indicating the payment likely belongs to this customer.",
+   "No amount match was detected as no policy was identified."
+  ],
+  "suggested_action": "Contact the customer to clarify which of their two active policies this payment should be applied to.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S2-hold-multi-ambiguous-06",
+  "pass": 0,
+  "scenario": 2,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: Anya Petrova vs customer: Anya Petrova (name similarity: 100%)\n- No policy reference in payment\n- Customer has 2 active policies\n- Amount variance: n/a (no policy identified)\n- Risk flags: False\n- Supporting signals: account_match=True, amount_match=False, historical_match=True",
+  "reasoning": [
+   "Sender and customer names match perfectly (Anya Petrova).",
+   "Customer has 2 active policies, but no policy reference was provided in the payment.",
+   "Supporting signals indicate a strong account match and historical payment relationship.",
+   "The 'HOLD' recommendation is due to the absence of a specific policy reference for allocation."
+  ],
+  "suggested_action": "Contact Anya Petrova to determine which of her two active policies the payment is intended for.",
+  "used_fallback": false,
+  "corpus": "heldout"
+ },
+ {
+  "case_id": "S3-tier3-above-0106",
+  "pass": 0,
+  "scenario": 3,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: Henrique Pires vs policyholder: Henrique Pires (similarity: 100%)\n- Policy: POL-12059\n- Amount variance: 36.4%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 0%",
+  "reasoning": [
+   "The payment sender (Henrique Pires) perfectly matches the policyholder (Henrique Pires).",
+   "There is a significant amount variance of 36.4%.",
+   "The payment is not multi-period or multi-method.",
+   "There is no historical consistency for payments associated with this policy."
+  ],
+  "suggested_action": "Investigate the reason for the 36.4% amount variance on Policy POL-12059.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S3-tier3-below-0172~name_case",
+  "pass": 0,
+  "scenario": 3,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: Marguerite Tolosa, vs policyholder: Marguerite Tolosa (similarity: 100%)\n- Policy: POL-12353\n- Amount variance: 35.2%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 0%",
+  "reasoning": [
+   "The payment amount has a significant variance of 35.2% from the expected amount.",
+   "No historical payment consistency was found (0%), indicating an unusual payment pattern for this policy.",
+   "The payment is not associated with multiple periods or multiple payment methods.",
+   "The sender and policyholder are the same, ruling out third-party involvement."
+  ],
+  "suggested_action": "Review the policy's payment history and recent statements to understand the reason for the significant amount variance.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S3-tier4-0054~name_case",
+  "pass": 0,
+  "scenario": 3,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: NOUD PERONNE vs policyholder: Noud Peronne (similarity: 100%)\n- Policy: POL-12969\n- Amount variance: 72.8%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 0%",
+  "reasoning": [
+   "The payment amount has a significant variance of 72.8%, indicating a mismatch with expected payment.",
+   "There is no historical consistency for this payment, suggesting it's an unusual or first-time transaction.",
+   "The policyholder and sender names are an exact match, but this doesn't override the amount discrepancy.",
+   "The payment is not multi-period or multi-method, and no third-party is involved, simplifying the investigation."
+  ],
+  "suggested_action": "Investigate the reason for the 72.8% amount variance by contacting the policyholder or reviewing policy POL-12969 for discrepancies.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S3-tier3-below-03",
+  "pass": 0,
+  "scenario": 3,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: Isabella Costa vs policyholder: Isabella Costa (similarity: 100%)\n- Policy: POL-90012\n- Amount variance: 30.0%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 0%",
+  "reasoning": [
+   "The payment amount has a significant 30% variance compared to expected.",
+   "There is no historical consistency for this payment, indicating it's an unusual transaction.",
+   "The payment is from and for the policyholder, but the amount discrepancy is the primary concern."
+  ],
+  "suggested_action": "Investigate the reason for the 30% payment variance and validate the correct amount with the policyholder.",
+  "used_fallback": false,
+  "corpus": "heldout"
+ },
+ {
+  "case_id": "S3-tier3-above-0163",
+  "pass": 0,
+  "scenario": 3,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: Abeer Sager vs policyholder: Abeer Sager (similarity: 100%)\n- Policy: POL-12948\n- Amount variance: 22.7%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 0%",
+  "reasoning": [
+   "The payment amount has a significant variance of 22.7% compared to the expected amount.",
+   "There is no historical consistency for this payment, indicating it's an unusual payment pattern.",
+   "The payment is not multi-period, multi-method, or from a third party, suggesting it should be straightforward if not for the variance.",
+   "While the sender and policyholder match perfectly, the substantial amount variance warrants further investigation."
+  ],
+  "suggested_action": "Review the payment details and policy POL-12948 to understand the reason for the 22.7% amount variance.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S3-tier3-below-06",
+  "pass": 0,
+  "scenario": 3,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: Sofia Lindberg vs policyholder: Sofia Lindberg (similarity: 100%)\n- Policy: POL-91008\n- Amount variance: 20.0%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 0%",
+  "reasoning": [
+   "The payment sender (Sofia Lindberg) matches the policyholder (Sofia Lindberg) with 100% similarity.",
+   "The payment exhibits a significant 20.0% variance from the expected amount.",
+   "This is not a multi-period or multi-method payment.",
+   "There is no historical consistency for this payment, indicating it's an unusual occurrence."
+  ],
+  "suggested_action": "Investigate the reason for the 20% amount variance and contact the policyholder for clarification if needed.",
+  "used_fallback": false,
+  "corpus": "full"
+ },
+ {
+  "case_id": "S3-tier4-05~name_case",
+  "pass": 0,
+  "scenario": 3,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: Sofia Lindberg, vs policyholder: Sofia Lindberg (similarity: 100%)\n- Policy: POL-91008\n- Amount variance: 70.0%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 0%",
+  "reasoning": [
+   "The payment amount has a significant 70% variance from the expected amount, triggering an automatic hold.",
+   "The policyholder (Sofia Lindberg) is the same as the payment sender, ruling out third-party involvement.",
+   "There is no historical payment consistency, indicating potential issues or a new payment pattern."
+  ],
+  "suggested_action": "Investigate the reason for the 70% payment amount variance by contacting the policyholder or reviewing policy details for recent changes.",
+  "used_fallback": false,
+  "corpus": "full"
+ },
+ {
+  "case_id": "S3-tier4-0128~ref_noise",
+  "pass": 0,
+  "scenario": 3,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: SHb Norberg vs policyholder: SHb Norberg (similarity: 100%)\n- Policy: POL-13564\n- Amount variance: 65.0%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 94%",
+  "reasoning": [
+   "The payment amount has a significant 65.0% variance from the expected amount, suggesting underpayment.",
+   "The payment is not for multiple periods, nor does it involve multiple payment methods, simplifying analysis.",
+   "The sender and policyholder are identical (SHb Norberg), confirming the payment originated from the insured.",
+   "Despite the current variance, historical payments for this policy have been 94% consistent, warranting further review."
+  ],
+  "suggested_action": "Investigate the reason for the 65% payment variance and contact the policyholder for clarification or additional payment.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S4-unknown-person-0031",
+  "pass": 0,
+  "scenario": 4,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Sender: Floortje Font\n- Best customer match: Eleonore Alboni (51% similarity) \u2014 below 75% threshold\n- Third-party indicator: False (None)\n- Policy reference found: False\n- Amount variance: 0.0%\n- Payment method: Check",
+  "reasoning": [
+   "Low customer match similarity (51%) to Eleonore Alboni, falling below the 75% threshold.",
+   "No policy reference was found on the payment.",
+   "Payment sender 'Floortje Font' does not match the proposed customer 'Eleonore Alboni'.",
+   "No third-party indicator present to explain the sender/customer mismatch."
+  ],
+  "suggested_action": "Manually investigate the payment to identify the correct policyholder or determine if it is a new policy application.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S4-bad-policy-ref-0038",
+  "pass": 0,
+  "scenario": 4,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Sender: Annetta Majczyna\n- Best customer match: Anna Lepianka (57% similarity) \u2014 below 75% threshold\n- Third-party indicator: False (None)\n- Policy reference found: False\n- Amount variance: 0.0%\n- Payment method: Wire",
+  "reasoning": [
+   "Sender 'Annetta Majczyna' does not match the best customer 'Anna Lepianka' (57% similarity, below 75% threshold).",
+   "No policy reference was found on the payment.",
+   "Third-party indicator is false, meaning the sender is not a known third party.",
+   "Payment method is Wire, which often requires manual reconciliation."
+  ],
+  "suggested_action": "Investigate the sender 'Annetta Majczyna' and contact the policyholder 'Anna Lepianka' to clarify the payment intent.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S4-unknown-person-03",
+  "pass": 0,
+  "scenario": 4,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Sender: Robert Smith\n- Best customer match: Renata Silva (45% similarity) \u2014 below 75% threshold\n- Third-party indicator: True (None)\n- Policy reference found: False\n- Amount variance: 0.0%\n- Payment method: ACH",
+  "reasoning": [
+   "Sender 'Robert Smith' does not match the best customer 'Renata Silva'.",
+   "Customer match (45%) is significantly below the 75% threshold.",
+   "No policy reference was found.",
+   "Payment is flagged as a third-party payment, but no third-party details are provided.",
+   "Unidentified payment method: ACH."
+  ],
+  "suggested_action": "Investigate the sender, Robert Smith, and contact the customer, Renata Silva, to determine the purpose of this ACH payment and identify the correct policy or account.",
+  "used_fallback": false,
+  "corpus": "full"
+ },
+ {
+  "case_id": "S4-third-party-hold-0023",
+  "pass": 0,
+  "scenario": 4,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: Orchard Ridge Mortgage Escrow\n- Best customer match: Mugdha Pruchnik (30% similarity) \u2014 below 75% threshold\n- Third-party indicator: True (None)\n- Policy reference found: True\n- Amount variance: 2.4%\n- Payment method: Wire",
+  "reasoning": [
+   "Sender 'Orchard Ridge Mortgage Escrow' suggests a third-party payment, but the 'Third-party indicator' is 'True (None)' which is contradictory or incomplete.",
+   "The customer match for Mugdha Pruchnik is only 30%, which is well below the 75% confidence threshold for direct application.",
+   "There is a policy reference found, but without a strong customer match, direct application is risky.",
+   "The amount variance of 2.4% is minor, but doesn't override the other identification issues.",
+   "The payment method is Wire, which typically has direct and clear sender information."
+  ],
+  "suggested_action": "Verify the true sender of the wire payment, confirm the intended recipient from Orchard Ridge Mortgage Escrow, and manually match to the correct policyholder.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S4-unknown-company-06",
+  "pass": 0,
+  "scenario": 4,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Sender: Zenith Corp\n- Best customer match: Lena Petrova (44% similarity) \u2014 below 75% threshold\n- Third-party indicator: True (None)\n- Policy reference found: False\n- Amount variance: 0.0%\n- Payment method: Check",
+  "reasoning": [
+   "Sender 'Zenith Corp' does not match any known policyholders.",
+   "Best customer match 'Lena Petrova' has a low similarity score (44%) and is below the 75% threshold.",
+   "No policy reference was found on the payment.",
+   "Third-party indicator is true, but no specific third-party details are provided.",
+   "Payment method is Check, requiring manual processing if no policy is identified."
+  ],
+  "suggested_action": "Investigate the sender 'Zenith Corp' and the payment details to identify the correct policy or payer, contacting the customer if necessary.",
+  "used_fallback": false,
+  "corpus": "full"
+ },
+ {
+  "case_id": "S1-hold-name-05",
+  "pass": 0,
+  "scenario": 4,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Sender: Liam M.\n- Best customer match: Liam Murphy (69% similarity) \u2014 below 75% threshold\n- Third-party indicator: False (None)\n- Policy reference found: True\n- Amount variance: 0.3%\n- Payment method: ACH",
+  "reasoning": [
+   "Customer match is below the 75% threshold, indicating uncertainty in identity.",
+   "Unidentified sender 'Liam M.' does not fully match 'Liam Murphy'.",
+   "Despite a policy reference and low amount variance, the weak customer match necessitates review.",
+   "Payment method is ACH, which offers less immediate recourse than credit card if misapplied."
+  ],
+  "suggested_action": "Review the customer and payment details to confirm the correct policyholder and apply the payment accordingly, or initiate a refund if no match is found.",
+  "used_fallback": false,
+  "corpus": "heldout"
+ },
+ {
+  "case_id": "S4-third-party-hold-05~ref_noise",
+  "pass": 0,
+  "scenario": 4,
+  "recommendation": "HOLD",
+  "context_summary": "- Sender: Schmidt & Co. Payroll\n- Best customer match: Naomi Schmidt (38% similarity) \u2014 below 75% threshold\n- Third-party indicator: True (None)\n- Policy reference found: True\n- Amount variance: 2.5%\n- Payment method: ACH",
+  "reasoning": [
+   "Customer match is below the 75% threshold (38% similarity to Naomi Schmidt).",
+   "Sender 'Schmidt & Co. Payroll' does not directly match the potential customer name.",
+   "Third-party indicator is True, but no specific third-party details are provided.",
+   "Although a policy reference was found, the customer mismatch raises doubts about correct allocation.",
+   "A 2.5% amount variance, while small, contributes to the need for verification given other red flags."
+  ],
+  "suggested_action": "Manually investigate the payment details and sender to confirm the intended recipient and policy before processing.",
+  "used_fallback": false,
+  "corpus": "full"
+ },
+ {
+  "case_id": "S4-unknown-company-03",
+  "pass": 0,
+  "scenario": 4,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Sender: Tech Innovations Inc\n- Best customer match: Nia Jones (42% similarity) \u2014 below 75% threshold\n- Third-party indicator: True (None)\n- Policy reference found: False\n- Amount variance: 0.0%\n- Payment method: Wire",
+  "reasoning": [
+   "Sender 'Tech Innovations Inc' does not clearly identify the payee.",
+   "Customer match (Nia Jones) is low at 42%, falling below the 75% confidence threshold.",
+   "No policy reference was found to associate this payment with an active policy.",
+   "Third-party indicator is 'True (None)', suggesting the sender is not directly tied to the policyholder.",
+   "Wire payment method indicates direct bank transfer, requiring careful verification."
+  ],
+  "suggested_action": "Investigate the sender 'Tech Innovations Inc' and contact Nia Jones to determine the purpose of this wire payment and identify the correct policy.",
+  "used_fallback": false,
+  "corpus": "heldout"
+ },
+ {
+  "case_id": "S5-dup-tolerance-0026~ref_noise",
+  "pass": 0,
+  "scenario": 5,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Original payment: PMT-001 (26.1 hours ago)\n- Current payment: PMT-002\n- Amount difference: $1.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-12241\n- Outstanding balance: $0.00",
+  "reasoning": [
+   "Original payment PMT-001 was made 26.1 hours ago, indicating a recent transaction.",
+   "Current payment PMT-002 matches key identifiers (sender, method, policy) with PMT-001.",
+   "The $1.00 amount difference is within the $2.00 tolerance, suggesting a minor discrepancy.",
+   "Policy POL-12241 has a $0.00 outstanding balance, indicating it's fully paid or overpaid."
+  ],
+  "suggested_action": "Investigate if PMT-002 is a duplicate payment or a minor adjustment related to PMT-001 due to the zero outstanding balance.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S5-dup-exact-0118",
+  "pass": 0,
+  "scenario": 5,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Original payment: PMT-001 (55.4 hours ago)\n- Current payment: PMT-002\n- Amount difference: $0.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-12598\n- Outstanding balance: $0.00",
+  "reasoning": [
+   "Original payment PMT-001 was made 55.4 hours ago.",
+   "Current payment PMT-002 has an identical amount ($0.00 difference) to PMT-001.",
+   "Both payments match on sender name, payment method, and policy reference for POL-12598.",
+   "The policy POL-12598 currently has an outstanding balance of $0.00."
+  ],
+  "suggested_action": "Investigate why a second payment (PMT-002) for the same amount was initiated given the policy's zero outstanding balance and recent prior payment (PMT-001).",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S5-dup-exact-04",
+  "pass": 0,
+  "scenario": 5,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Original payment: PMT-001 (25.0 hours ago)\n- Current payment: PMT-002\n- Amount difference: $0.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-90010\n- Outstanding balance: $0.00",
+  "reasoning": [
+   "Original payment PMT-001 was received 25 hours ago.",
+   "Current payment PMT-002 has an amount difference of $0.00.",
+   "Both payments match on sender name, payment method, and policy reference.",
+   "Policy POL-90010 currently has a $0.00 outstanding balance."
+  ],
+  "suggested_action": "Investigate if PMT-002 is a duplicate payment for POL-90010 given the original payment and zero outstanding balance.",
+  "used_fallback": false,
+  "corpus": "heldout"
+ },
+ {
+  "case_id": "S5-dup-exact-04~ref_noise",
+  "pass": 0,
+  "scenario": 5,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Original payment: PMT-001 (25.0 hours ago)\n- Current payment: PMT-002\n- Amount difference: $0.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-90010\n- Outstanding balance: $0.00",
+  "reasoning": [
+   "Original payment PMT-001 was received 25 hours ago, indicating a recent payment activity.",
+   "Current payment PMT-002 matches original on sender name, payment method, and policy reference.",
+   "Amount difference is $0.00, well within tolerance, suggesting it might be a duplicate or related transaction.",
+   "Policy POL-90010 has a $0.00 outstanding balance, meaning the policy is already paid in full."
+  ],
+  "suggested_action": "Investigate if PMT-002 is a duplicate of PMT-001 or an overpayment, and consider initiating a refund if confirmed.",
+  "used_fallback": false,
+  "corpus": "heldout"
+ },
+ {
+  "case_id": "S5-dup-balance-02",
+  "pass": 0,
+  "scenario": 5,
+  "recommendation": "HOLD",
+  "context_summary": "- Original payment: PMT-001 (46.0 hours ago)\n- Current payment: PMT-002\n- Amount difference: $0.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-90015\n- Outstanding balance: $2000.00",
+  "reasoning": [
+   "The system recommends 'HOLD' due to the presence of a previous payment (PMT-001) for the same policy.",
+   "PMT-002 is an exact amount match to PMT-001 ($0.00 difference).",
+   "PMT-002 matches PMT-001 on sender name, payment method, and policy reference.",
+   "The original payment (PMT-001) was received 46 hours ago, suggesting a potential duplicate."
+  ],
+  "suggested_action": "Investigate PMT-001 and PMT-002 to confirm if PMT-002 is a duplicate payment for POL-90015 and if PMT-001 has been processed correctly.",
+  "used_fallback": false,
+  "corpus": "full"
+ },
+ {
+  "case_id": "S5-dup-tolerance-0050",
+  "pass": 0,
+  "scenario": 5,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Original payment: PMT-001 (27.8 hours ago)\n- Current payment: PMT-002\n- Amount difference: $1.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-12157\n- Outstanding balance: $0.00",
+  "reasoning": [
+   "Original payment PMT-001 was made 27.8 hours ago, indicating a potential duplicate.",
+   "Outstanding balance for POL-12157 is $0.00, suggesting no further payment is due.",
+   "Despite a $1.00 difference (within tolerance), PMT-002 matches key identifiers with PMT-001 (sender name, payment method, policy reference)."
+  ],
+  "suggested_action": "Investigate if PMT-002 is a duplicate payment for POL-12157 and determine if a refund is required.",
+  "used_fallback": false,
+  "corpus": "mock500"
+ },
+ {
+  "case_id": "S5-dup-balance-03",
+  "pass": 0,
+  "scenario": 5,
+  "recommendation": "HOLD",
+  "context_summary": "- Original payment: PMT-001 (35.0 hours ago)\n- Current payment: PMT-002\n- Amount difference: $0.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-91007\n- Outstanding balance: $50.00",
+  "reasoning": [
+   "Original payment PMT-001 was processed 35.0 hours ago, indicating recent activity.",
+   "Current payment PMT-002 has a $0.00 amount difference from PMT-001, falling within tolerance.",
+   "PMT-002 matches PMT-001 on sender name, payment method, and policy reference (POL-91007).",
+   "Policy POL-91007 currently has an outstanding balance of $50.00.",
+   "The combination of recent payment, exact match, and existing balance suggests a potential duplicate or follow-up payment that needs investigation."
+  ],
+  "suggested_action": "Investigate if PMT-002 is a duplicate payment for the same outstanding balance as PMT-001, or if it's intended to cover a different portion of the $50.00 outstanding balance.",
+  "used_fallback": false,
+  "corpus": "full"
+ },
+ {
+  "case_id": "S5-dup-exact-03~name_case",
+  "pass": 0,
+  "scenario": 5,
+  "recommendation": "ESCALATE",
+  "context_summary": "- Original payment: PMT-001 (31.0 hours ago)\n- Current payment: PMT-002\n- Amount difference: $0.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-90004\n- Outstanding balance: $0.00",
+  "reasoning": [
+   "Original payment PMT-001 was received 31 hours ago.",
+   "Current payment PMT-002 has an identical amount to PMT-001.",
+   "Both payments match on sender name, payment method, and policy reference.",
+   "Policy POL-90004 has no outstanding balance, indicating a potential duplicate payment."
+  ],
+  "suggested_action": "Investigate if PMT-002 is a duplicate of PMT-001 and determine if a refund is required.",
+  "used_fallback": false,
+  "corpus": "full"
+ }
+]

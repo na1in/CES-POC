@@ -92,7 +92,7 @@
 - [x] `backend/app/main.py` — Added `CORSMiddleware` (was missing; caused all browser API calls to fail)
 - [x] `frontend/src/lib/api.ts` — Fixed Content-Type override clobbering form logins
 - [x] `frontend/src/components/RouteGuard.tsx` — Role-specific redirect on login (`roleHome` map)
-- [x] `backend/scripts/seed.py` — Added `PMT-ESC-001` (escalated investigation seed case)
+- [x] `backend/scripts/seed.py` — Added `PMT-900` (escalated investigation seed case)
 
 ---
 

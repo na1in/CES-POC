@@ -179,7 +179,7 @@ The login page shows clickable user cards — no password required.
 | URL | Logged in as | What you'll see |
 |-----|-------------|-----------------|
 | `http://localhost:3001/` | Priya | Queue of held payments with AI recommendations |
-| `http://localhost:3001/payments/PMT-ESC-001` | Damien | Pre-escalated case — try "Awaiting Sender Response" |
+| `http://localhost:3001/payments/PMT-900` | Damien | Pre-escalated case — try "Awaiting Sender Response" |
 | `http://localhost:3001/investigations` | Damien | Investigation queue with SLA report modal |
 | `http://localhost:3001/governance` | Lorraine | Decision metrics, override rate, SLA adherence |
 | `http://localhost:3001/governance/exceptions` | Lorraine | SLA breaches + anomaly flags |
