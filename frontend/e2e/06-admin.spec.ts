@@ -8,7 +8,7 @@ test.describe("Admin Dashboard", () => {
 
   test("shows admin dashboard heading", async ({ page }) => {
     await expect(page.getByRole("heading", { name: /admin dashboard/i })).toBeVisible()
-    await expect(page.getByText(/per-scenario AI performance analytics/i)).toBeVisible()
+    await expect(page.getByText(/per-scenario recommendation performance/i)).toBeVisible()
   })
 
   test("shows scenario tabs", async ({ page }) => {

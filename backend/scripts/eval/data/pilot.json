@@ -1,0 +1,1535 @@
+{
+  "meta": {
+    "model": "google/gemini-2.5-flash",
+    "seconds": 47.2,
+    "tokens": {
+      "prompt_tokens": 21720,
+      "completion_tokens": 13815
+    },
+    "archetypes": 20,
+    "valid_cases": 20
+  },
+  "world": {
+    "customers": [
+      {
+        "customer_id": "CUST-9001",
+        "name": "Aisha Khan",
+        "account_number": "ACC-9001",
+        "status": "active",
+        "risk_flags": [],
+        "policies": [
+          {
+            "policy_number": "POL-90001",
+            "policy_type": "Auto",
+            "premium_usd": 250.0,
+            "premium_frequency": "monthly",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 15,
+            "history": [
+              {
+                "days_ago": 30,
+                "amount_usd": 250.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              },
+              {
+                "days_ago": 60,
+                "amount_usd": 250.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              },
+              {
+                "days_ago": 90,
+                "amount_usd": 250.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              },
+              {
+                "days_ago": 120,
+                "amount_usd": 250.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              },
+              {
+                "days_ago": 150,
+                "amount_usd": 250.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              },
+              {
+                "days_ago": 180,
+                "amount_usd": 250.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              }
+            ]
+          },
+          {
+            "policy_number": "POL-90002",
+            "policy_type": "Health",
+            "premium_usd": 180.0,
+            "premium_frequency": "monthly",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 20,
+            "history": [
+              {
+                "days_ago": 30,
+                "amount_usd": 180.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              },
+              {
+                "days_ago": 60,
+                "amount_usd": 180.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              },
+              {
+                "days_ago": 90,
+                "amount_usd": 180.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              },
+              {
+                "days_ago": 120,
+                "amount_usd": 180.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              },
+              {
+                "days_ago": 150,
+                "amount_usd": 180.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              },
+              {
+                "days_ago": 180,
+                "amount_usd": 180.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9001",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9002",
+        "name": "Maria Rodriguez",
+        "account_number": "ACC-9002",
+        "status": "active",
+        "risk_flags": [],
+        "policies": [
+          {
+            "policy_number": "POL-90003",
+            "policy_type": "Home",
+            "premium_usd": 1200.0,
+            "premium_frequency": "annual",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 25,
+            "history": [
+              {
+                "days_ago": 365,
+                "amount_usd": 1200.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9002",
+                "status": "applied"
+              },
+              {
+                "days_ago": 730,
+                "amount_usd": 1200.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9002",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1095,
+                "amount_usd": 1200.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9002",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1460,
+                "amount_usd": 1200.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9002",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1825,
+                "amount_usd": 1200.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9002",
+                "status": "applied"
+              },
+              {
+                "days_ago": 2190,
+                "amount_usd": 1200.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9002",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9003",
+        "name": "Kenji Tanaka",
+        "account_number": "ACC-9003",
+        "status": "active",
+        "risk_flags": [
+          "chronic_late_payments"
+        ],
+        "policies": [
+          {
+            "policy_number": "POL-90004",
+            "policy_type": "Auto",
+            "premium_usd": 300.0,
+            "premium_frequency": "monthly",
+            "status": "active",
+            "outstanding_balance_usd": 150.0,
+            "next_due_in_days": -2,
+            "history": [
+              {
+                "days_ago": 30,
+                "amount_usd": 300.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              },
+              {
+                "days_ago": 60,
+                "amount_usd": 300.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              },
+              {
+                "days_ago": 90,
+                "amount_usd": 300.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              },
+              {
+                "days_ago": 120,
+                "amount_usd": 300.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              },
+              {
+                "days_ago": 150,
+                "amount_usd": 300.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              },
+              {
+                "days_ago": 180,
+                "amount_usd": 300.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              }
+            ]
+          },
+          {
+            "policy_number": "POL-90005",
+            "policy_type": "Life",
+            "premium_usd": 1500.0,
+            "premium_frequency": "annual",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 10,
+            "history": [
+              {
+                "days_ago": 365,
+                "amount_usd": 1500.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              },
+              {
+                "days_ago": 730,
+                "amount_usd": 1500.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1095,
+                "amount_usd": 1500.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1460,
+                "amount_usd": 1500.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1825,
+                "amount_usd": 1500.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              },
+              {
+                "days_ago": 2190,
+                "amount_usd": 1500.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9003",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9004",
+        "name": "Sophie Dubois",
+        "account_number": "ACC-9004",
+        "status": "active",
+        "risk_flags": [],
+        "policies": [
+          {
+            "policy_number": "POL-90006",
+            "policy_type": "Home",
+            "premium_usd": 950.0,
+            "premium_frequency": "semi_annual",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 5,
+            "history": [
+              {
+                "days_ago": 182,
+                "amount_usd": 950.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9004",
+                "status": "applied"
+              },
+              {
+                "days_ago": 365,
+                "amount_usd": 950.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9004",
+                "status": "applied"
+              },
+              {
+                "days_ago": 547,
+                "amount_usd": 950.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9004",
+                "status": "applied"
+              },
+              {
+                "days_ago": 730,
+                "amount_usd": 950.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9004",
+                "status": "applied"
+              },
+              {
+                "days_ago": 912,
+                "amount_usd": 950.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9004",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1095,
+                "amount_usd": 950.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9004",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9005",
+        "name": "Chen Wei",
+        "account_number": "ACC-9005",
+        "status": "active",
+        "risk_flags": [],
+        "policies": [
+          {
+            "policy_number": "POL-90007",
+            "policy_type": "Auto",
+            "premium_usd": 150.0,
+            "premium_frequency": "monthly",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 18,
+            "history": [
+              {
+                "days_ago": 30,
+                "amount_usd": 150.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              },
+              {
+                "days_ago": 60,
+                "amount_usd": 150.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              },
+              {
+                "days_ago": 90,
+                "amount_usd": 150.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              },
+              {
+                "days_ago": 120,
+                "amount_usd": 150.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              },
+              {
+                "days_ago": 150,
+                "amount_usd": 150.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              },
+              {
+                "days_ago": 180,
+                "amount_usd": 150.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              }
+            ]
+          },
+          {
+            "policy_number": "POL-90008",
+            "policy_type": "Health",
+            "premium_usd": 150.0,
+            "premium_frequency": "monthly",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 22,
+            "history": [
+              {
+                "days_ago": 30,
+                "amount_usd": 150.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              },
+              {
+                "days_ago": 60,
+                "amount_usd": 150.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              },
+              {
+                "days_ago": 90,
+                "amount_usd": 150.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              },
+              {
+                "days_ago": 120,
+                "amount_usd": 150.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              },
+              {
+                "days_ago": 150,
+                "amount_usd": 150.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              },
+              {
+                "days_ago": 180,
+                "amount_usd": 150.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9005",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9006",
+        "name": "Fatima Al-Fassi",
+        "account_number": "ACC-9006",
+        "status": "inactive",
+        "risk_flags": [],
+        "policies": [
+          {
+            "policy_number": "POL-90009",
+            "policy_type": "Life",
+            "premium_usd": 300.0,
+            "premium_frequency": "annual",
+            "status": "inactive",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 100,
+            "history": [
+              {
+                "days_ago": 365,
+                "amount_usd": 300.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9006",
+                "status": "applied"
+              },
+              {
+                "days_ago": 730,
+                "amount_usd": 300.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9006",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1095,
+                "amount_usd": 300.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9006",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1460,
+                "amount_usd": 300.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9006",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1825,
+                "amount_usd": 300.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9006",
+                "status": "applied"
+              },
+              {
+                "days_ago": 2190,
+                "amount_usd": 300.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9006",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9007",
+        "name": "David Miller",
+        "account_number": "ACC-9007",
+        "status": "active",
+        "risk_flags": [
+          "fraud_history"
+        ],
+        "policies": [
+          {
+            "policy_number": "POL-90010",
+            "policy_type": "Auto",
+            "premium_usd": 400.0,
+            "premium_frequency": "monthly",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 7,
+            "history": [
+              {
+                "days_ago": 30,
+                "amount_usd": 400.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9007",
+                "status": "applied"
+              },
+              {
+                "days_ago": 60,
+                "amount_usd": 400.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9007",
+                "status": "applied"
+              },
+              {
+                "days_ago": 90,
+                "amount_usd": 400.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9007",
+                "status": "applied"
+              },
+              {
+                "days_ago": 120,
+                "amount_usd": 400.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9007",
+                "status": "applied"
+              },
+              {
+                "days_ago": 150,
+                "amount_usd": 400.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9007",
+                "status": "applied"
+              },
+              {
+                "days_ago": 180,
+                "amount_usd": 400.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9007",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9008",
+        "name": "Olga Petrova",
+        "account_number": "ACC-9008",
+        "status": "active",
+        "risk_flags": [],
+        "policies": [
+          {
+            "policy_number": "POL-90011",
+            "policy_type": "Life",
+            "premium_usd": 5000.0,
+            "premium_frequency": "annual",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 12,
+            "history": [
+              {
+                "days_ago": 365,
+                "amount_usd": 5000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              },
+              {
+                "days_ago": 730,
+                "amount_usd": 5000.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1095,
+                "amount_usd": 5000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1460,
+                "amount_usd": 5000.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1825,
+                "amount_usd": 5000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              },
+              {
+                "days_ago": 2190,
+                "amount_usd": 5000.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              }
+            ]
+          },
+          {
+            "policy_number": "POL-90012",
+            "policy_type": "Home",
+            "premium_usd": 1000.0,
+            "premium_frequency": "annual",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 17,
+            "history": [
+              {
+                "days_ago": 365,
+                "amount_usd": 1000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              },
+              {
+                "days_ago": 730,
+                "amount_usd": 1000.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1095,
+                "amount_usd": 1000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1460,
+                "amount_usd": 1000.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1825,
+                "amount_usd": 1000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              },
+              {
+                "days_ago": 2190,
+                "amount_usd": 1000.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9008",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9009",
+        "name": "John Smith",
+        "account_number": "ACC-9009",
+        "status": "active",
+        "risk_flags": [],
+        "policies": [
+          {
+            "policy_number": "POL-90013",
+            "policy_type": "Auto",
+            "premium_usd": 450.0,
+            "premium_frequency": "monthly",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 2,
+            "history": [
+              {
+                "days_ago": 30,
+                "amount_usd": 450.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9009",
+                "status": "applied"
+              },
+              {
+                "days_ago": 60,
+                "amount_usd": 450.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9009",
+                "status": "applied"
+              },
+              {
+                "days_ago": 90,
+                "amount_usd": 450.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9009",
+                "status": "applied"
+              },
+              {
+                "days_ago": 120,
+                "amount_usd": 450.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9009",
+                "status": "applied"
+              },
+              {
+                "days_ago": 150,
+                "amount_usd": 450.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9009",
+                "status": "applied"
+              },
+              {
+                "days_ago": 180,
+                "amount_usd": 450.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9009",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9010",
+        "name": "Priya Sharma",
+        "account_number": "ACC-9010",
+        "status": "active",
+        "risk_flags": [],
+        "policies": [
+          {
+            "policy_number": "POL-90014",
+            "policy_type": "Life",
+            "premium_usd": 2000.0,
+            "premium_frequency": "annual",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 28,
+            "history": [
+              {
+                "days_ago": 365,
+                "amount_usd": 2000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9010",
+                "status": "applied"
+              },
+              {
+                "days_ago": 730,
+                "amount_usd": 2000.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9010",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1095,
+                "amount_usd": 2000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9010",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1460,
+                "amount_usd": 2000.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9010",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1825,
+                "amount_usd": 2000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9010",
+                "status": "applied"
+              },
+              {
+                "days_ago": 2190,
+                "amount_usd": 2000.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9010",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9011",
+        "name": "Carlos Gomez",
+        "account_number": "ACC-9011",
+        "status": "active",
+        "risk_flags": [],
+        "policies": [
+          {
+            "policy_number": "POL-90015",
+            "policy_type": "Health",
+            "premium_usd": 350.0,
+            "premium_frequency": "monthly",
+            "status": "active",
+            "outstanding_balance_usd": 175.0,
+            "next_due_in_days": -5,
+            "history": [
+              {
+                "days_ago": 30,
+                "amount_usd": 350.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9011",
+                "status": "applied"
+              },
+              {
+                "days_ago": 60,
+                "amount_usd": 350.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9011",
+                "status": "applied"
+              },
+              {
+                "days_ago": 90,
+                "amount_usd": 350.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9011",
+                "status": "applied"
+              },
+              {
+                "days_ago": 120,
+                "amount_usd": 350.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9011",
+                "status": "applied"
+              },
+              {
+                "days_ago": 150,
+                "amount_usd": 350.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9011",
+                "status": "applied"
+              },
+              {
+                "days_ago": 180,
+                "amount_usd": 350.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9011",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "customer_id": "CUST-9012",
+        "name": "Emily White",
+        "account_number": "ACC-9012",
+        "status": "active",
+        "risk_flags": [],
+        "policies": [
+          {
+            "policy_number": "POL-90016",
+            "policy_type": "Auto",
+            "premium_usd": 200.0,
+            "premium_frequency": "monthly",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 10,
+            "history": [
+              {
+                "days_ago": 30,
+                "amount_usd": 200.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              },
+              {
+                "days_ago": 60,
+                "amount_usd": 200.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              },
+              {
+                "days_ago": 90,
+                "amount_usd": 200.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              },
+              {
+                "days_ago": 120,
+                "amount_usd": 200.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              },
+              {
+                "days_ago": 150,
+                "amount_usd": 200.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              },
+              {
+                "days_ago": 180,
+                "amount_usd": 200.0,
+                "payment_method": "Credit Card",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              }
+            ]
+          },
+          {
+            "policy_number": "POL-90017",
+            "policy_type": "Home",
+            "premium_usd": 2000.0,
+            "premium_frequency": "annual",
+            "status": "active",
+            "outstanding_balance_usd": 0.0,
+            "next_due_in_days": 20,
+            "history": [
+              {
+                "days_ago": 365,
+                "amount_usd": 2000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              },
+              {
+                "days_ago": 730,
+                "amount_usd": 2000.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1095,
+                "amount_usd": 2000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1460,
+                "amount_usd": 2000.0,
+                "payment_method": "Check",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              },
+              {
+                "days_ago": 1825,
+                "amount_usd": 2000.0,
+                "payment_method": "ACH",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              },
+              {
+                "days_ago": 2190,
+                "amount_usd": 2000.0,
+                "payment_method": "Wire",
+                "sender_account": "ACC-9012",
+                "status": "applied"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "archetype_id": "S1-apply-a",
+      "target_customer_id": "CUST-9008",
+      "target_policy_number": "POL-90011",
+      "payment": {
+        "sender_name": "Olga P. Petrova",
+        "sender_account": "ACC-9008",
+        "beneficiary_name": "Olga P. Petrova",
+        "payment_method": "ACH",
+        "amount_usd": 5000.0,
+        "hours_ago": 12.0,
+        "reference_field_1": "POL-90011",
+        "reference_field_2": "Annual Premium"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be auto-applied because the name similarity is high, the amount variance is 0%, there are no risk flags, the policy is active, and the payment method is low risk.",
+      "expected_scenario": 1,
+      "expected_recommendation": "apply",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S1-apply-b",
+      "target_customer_id": "CUST-9004",
+      "target_policy_number": "POL-90006",
+      "payment": {
+        "sender_name": "Sophie Dubois",
+        "sender_account": "ACC-9004",
+        "beneficiary_name": "Sophie Dubois",
+        "payment_method": "Credit Card",
+        "amount_usd": 950.0,
+        "hours_ago": 18.0,
+        "reference_field_1": "POL-90006",
+        "reference_field_2": "Semi-Annual Premium"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be auto-applied because the name is an exact match, the amount variance is 0%, there are no risk flags, the policy is active, and the payment method is low risk.",
+      "expected_scenario": 1,
+      "expected_recommendation": "apply",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S1-hold-name",
+      "target_customer_id": "CUST-9001",
+      "target_policy_number": "POL-90001",
+      "payment": {
+        "sender_name": "Aisha K.",
+        "sender_account": "ACC-9001",
+        "beneficiary_name": "Aisha K.",
+        "payment_method": "ACH",
+        "amount_usd": 250.0,
+        "hours_ago": 24.0,
+        "reference_field_1": "POL-90001",
+        "reference_field_2": "Monthly Payment"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be held because the name similarity is between 75% and 90%.",
+      "expected_scenario": 1,
+      "expected_recommendation": "hold",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S1-hold-risk",
+      "target_customer_id": "CUST-9007",
+      "target_policy_number": "POL-90010",
+      "payment": {
+        "sender_name": "David Miller",
+        "sender_account": "ACC-9007",
+        "beneficiary_name": "David Miller",
+        "payment_method": "ACH",
+        "amount_usd": 400.0,
+        "hours_ago": 36.0,
+        "reference_field_1": "POL-90010",
+        "reference_field_2": "Auto Premium"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be held because the customer has an active risk flag.",
+      "expected_scenario": 1,
+      "expected_recommendation": "hold",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S2-apply-single",
+      "target_customer_id": "CUST-9009",
+      "target_policy_number": "POL-90013",
+      "payment": {
+        "sender_name": "John Smith",
+        "sender_account": "ACC-9009",
+        "beneficiary_name": "John Smith",
+        "payment_method": "ACH",
+        "amount_usd": 450.0,
+        "hours_ago": 10.0,
+        "reference_field_1": "Insurance premium",
+        "reference_field_2": ""
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be applied with approval because there is a strong customer match, no policy reference, only one active policy, and the amount matches the policy premium.",
+      "expected_scenario": 2,
+      "expected_recommendation": "apply",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S2-apply-multi-unique",
+      "target_customer_id": "CUST-9008",
+      "target_policy_number": "POL-90012",
+      "payment": {
+        "sender_name": "Olga Petrova",
+        "sender_account": "ACC-9008",
+        "beneficiary_name": "Olga Petrova",
+        "payment_method": "ACH",
+        "amount_usd": 1000.0,
+        "hours_ago": 15.0,
+        "reference_field_1": "Premium",
+        "reference_field_2": ""
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be applied with approval because there is a strong customer match, no policy reference, multiple policies, but the amount uniquely identifies one policy.",
+      "expected_scenario": 2,
+      "expected_recommendation": "apply",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S2-hold-multi-ambiguous",
+      "target_customer_id": "CUST-9005",
+      "target_policy_number": "",
+      "payment": {
+        "sender_name": "Chen Wei",
+        "sender_account": "ACC-9005",
+        "beneficiary_name": "Chen Wei",
+        "payment_method": "ACH",
+        "amount_usd": 150.0,
+        "hours_ago": 20.0,
+        "reference_field_1": "Monthly Payment",
+        "reference_field_2": ""
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be held because there is a strong customer match, no policy reference, and the amount matches multiple policies, creating ambiguity.",
+      "expected_scenario": 2,
+      "expected_recommendation": "hold",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S2-apply-single-card",
+      "target_customer_id": "CUST-9002",
+      "target_policy_number": "POL-90003",
+      "payment": {
+        "sender_name": "Maria Rodriguez",
+        "sender_account": "ACC-9002",
+        "beneficiary_name": "Maria Rodriguez",
+        "payment_method": "Credit Card",
+        "amount_usd": 1200.0,
+        "hours_ago": 22.0,
+        "reference_field_1": "",
+        "reference_field_2": "Annual Insurance"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be applied with approval because there is a strong customer match, no policy reference, only one active policy, and the amount matches the policy premium.",
+      "expected_scenario": 2,
+      "expected_recommendation": "apply",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S3-tier3-above",
+      "target_customer_id": "CUST-9010",
+      "target_policy_number": "POL-90014",
+      "payment": {
+        "sender_name": "Priya Sharma",
+        "sender_account": "ACC-9010",
+        "beneficiary_name": "Priya Sharma",
+        "payment_method": "ACH",
+        "amount_usd": 2600.0,
+        "hours_ago": 28.0,
+        "reference_field_1": "POL-90014",
+        "reference_field_2": "Life Premium"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be held for manual review because the amount variance is between 15% and 50% (30% above expected) and it's not a clear multi-period payment.",
+      "expected_scenario": 3,
+      "expected_recommendation": "hold",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S3-tier3-below",
+      "target_customer_id": "CUST-9012",
+      "target_policy_number": "POL-90017",
+      "payment": {
+        "sender_name": "Emily White",
+        "sender_account": "ACC-9012",
+        "beneficiary_name": "Emily White",
+        "payment_method": "Wire",
+        "amount_usd": 1400.0,
+        "hours_ago": 30.0,
+        "reference_field_1": "POL-90017",
+        "reference_field_2": "Home Insurance"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be held for manual review because the amount variance is between 15% and 50% (30% below expected) and it's not a clear multi-period payment.",
+      "expected_scenario": 3,
+      "expected_recommendation": "hold",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S3-tier4",
+      "target_customer_id": "CUST-9001",
+      "target_policy_number": "POL-90002",
+      "payment": {
+        "sender_name": "Aisha Khan",
+        "sender_account": "ACC-9001",
+        "beneficiary_name": "Aisha Khan",
+        "payment_method": "ACH",
+        "amount_usd": 300.0,
+        "hours_ago": 32.0,
+        "reference_field_1": "POL-90002",
+        "reference_field_2": "Health Premium"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be held for investigation because the amount variance is between 50% and 100% (66.67% above expected).",
+      "expected_scenario": 3,
+      "expected_recommendation": "hold",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S3-tier5",
+      "target_customer_id": "CUST-9002",
+      "target_policy_number": "POL-90003",
+      "payment": {
+        "sender_name": "Maria Rodriguez",
+        "sender_account": "ACC-9002",
+        "beneficiary_name": "Maria Rodriguez",
+        "payment_method": "ACH",
+        "amount_usd": 3200.0,
+        "hours_ago": 38.0,
+        "reference_field_1": "POL-90003",
+        "reference_field_2": "Annual Payment"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be escalated because the amount variance is greater than 100% (166.67% above expected).",
+      "expected_scenario": 3,
+      "expected_recommendation": "escalate",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S4-unknown-person",
+      "target_customer_id": "",
+      "target_policy_number": "",
+      "payment": {
+        "sender_name": "Alice Wonderland",
+        "sender_account": "ACC-XYZ1",
+        "beneficiary_name": "CES Insurance",
+        "payment_method": "Check",
+        "amount_usd": 300.0,
+        "hours_ago": 40.0,
+        "reference_field_1": "Insurance",
+        "reference_field_2": ""
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be escalated because no matching customer is found in the database with a similarity score above the threshold.",
+      "expected_scenario": 4,
+      "expected_recommendation": "escalate",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S4-unknown-company",
+      "target_customer_id": "",
+      "target_policy_number": "",
+      "payment": {
+        "sender_name": "Global Holdings Inc.",
+        "sender_account": "ACC-GHI2",
+        "beneficiary_name": "CES Insurance Co.",
+        "payment_method": "Wire",
+        "amount_usd": 1500.0,
+        "hours_ago": 42.0,
+        "reference_field_1": "",
+        "reference_field_2": "Property policy"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be escalated because no matching customer is found in the database with a similarity score above the threshold.",
+      "expected_scenario": 4,
+      "expected_recommendation": "escalate",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S4-third-party-hold",
+      "target_customer_id": "CUST-9001",
+      "target_policy_number": "POL-90001",
+      "payment": {
+        "sender_name": "Khan Family Trust",
+        "sender_account": "TRST-1234",
+        "beneficiary_name": "Aisha Khan",
+        "payment_method": "ACH",
+        "amount_usd": 255.0,
+        "hours_ago": 44.0,
+        "reference_field_1": "POL-90001",
+        "reference_field_2": "Monthly Payment"
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be held because a third-party payment is detected for an existing policy with an acceptable amount variance.",
+      "expected_scenario": 4,
+      "expected_recommendation": "hold",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S4-bad-policy-ref",
+      "target_customer_id": "",
+      "target_policy_number": "",
+      "payment": {
+        "sender_name": "Bob Johnson",
+        "sender_account": "ACC-BJ56",
+        "beneficiary_name": "CES Insurance",
+        "payment_method": "Check",
+        "amount_usd": 500.0,
+        "hours_ago": 46.0,
+        "reference_field_1": "POL-99999",
+        "reference_field_2": ""
+      },
+      "prior_payments": [],
+      "rationale": "The payment should be escalated because the sender is unknown and the provided policy reference does not exist.",
+      "expected_scenario": 4,
+      "expected_recommendation": "escalate",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S5-dup-exact",
+      "target_customer_id": "CUST-9001",
+      "target_policy_number": "POL-90001",
+      "payment": {
+        "sender_name": "Aisha Khan",
+        "sender_account": "ACC-9001",
+        "beneficiary_name": "Aisha Khan",
+        "payment_method": "ACH",
+        "amount_usd": 250.0,
+        "hours_ago": 20.0,
+        "reference_field_1": "POL-90001",
+        "reference_field_2": "Monthly Premium"
+      },
+      "prior_payments": [
+        {
+          "sender_name": "Aisha Khan",
+          "sender_account": "ACC-9001",
+          "beneficiary_name": "Aisha Khan",
+          "payment_method": "ACH",
+          "amount_usd": 250.0,
+          "hours_ago": 40.0,
+          "reference_field_1": "POL-90001",
+          "reference_field_2": "Monthly Premium"
+        }
+      ],
+      "rationale": "The payment should be escalated as a potential duplicate because it exactly matches a prior payment within the 72-hour window and the policy has no outstanding balance.",
+      "expected_scenario": 5,
+      "expected_recommendation": "escalate",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S5-dup-tolerance",
+      "target_customer_id": "CUST-9004",
+      "target_policy_number": "POL-90006",
+      "payment": {
+        "sender_name": "Sophie Dubois",
+        "sender_account": "ACC-9004",
+        "beneficiary_name": "Sophie Dubois",
+        "payment_method": "ACH",
+        "amount_usd": 949.0,
+        "hours_ago": 25.0,
+        "reference_field_1": "POL-90006",
+        "reference_field_2": "Semi-Annual Premium"
+      },
+      "prior_payments": [
+        {
+          "sender_name": "Sophie Dubois",
+          "sender_account": "ACC-9004",
+          "beneficiary_name": "Sophie Dubois",
+          "payment_method": "ACH",
+          "amount_usd": 950.0,
+          "hours_ago": 50.0,
+          "reference_field_1": "POL-90006",
+          "reference_field_2": "Semi-Annual Premium"
+        }
+      ],
+      "rationale": "The payment should be escalated as a potential duplicate because it matches a prior payment within the 72-hour window, with amount within $2 tolerance, and the policy has no outstanding balance.",
+      "expected_scenario": 5,
+      "expected_recommendation": "escalate",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S5-dup-balance",
+      "target_customer_id": "CUST-9011",
+      "target_policy_number": "POL-90015",
+      "payment": {
+        "sender_name": "Carlos Gomez",
+        "sender_account": "ACC-9011",
+        "beneficiary_name": "Carlos Gomez",
+        "payment_method": "ACH",
+        "amount_usd": 350.0,
+        "hours_ago": 18.0,
+        "reference_field_1": "POL-90015",
+        "reference_field_2": "Monthly Health"
+      },
+      "prior_payments": [
+        {
+          "sender_name": "Carlos Gomez",
+          "sender_account": "ACC-9011",
+          "beneficiary_name": "Carlos Gomez",
+          "payment_method": "ACH",
+          "amount_usd": 350.0,
+          "hours_ago": 38.0,
+          "reference_field_1": "POL-90015",
+          "reference_field_2": "Monthly Health"
+        }
+      ],
+      "rationale": "The payment should be held as a potential duplicate because it exactly matches a prior payment within the 72-hour window, but the policy has an outstanding balance.",
+      "expected_scenario": 5,
+      "expected_recommendation": "hold",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    },
+    {
+      "archetype_id": "S5-near-dup-control",
+      "target_customer_id": "CUST-9008",
+      "target_policy_number": "POL-90011",
+      "payment": {
+        "sender_name": "Olga Petrova",
+        "sender_account": "ACC-9008",
+        "beneficiary_name": "Olga Petrova",
+        "payment_method": "ACH",
+        "amount_usd": 5010.0,
+        "hours_ago": 24.0,
+        "reference_field_1": "POL-90011",
+        "reference_field_2": "Annual Premium"
+      },
+      "prior_payments": [
+        {
+          "sender_name": "Olga Petrova",
+          "sender_account": "ACC-9008",
+          "beneficiary_name": "Olga Petrova",
+          "payment_method": "ACH",
+          "amount_usd": 5000.0,
+          "hours_ago": 44.0,
+          "reference_field_1": "POL-90011",
+          "reference_field_2": "Annual Premium"
+        }
+      ],
+      "rationale": "The payment is not a duplicate because the amount difference exceeds the $2 tolerance, even though other fields match and it's within the time window.",
+      "expected_scenario": 1,
+      "expected_recommendation": "apply",
+      "checks": {
+        "failures": [],
+        "warnings": []
+      }
+    }
+  ]
+}

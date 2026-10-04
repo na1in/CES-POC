@@ -71,7 +71,7 @@ describe("Governance — empty data", () => {
     expect(screen.getByText("Auto-Applied by AI")).toBeInTheDocument()
     expect(screen.getByText("Applied after Human Review")).toBeInTheDocument()
     expect(screen.getByText("Held Pending Review")).toBeInTheDocument()
-    expect(screen.getByText("Escalated by AI")).toBeInTheDocument()
+    expect(screen.getByText("Auto-Escalated")).toBeInTheDocument()
     expect(screen.getByText("Escalated by Human")).toBeInTheDocument()
     expect(screen.getByText("Human Overrides")).toBeInTheDocument()
   })

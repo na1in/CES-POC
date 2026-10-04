@@ -10,32 +10,54 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts"
+import type { PieLabelRenderProps } from "recharts"
 import { getAnalyticsDecisions, type AnalyticsDecisions } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { SCENARIO_LABEL, ALL_SCENARIOS, scenarioShortLabel } from "@/lib/scenarioLabels"
+import {
+  CHART_NEUTRAL, CHART_APPLY, CHART_HOLD, CHART_ESCALATE, ATTRIBUTION_RAMP,
+} from "@/lib/chartColors"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TABS = [
-  { key: "all",        label: "All" },
-  { key: "scenario_1", label: "Scenario 1" },
-  { key: "scenario_2", label: "Scenario 2" },
-  { key: "scenario_3", label: "Scenario 3" },
-  { key: "scenario_4", label: "Scenario 4" },
-  { key: "scenario_5", label: "Scenario 5" },
+  { key: "all", label: "All" },
+  ...ALL_SCENARIOS.map(key => ({ key, label: SCENARIO_LABEL[key] })),
 ] as const
 
 type TabKey = (typeof TABS)[number]["key"]
 
+// Ordered by how much human involvement the decision took, so the ramp is
+// read light → dark rather than as three unrelated identities.
 const PIE_COLORS: Record<string, string> = {
-  "AI Autonomous":   "#10B981",
-  "Operator Confirmed": "#7C4DFF",
-  "Operator Override":  "#F59E0B",
+  "Auto-Applied":       ATTRIBUTION_RAMP[0],
+  "Operator Confirmed": ATTRIBUTION_RAMP[1],
+  "Operator Override":  ATTRIBUTION_RAMP[2],
 }
 
 const DECISION_COLORS: Record<string, string> = {
-  "APPLY":    "#10B981",
-  "HOLD":     "#F59E0B",
-  "ESCALATE": "#EF4444",
+  "APPLY":    CHART_APPLY,
+  "HOLD":     CHART_HOLD,
+  "ESCALATE": CHART_ESCALATE,
+}
+
+// Recharts tints a pie label with its own slice colour. A fill that is fine for
+// the wedge (3:1, non-text) fails as 11px text, so render the label in ink —
+// as a hex, since SVG presentation attributes don't resolve CSS variables.
+const PIE_LABEL_INK = "#1E293B"
+
+function renderPieLabel(props: PieLabelRenderProps) {
+  const { x, y, textAnchor, percent } = props
+  return (
+    <text
+      x={Number(x)} y={Number(y)}
+      textAnchor={(textAnchor as "start" | "middle" | "end") ?? "middle"}
+      dominantBaseline="central"
+      fill={PIE_LABEL_INK} fontSize={11} fontWeight={600}
+    >
+      {`${Math.round((percent ?? 0) * 100)}%`}
+    </text>
+  )
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -120,12 +142,12 @@ export default function AdminDashboardPage() {
   // Decision distribution pie data
   const pieData = activeTab === "all"
     ? [
-        { label: "AI Autonomous",   value: data?.summary.auto_applied ?? 0 },
+        { label: "Auto-Applied",    value: data?.summary.auto_applied ?? 0 },
         { label: "Operator Confirmed", value: data?.summary.applied_human_review ?? 0 },
         { label: "Operator Override",  value: data?.summary.human_overrides ?? 0 },
       ].filter(d => d.value > 0)
     : [
-        { label: "AI Autonomous",   value: activeScenario?.ai_autonomous ?? 0 },
+        { label: "Auto-Applied",    value: activeScenario?.ai_autonomous ?? 0 },
         { label: "Operator Confirmed", value: activeScenario?.human_confirmed ?? 0 },
         { label: "Operator Override",  value: activeScenario?.human_override ?? 0 },
       ].filter(d => d.value > 0)
@@ -133,13 +155,13 @@ export default function AdminDashboardPage() {
   // Decision outcome bar data
   const outcomeData = activeTab === "all"
     ? scenarioData.map(s => ({
-        scenario: s.scenario_route?.replace("scenario_", "S") ?? s.scenario_route,
+        scenario: scenarioShortLabel(s.scenario_route, s.scenario_route),
         APPLY:    s.apply_count,
         HOLD:     s.hold_count,
         ESCALATE: s.escalate_count,
       }))
     : activeScenario
-      ? [{ scenario: activeTab.replace("scenario_", "S"), APPLY: activeScenario.apply_count, HOLD: activeScenario.hold_count, ESCALATE: activeScenario.escalate_count }]
+      ? [{ scenario: scenarioShortLabel(activeTab), APPLY: activeScenario.apply_count, HOLD: activeScenario.hold_count, ESCALATE: activeScenario.escalate_count }]
       : []
 
   // Confidence histogram
@@ -170,8 +192,12 @@ export default function AdminDashboardPage() {
           <span style={{ fontSize: 12, color: "var(--pw-text-muted)", flex: 1 }}>Search…</span>
           <span style={{ fontSize: 10, color: "var(--pw-text-muted)", background: "var(--pw-border)", padding: "1px 4px", borderRadius: 3 }}>⌘K</span>
         </div>
-        <Bell size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
-        <SettingsIcon size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} onClick={() => router.push("/settings")} />
+        <button type="button" aria-label="Notifications" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+          <Bell size={16} color="var(--pw-text-secondary)" />
+        </button>
+        <button type="button" aria-label="Settings" onClick={() => router.push("/settings")} style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+          <SettingsIcon size={16} color="var(--pw-text-secondary)" />
+        </button>
         <div style={{ position: "relative" }}>
           <button
             aria-label="User menu"
@@ -219,7 +245,7 @@ export default function AdminDashboardPage() {
           </button>
         </div>
         <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "4px 0 0" }}>
-          Per-scenario AI performance analytics and threshold tuning signals.
+          Per-scenario recommendation performance and threshold tuning signals.
         </p>
       </div>
 
@@ -253,7 +279,7 @@ export default function AdminDashboardPage() {
             value={volume.toLocaleString()}
             icon={<Activity size={18} />}
             iconColor="var(--pw-primary)"
-            iconBg="rgba(124,77,255,0.1)"
+            iconBg="rgba(10,102,194,0.1)"
           />
           <StatTile
             label="Avg Confidence"
@@ -266,8 +292,8 @@ export default function AdminDashboardPage() {
             label="Override Count"
             value={overrideCount}
             icon={<AlertTriangle size={18} />}
-            iconColor="#EF4444"
-            iconBg="rgba(239,68,68,0.1)"
+            iconColor="var(--pw-escalate)"
+            iconBg="var(--pw-escalate-tint)"
           />
         </div>
 
@@ -301,19 +327,24 @@ export default function AdminDashboardPage() {
                 <span style={{ fontSize: 13, color: "var(--pw-text-muted)" }}>No data for this scenario</span>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
+              <ResponsiveContainer width="100%" height={240}>
+                <PieChart margin={{ top: 16, right: 8, bottom: 8, left: 8 }}>
+                  {/* Taller than the bar charts, smaller radius: the slice
+                      percentages sit outside the arc and were clipping the
+                      card edge and colliding with the legend. */}
                   <Pie
                     data={pieData}
                     dataKey="value"
                     nameKey="label"
-                    cx="50%" cy="50%"
-                    outerRadius={70}
-                    label={({ percent }) => `${Math.round((percent ?? 0) * 100)}%`}
+                    cx="50%" cy="46%"
+                    outerRadius={62}
+                    label={renderPieLabel}
                     labelLine={false}
+                    stroke="#FFFFFF"
+                    strokeWidth={2}
                   >
                     {pieData.map(entry => (
-                      <Cell key={entry.label} fill={PIE_COLORS[entry.label] ?? "#94A3B8"} />
+                      <Cell key={entry.label} fill={PIE_COLORS[entry.label] ?? CHART_NEUTRAL} />
                     ))}
                   </Pie>
                   <Tooltip contentStyle={tooltipStyle} />
@@ -336,7 +367,7 @@ export default function AdminDashboardPage() {
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart
                   data={scenarioData.map(s => ({
-                    scenario: s.scenario_route?.replace("scenario_", "S") ?? s.scenario_route,
+                    scenario: scenarioShortLabel(s.scenario_route, s.scenario_route),
                     volume: s.volume,
                   }))}
                   barCategoryGap="35%"
@@ -344,7 +375,7 @@ export default function AdminDashboardPage() {
                   <XAxis dataKey="scenario" tick={axisTickStyle} axisLine={false} tickLine={false} />
                   <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} width={30} />
                   <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--pw-bg)" }} />
-                  <Bar dataKey="volume" name="VOLUME" fill="#7C4DFF" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="volume" name="VOLUME" fill={CHART_NEUTRAL} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -362,7 +393,7 @@ export default function AdminDashboardPage() {
                   <XAxis dataKey="bucket" tick={axisTickStyle} axisLine={false} tickLine={false} />
                   <YAxis tick={axisTickStyle} axisLine={false} tickLine={false} width={30} />
                   <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--pw-bg)" }} />
-                  <Bar dataKey="count" name="PAYMENTS" fill="#7C4DFF" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" name="PAYMENTS" fill={CHART_NEUTRAL} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}

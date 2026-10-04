@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 import jellyfish
 import openai
@@ -24,9 +25,40 @@ def _get_client() -> openai.AsyncOpenAI:
     return _client
 
 
+def normalise_name_pair(a: str, b: str) -> tuple[str, str]:
+    """
+    Lower-case both names, drop periods and commas, and ignore a single-letter initial that only one of the two names
+    has. "Boris P. Ulker" vs "Boris Ulker" compares as "boris ulker" twice instead of losing ~19 points to the extra
+    "P.", which sent nearly half of the middle-initial payments to HOLD (the spec expects APPLY).
+
+    An initial is kept when it is evidence:
+      - the other name has the same initial ("John A Smith" vs "John A Smith"), or
+      - it stands for a name the other side spells out and this side does not ("Robert J Miller" vs "Robert James
+        Miller"; a token this side already has in full does not count, so the "M." in "Matthew M. Estevez" is not
+        supported by "Matthew"), or
+      - the other name carries a different initial of its own ("John B Smith" vs "John A Smith": two different
+        initials, not one missing).
+    Nicknames are not expanded (that is a business decision, not a string rule).
+    """
+    def tokens(name: str) -> list[str]:
+        return re.sub(r"[.,]", " ", name.lower()).split()
+
+    def drop_unmatched_initials(mine: list[str], other: list[str]) -> list[str]:
+        other_has_initial = any(len(o) == 1 for o in other)
+
+        def supported(initial: str) -> bool:
+            return initial in other or any(len(o) > 1 and o.startswith(initial) and o not in mine for o in other)
+
+        kept = [t for t in mine if not (len(t) == 1 and not other_has_initial and not supported(t))]
+        return kept or mine  # never reduce a name to nothing
+
+    ta, tb = tokens(a), tokens(b)
+    return " ".join(drop_unmatched_initials(ta, tb)), " ".join(drop_unmatched_initials(tb, ta))
+
+
 def _deterministic_score(a: str, b: str) -> float:
     """Hybrid of Jaro-Winkler (50%), Levenshtein (30%), Soundex bonus (10%), normalised to 100."""
-    a, b = a.strip().lower(), b.strip().lower()
+    a, b = normalise_name_pair(a.strip(), b.strip())
     if not a or not b:
         return 0.0
 
@@ -52,6 +84,7 @@ async def _llm_score(a: str, b: str) -> float | None:
         response = await _get_client().chat.completions.create(
             model=_MODEL,
             max_tokens=128,
+            temperature=0,  # the score gates APPLY (> 90): identical input should give identical output
             timeout=10.0,
             messages=[{"role": "user", "content": prompt}],
             extra_body={"thinking": {"type": "disabled"}},
@@ -120,8 +153,7 @@ async def compute_name_similarity(
     """
     Returns a dict with all algorithm breakdown fields ready to store in payment_signals.
     """
-    a = sender_name.strip().lower()
-    b = customer_name.strip().lower()
+    a, b = normalise_name_pair(sender_name.strip(), customer_name.strip())
 
     jw = jellyfish.jaro_winkler_similarity(a, b) * 100
     max_len = max(len(a), len(b))

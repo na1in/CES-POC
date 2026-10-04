@@ -118,7 +118,8 @@ CREATE TYPE audit_action_type AS ENUM (
     'config_change_rejected',      -- Lorraine rejected a change request
     'config_change_deployed',      -- Marcus deployed an approved change
     'config_change_rolled_back',   -- Emergency rollback executed
-    'sla_breached'                 -- Investigation SLA exceeded (system-generated)
+    'sla_breached',                -- Investigation SLA exceeded (system-generated)
+    'policy_attached'              -- Analyst manually attached a policy to an unmatched payment
 );
 
 -- Category of document attached to a case.

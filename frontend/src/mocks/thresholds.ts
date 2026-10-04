@@ -4,7 +4,7 @@ export const mockThresholds: ConfigurationThreshold[] = [
   {
     parameter_name: "name_match_auto_apply",
     parameter_value: "90%",
-    description: "Min name similarity for Scenario 1 auto-apply",
+    description: "Min name similarity % for an Apply recommendation (Scenario 1)",
     effective_date: "2026-01-15T00:00:00.000Z",
   },
   {
@@ -28,7 +28,7 @@ export const mockThresholds: ConfigurationThreshold[] = [
   {
     parameter_name: "amount_tolerance_auto",
     parameter_value: "2%",
-    description: "Max variance for Scenario 1 auto-apply",
+    description: "Max variance % for an Apply recommendation (Scenario 1)",
     effective_date: "2026-01-15T00:00:00.000Z",
   },
   {

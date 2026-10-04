@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import {
   Bell, Settings as SettingsIcon, ChevronDown, ChevronRight,
   ChevronLeft, SlidersHorizontal, X,
+  CheckCircle2,
 } from "lucide-react"
 import {
   getThresholds, getChangeRequests, getThresholdHistory,
@@ -238,8 +239,12 @@ export default function ConfigManagementPage() {
           <span style={{ fontSize: 12, color: "var(--pw-text-muted)", flex: 1 }}>Search…</span>
           <span style={{ fontSize: 10, color: "var(--pw-text-muted)", background: "var(--pw-border)", padding: "1px 4px", borderRadius: 3 }}>⌘K</span>
         </div>
-        <Bell size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
-        <SettingsIcon size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} onClick={() => router.push("/settings")} />
+        <button type="button" aria-label="Notifications" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+          <Bell size={16} color="var(--pw-text-secondary)" />
+        </button>
+        <button type="button" aria-label="Settings" onClick={() => router.push("/settings")} style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+          <SettingsIcon size={16} color="var(--pw-text-secondary)" />
+        </button>
         <div style={{ position: "relative" }}>
           <button aria-label="User menu" onClick={() => setRoleMenuOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 6, background: "var(--pw-bg)", border: "1px solid var(--pw-border)", borderRadius: 8, padding: "4px 10px", fontSize: 12, color: "var(--pw-text-secondary)", cursor: "pointer" }}>
             <div style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--pw-primary)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: 10 }}>
@@ -378,6 +383,17 @@ export default function ConfigManagementPage() {
 
         {/* ── Section 3: Change Request List ── */}
         <SectionCard title="Change Requests" icon={<ChevronRight size={16} />}>
+          {/* With no requests at all, the tab strip is five zero-counts above a
+              tall empty card — collapse to one compact line instead. */}
+          {changeRequests.length === 0 ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 20px" }}>
+              <CheckCircle2 size={18} color="var(--pw-apply)" style={{ flexShrink: 0 }} />
+              <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: 0 }}>
+                All clear — no change requests have been submitted.
+              </p>
+            </div>
+          ) : (
+          <>
           <div style={{ display: "flex", borderBottom: "1px solid var(--pw-border)", padding: "0 20px" }}>
             {REQUEST_TABS.map(tab => (
               <button
@@ -401,7 +417,7 @@ export default function ConfigManagementPage() {
           </div>
 
           {filteredRequests.length === 0 ? (
-            <div style={{ padding: "32px 24px", textAlign: "center" }}>
+            <div style={{ padding: "14px 24px" }}>
               <p style={{ fontSize: 13, color: "var(--pw-text-muted)", margin: 0 }}>No change requests in this category.</p>
             </div>
           ) : (
@@ -428,7 +444,7 @@ export default function ConfigManagementPage() {
                         <span style={{ margin: "0 6px", color: "var(--pw-text-muted)" }}>→</span>
                         <span style={{ fontFamily: "var(--pw-font-mono)", fontWeight: 700, color: "var(--pw-primary)" }}>{r.proposed_value}</span>
                       </td>
-                      <td style={{ ...TD, fontSize: 12, color: "var(--pw-text-secondary)" }}>{r.proposed_by}</td>
+                      <td style={{ ...TD, fontSize: 12, color: "var(--pw-text-secondary)" }}>{r.proposed_by_name ?? r.proposed_by}</td>
                       <td style={{ ...TD, fontSize: 12, color: "var(--pw-text-muted)", whiteSpace: "nowrap" }}>
                         {new Date(r.proposed_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       </td>
@@ -479,6 +495,8 @@ export default function ConfigManagementPage() {
               </table>
             </div>
           )}
+          </>
+          )}
         </SectionCard>
 
         {/* ── Section 4: Version History ── */}
@@ -521,7 +539,7 @@ export default function ConfigManagementPage() {
                                 </td>
                                 <td style={{ ...TD, padding: "8px 10px", fontFamily: "var(--pw-font-mono)", fontSize: 11 }}>{v.old_value ?? "—"}</td>
                                 <td style={{ ...TD, padding: "8px 10px", fontFamily: "var(--pw-font-mono)", fontSize: 11, fontWeight: 700, color: "var(--pw-primary)" }}>{v.new_value}</td>
-                                <td style={{ ...TD, padding: "8px 10px", fontSize: 11, color: "var(--pw-text-secondary)" }}>{v.changed_by}</td>
+                                <td style={{ ...TD, padding: "8px 10px", fontSize: 11, color: "var(--pw-text-secondary)" }}>{v.changed_by_name ?? v.changed_by}</td>
                               </tr>
                             ))}
                           </tbody>

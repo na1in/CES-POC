@@ -88,7 +88,7 @@ describe("Override Analysis — table", () => {
     // Use getAllByText for labels that also appear in the filter bar ("Scenario")
     expect(screen.getByText("Payment ID")).toBeInTheDocument()
     expect(screen.getAllByText("Scenario").length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText("AI Rec")).toBeInTheDocument()
+    expect(screen.getByText("Recommended")).toBeInTheDocument()
     expect(screen.getByText("Human Decision")).toBeInTheDocument()
     expect(screen.getByText("Confidence")).toBeInTheDocument()
     expect(screen.getAllByText("Override Reason").length).toBeGreaterThanOrEqual(1)

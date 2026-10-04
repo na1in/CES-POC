@@ -14,23 +14,14 @@ import {
 } from "@/components/ui/table"
 import { listPayments, type PaymentRow } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { formatAge } from "@/lib/formatTime"
+import { SCENARIO_LABEL, ALL_SCENARIOS } from "@/lib/scenarioLabels"
 import type { ScenarioRoute } from "@/types/recommendation"
-import type { PaymentMethod } from "@/types/payment"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatUSD(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100)
-}
-
-function formatAge(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const minutes = Math.floor(diff / 60_000)
-  const hours = Math.floor(diff / 3_600_000)
-  const days = Math.floor(diff / 86_400_000)
-  if (minutes < 60) return `${minutes}m ago`
-  if (hours < 24) return `${hours}h ago`
-  return `${days}d ago`
 }
 
 function formatToday(): string {
@@ -57,18 +48,11 @@ function getFlags(payment: PaymentRow): string[] {
   return flags
 }
 
-const SCENARIO_LABEL: Record<ScenarioRoute, string> = {
-  scenario_1: "Policy Match",
-  scenario_2: "Cust. Match",
-  scenario_3: "High Variance",
-  scenario_4: "No Match",
-  scenario_5: "Duplicate",
-}
+const REC_ORDER: Record<string, number> = { apply: 0, hold: 1, escalate: 2 }
 
-const ALL_SCENARIOS: ScenarioRoute[] = [
-  "scenario_1", "scenario_2", "scenario_3", "scenario_4", "scenario_5",
-]
-const ALL_METHODS: PaymentMethod[] = ["ACH", "Check", "Credit Card", "Wire"]
+function recRank(rec: string | null | undefined): number {
+  return rec != null && rec in REC_ORDER ? REC_ORDER[rec] : 3
+}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -122,7 +106,7 @@ function ConfidencePct({ score }: { score: number }) {
         : "var(--pw-escalate)"
   return (
     <span className="text-sm font-medium mono" style={{ color, fontFamily: "var(--pw-font-mono)" }}>
-      {score}%
+      {Math.round(score)}%
     </span>
   )
 }
@@ -175,8 +159,12 @@ function Nav() {
         </kbd>
       </div>
 
-      <Bell size={18} style={{ color: "var(--pw-text-secondary)" }} />
-      <Settings size={18} style={{ color: "var(--pw-text-secondary)" }} />
+      <button type="button" aria-label="Notifications" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+        <Bell size={18} style={{ color: "var(--pw-text-secondary)" }} />
+      </button>
+      <button type="button" aria-label="Settings" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+        <Settings size={18} style={{ color: "var(--pw-text-secondary)" }} />
+      </button>
 
       {/* Avatar + role dropdown */}
       <div style={{ position: "relative" }}>
@@ -317,10 +305,8 @@ export default function QueueDashboard() {
   const [activeTab, setActiveTab] = useState<"open" | "closed">("open")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(null)
   const [scenarioFilter, setScenarioFilter] = useState<Set<ScenarioRoute>>(new Set())
-  const [bandFilter, setBandFilter] = useState<Set<ConfidenceBand>>(new Set())
-  const [methodFilter, setMethodFilter] = useState<Set<PaymentMethod>>(new Set())
   const [bannerDismissed, setBannerDismissed] = useState(false)
-  const [sortKey, setSortKey] = useState<string>("confidence_desc")
+  const [sortKey, setSortKey] = useState<string>("rec_apply_first")
 
   useEffect(() => {
     listPayments({ page_size: 200 })
@@ -337,12 +323,10 @@ export default function QueueDashboard() {
 
   function clearFilters() {
     setScenarioFilter(new Set())
-    setBandFilter(new Set())
-    setMethodFilter(new Set())
     setStatusFilter(null)
   }
 
-  const hasFilters = scenarioFilter.size > 0 || bandFilter.size > 0 || methodFilter.size > 0 || statusFilter !== null
+  const hasFilters = scenarioFilter.size > 0 || statusFilter !== null
   const failedCount = payments.filter(p => p.status === "processing_failed").length
 
   const OPEN_STATUSES = new Set(["held", "processing_failed", "received", "processing"])
@@ -361,8 +345,8 @@ export default function QueueDashboard() {
     .map(p => ({ payment: p, rec: p }))
     .sort((a, b) => {
       switch (sortKey) {
-        case "confidence_desc": return (b.rec?.confidence_score ?? 0) - (a.rec?.confidence_score ?? 0)
-        case "confidence_asc":  return (a.rec?.confidence_score ?? 0) - (b.rec?.confidence_score ?? 0)
+        case "rec_apply_first":    return recRank(a.rec.recommendation) - recRank(b.rec.recommendation)
+        case "rec_escalate_first": return recRank(b.rec.recommendation) - recRank(a.rec.recommendation)
         case "sender_asc":      return a.payment.sender_name.localeCompare(b.payment.sender_name)
         case "sender_desc":     return b.payment.sender_name.localeCompare(a.payment.sender_name)
         case "amount_desc":     return b.payment.amount - a.payment.amount
@@ -373,10 +357,8 @@ export default function QueueDashboard() {
       }
     })
 
-  const filtered = rows.filter(({ payment, rec }) => {
+  const filtered = rows.filter(({ rec }) => {
     if (scenarioFilter.size > 0 && rec.scenario_route && !scenarioFilter.has(rec.scenario_route as ScenarioRoute)) return false
-    if (bandFilter.size > 0 && rec.confidence_score != null && !bandFilter.has(getBand(rec.confidence_score))) return false
-    if (methodFilter.size > 0 && !methodFilter.has(payment.payment_method as PaymentMethod)) return false
     return true
   })
 
@@ -491,49 +473,32 @@ export default function QueueDashboard() {
               ))}
             </div>
 
-            {/* Confidence */}
+            {/* Recommendation — shares state with the stat tiles above */}
             <div className="flex items-center gap-1.5">
               <span className="font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)", fontSize: 10 }}>
-                Confidence
+                Recommendation
               </span>
               <FilterChip
-                active={bandFilter.has("Low")}
-                activeStyle={{ background: "var(--pw-escalate-tint)", color: "var(--pw-escalate)", border: "1px solid var(--pw-escalate)" }}
-                onClick={() => setBandFilter(toggle(bandFilter, "Low"))}
-              >
-                Low
-              </FilterChip>
-              <FilterChip
-                active={bandFilter.has("Medium")}
-                activeStyle={{ background: "var(--pw-hold-tint)", color: "var(--pw-hold)", border: "1px solid var(--pw-hold)" }}
-                onClick={() => setBandFilter(toggle(bandFilter, "Medium"))}
-              >
-                Medium
-              </FilterChip>
-              <FilterChip
-                active={bandFilter.has("High")}
+                active={statusFilter === "apply"}
                 activeStyle={{ background: "var(--pw-apply-tint)", color: "var(--pw-apply)", border: "1px solid var(--pw-apply)" }}
-                onClick={() => setBandFilter(toggle(bandFilter, "High"))}
+                onClick={() => setStatusFilter(statusFilter === "apply" ? null : "apply")}
               >
-                High
+                Apply
               </FilterChip>
-            </div>
-
-            {/* Method */}
-            <div className="flex items-center gap-1.5">
-              <span className="font-semibold uppercase tracking-wide" style={{ color: "var(--pw-text-secondary)", fontSize: 10 }}>
-                Method
-              </span>
-              {ALL_METHODS.map(method => (
-                <FilterChip
-                  key={method}
-                  active={methodFilter.has(method)}
-                  activeStyle={{ background: "var(--pw-info-tint)", color: "var(--pw-info)", border: "1px solid var(--pw-info)" }}
-                  onClick={() => setMethodFilter(toggle(methodFilter, method))}
-                >
-                  {method}
-                </FilterChip>
-              ))}
+              <FilterChip
+                active={statusFilter === "hold"}
+                activeStyle={{ background: "var(--pw-hold-tint)", color: "var(--pw-hold)", border: "1px solid var(--pw-hold)" }}
+                onClick={() => setStatusFilter(statusFilter === "hold" ? null : "hold")}
+              >
+                Hold
+              </FilterChip>
+              <FilterChip
+                active={statusFilter === "escalate"}
+                activeStyle={{ background: "var(--pw-escalate-tint)", color: "var(--pw-escalate)", border: "1px solid var(--pw-escalate)" }}
+                onClick={() => setStatusFilter(statusFilter === "escalate" ? null : "escalate")}
+              >
+                Escalate
+              </FilterChip>
             </div>
 
             {/* Sort */}
@@ -556,8 +521,8 @@ export default function QueueDashboard() {
                   outline: "none",
                 }}
               >
-                <option value="confidence_desc">Confidence: High → Low</option>
-                <option value="confidence_asc">Confidence: Low → High</option>
+                <option value="rec_apply_first">Recommendation: Apply → Escalate</option>
+                <option value="rec_escalate_first">Recommendation: Escalate → Apply</option>
                 <option value="sender_asc">Sender: A → Z</option>
                 <option value="sender_desc">Sender: Z → A</option>
                 <option value="amount_desc">Amount: High → Low</option>
@@ -610,7 +575,7 @@ export default function QueueDashboard() {
                       onClick={() => router.push(`/payments/${payment.payment_id}`)}
                     >
                       {/* ID */}
-                      <TableCell>
+                      <TableCell style={{ whiteSpace: "nowrap" }}>
                         <span
                           className="text-xs font-medium"
                           style={{

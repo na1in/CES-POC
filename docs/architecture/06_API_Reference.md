@@ -102,7 +102,7 @@ Ingest a new payment. Saves as RECEIVED then runs the full pipeline asynchronous
 | beneficiary_name | string | No | |
 | payment_method | string | Yes | ACH, CHECK, WIRE, CREDIT_CARD |
 | payment_date | ISO 8601 | Yes | |
-| reference_1 | string | No | Free text — parsed by Claude at ingest |
+| reference_1 | string | No | Free text — the policy number is extracted (regex) at ingest |
 | reference_2 | string | No | Free text |
 
 **Response (201):**

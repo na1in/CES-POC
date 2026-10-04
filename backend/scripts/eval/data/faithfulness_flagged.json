@@ -1,0 +1,128 @@
+{
+ "flagged": [
+  {
+   "corpus": "mock500",
+   "case_id": "S3-tier3-below-0148",
+   "scenario": 3,
+   "recommendation": "HOLD",
+   "unsupported": [],
+   "flag_contradictions": [
+    "Multi-method: text says present, prompt says False \u2014 \u201cThe payment is not for multiple periods, nor is it a partial payment from multiple methods.\u201d"
+   ],
+   "context_summary": "- Sender: Porfirio Antonucci vs policyholder: Porfirio Antonucci (similarity: 100%)\n- Policy: POL-11527\n- Amount variance: 28.8%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 0%",
+   "text": "Sender and policyholder names match perfectly, indicating a direct payment. The payment amount has a significant variance of 28.8%, suggesting it does not align with expected premium amounts. The payment is not for multiple periods, nor is it a partial payment from multiple methods. There is no history of consistent payments for this policy, making the current variance more suspicious. The 28.8% variance is a primary reason to hold and investigate further, as it's too high for automatic processing. Investigate the reason for the 28.8% payment variance and contact the policyholder if clarification is needed."
+  },
+  {
+   "corpus": "mock500",
+   "case_id": "S3-tier3-above-0227",
+   "scenario": 3,
+   "recommendation": "HOLD",
+   "unsupported": [],
+   "flag_contradictions": [
+    "Multi-period: text says present, prompt says False \u2014 \u201cThe multi-period and multi-method flags are false, meaning it's a single, standard payment.\u201d"
+   ],
+   "context_summary": "- Sender: Aarush Carreras vs policyholder: Aarush Carreras (similarity: 100%)\n- Policy: POL-13053\n- Amount variance: 29.9%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 0%",
+   "text": "The payment is from and for the policyholder, Aarush Carreras, indicating a direct payment. A significant amount variance of 29.9% suggests the payment may not match the expected premium. The multi-period and multi-method flags are false, meaning it's a single, standard payment. There is no historical consistency, indicating this payment behavior is unusual for this policy. No third party is involved in this transaction. Investigate the reason for the 29.9% amount variance and confirm the policyholder's payment intent."
+  },
+  {
+   "corpus": "mock500",
+   "case_id": "S1-hold-risk-0139",
+   "scenario": 1,
+   "recommendation": "HOLD",
+   "unsupported": [],
+   "flag_contradictions": [
+    "Risk flags: text says absent, prompt says True \u2014 \u201cThe payment method's low risk doesn't negate the system's identified risk flags.\u201d"
+   ],
+   "context_summary": "- Sender: Judith Palomino vs policyholder: Judith Palomino (similarity: 100%)\n- Policy reference: POL-13200\n- Amount variance: 0.0%\n- Risk flags: True\n- Account status: active\n- Payment method risk: low",
+   "text": "Despite a 100% sender/policyholder match and no amount variance, the payment has triggered risk flags. The presence of risk flags overrides the otherwise perfect match and zero variance. A 'HOLD' allows for further investigation into the nature of the triggered risk flags. The payment method's low risk doesn't negate the system's identified risk flags. Investigate the specific risk flags associated with this payment to determine appropriate next steps."
+  },
+  {
+   "corpus": "full",
+   "case_id": "S5-diff-account-dup-04",
+   "scenario": 5,
+   "recommendation": "ESCALATE",
+   "unsupported": [
+    {
+     "kind": "number",
+     "value": 24.0,
+     "class": "invented"
+    }
+   ],
+   "flag_contradictions": [],
+   "context_summary": "- Original payment: PMT-001 (30.0 hours ago)\n- Current payment: PMT-002\n- Amount difference: $0.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-90014\n- Outstanding balance: $0.00",
+   "text": "Original payment PMT-001 was received 30 hours ago, exceeding the 24-hour look-back period for potential duplicate identification. Current payment PMT-002 has an identical amount ($0.00 difference) to the original payment. PMT-002 matches PMT-001 on sender name, payment method, and policy reference (POL-90014). Policy POL-90014 currently has a $0.00 outstanding balance, suggesting PMT-001 may have already covered the balance. Investigate if PMT-002 is a legitimate new payment for a different charge or a delayed duplicate of PMT-001, and if necessary, initiate a refund or hold for clarification."
+  },
+  {
+   "corpus": "full",
+   "case_id": "S5-diff-account-dup-04~name_case",
+   "scenario": 5,
+   "recommendation": "ESCALATE",
+   "unsupported": [
+    {
+     "kind": "number",
+     "value": 24.0,
+     "class": "invented"
+    }
+   ],
+   "flag_contradictions": [],
+   "context_summary": "- Original payment: PMT-001 (30.0 hours ago)\n- Current payment: PMT-002\n- Amount difference: $0.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-90014\n- Outstanding balance: $0.00",
+   "text": "Original payment PMT-001 was made 30 hours ago, exceeding the 24-hour duplicate payment detection window. Current payment PMT-002 has an identical amount to PMT-001 ($0.00 difference). Both payments match on sender name, payment method, and policy reference (POL-90014). Policy POL-90014 currently has a $0.00 outstanding balance, suggesting PMT-001 covered the full amount. Investigate both PMT-001 and PMT-002 on policy POL-90014 to determine if PMT-002 is a duplicate payment that needs to be refunded."
+  },
+  {
+   "corpus": "heldout",
+   "case_id": "S5-near-dup-control-04",
+   "scenario": 1,
+   "recommendation": "APPLY",
+   "unsupported": [],
+   "flag_contradictions": [
+    "Risk flags: text says present, prompt says False \u2014 \u201cApply the payment directly to policy POL-90015 given the strong match and low risk indicators.\u201d"
+   ],
+   "context_summary": "- Sender: Noah Brown vs policyholder: Noah Brown (similarity: 100%)\n- Policy reference: POL-90015\n- Amount variance: 0.2%\n- Risk flags: False\n- Account status: active\n- Payment method risk: low",
+   "text": "Sender and policyholder names are an exact match, indicating the correct recipient. The policy reference 'POL-90015' is present and likely matches an active policy. The amount variance is minimal (0.2%), well within acceptable thresholds for direct application. No risk flags were triggered, and the payment method risk is low. The account status is active, further supporting direct application. Apply the payment directly to policy POL-90015 given the strong match and low risk indicators."
+  },
+  {
+   "corpus": "heldout",
+   "case_id": "S3-tier5-03~ref_noise",
+   "scenario": 3,
+   "recommendation": "ESCALATE",
+   "unsupported": [],
+   "flag_contradictions": [
+    "Multi-period: text says present, prompt says False \u2014 \u201cThe 'Multi-period' and 'Multi-method' flags are false, ruling out common reasons for payment discrepancies.\u201d"
+   ],
+   "context_summary": "- Sender: David Miller vs policyholder: David Miller (similarity: 100%)\n- Policy: POL-90005\n- Amount variance: 170.0%\n- Multi-period: False (estimated 0 periods)\n- Multi-method: False (fraction: 0.00)\n- Third-party: False (None)\n- Historical consistency: 0%",
+   "text": "The payment amount is 170% higher than expected, indicating a significant overpayment. No historical payment consistency (0%) suggests this is an unusual payment pattern. The 'Multi-period' and 'Multi-method' flags are false, ruling out common reasons for payment discrepancies. While the sender and policyholder match, the extreme overpayment warrants further investigation. Contact David Miller to understand the reason for the 170% overpayment and clarify the intended payment amount for POL-90005."
+  },
+  {
+   "corpus": "fresh500",
+   "case_id": "S5-dup-exact-0090",
+   "scenario": 5,
+   "recommendation": "ESCALATE",
+   "unsupported": [
+    {
+     "kind": "number",
+     "value": 25.0,
+     "class": "invented"
+    }
+   ],
+   "flag_contradictions": [],
+   "context_summary": "- Original payment: PMT-001 (24.8 hours ago)\n- Current payment: PMT-002\n- Amount difference: $0.00 (within $2.00 tolerance)\n- Match on: sender name, payment method, policy reference\n- Policy: POL-10813\n- Outstanding balance: $0.00",
+   "text": "Payment PMT-002 is an exact duplicate in terms of amount ($0.00 difference) of PMT-001. Both payments share the same sender name, payment method, and policy reference. The original payment (PMT-001) was received less than 25 hours ago, making a legitimate second payment highly improbable. Policy POL-10813 currently has a $0.00 outstanding balance, indicating no further payment is due. Investigate PMT-002 as a potential duplicate payment and initiate a refund if confirmed."
+  }
+ ],
+ "wrong_direction": [
+  {
+   "corpus": "mock500",
+   "case_id": "S3-tier4-0128~ref_noise",
+   "text_says": "under",
+   "truth": "over",
+   "text": "The payment amount has a significant 65.0% variance from the expected amount, suggesting underpayment. The payment is not for multiple periods, nor does it involve multiple payment methods, simplifying analysis. The sender and policyholder are identical (SHb Norberg), confirming the payment originated from the insured. Despite the current variance, historical payments for this policy have been 94%"
+  },
+  {
+   "corpus": "fresh500",
+   "case_id": "S1-apply-a-0794",
+   "text_says": "over",
+   "truth": "under",
+   "text": "Sender and policyholder names are an exact match, indicating the correct recipient. The policy reference 'POL-12059' is explicitly provided. The amount variance is minimal (1.0%), suggesting a minor rounding difference or slight overpayment. No risk flags were triggered, and the payment method risk is low. The account is active, confirming the policy is in force. Apply the payment to policy POL-12"
+  }
+ ]
+}

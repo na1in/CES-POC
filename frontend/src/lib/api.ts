@@ -1,4 +1,4 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+export const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null
@@ -196,6 +196,34 @@ export function overridePayment(id: string, action: string, reason: string): Pro
   })
 }
 
+export interface PolicySearchResult {
+  policy_number: string
+  customer_id: string
+  customer_name: string
+  policy_type: string
+  premium_amount: number
+  premium_frequency: string
+  status: string
+  outstanding_balance: number
+  next_due_date: string | null
+}
+
+export function searchPolicies(q: string): Promise<{ policies: PolicySearchResult[]; count: number }> {
+  return apiFetch(`/api/policies/search?q=${encodeURIComponent(q)}`)
+}
+
+export function attachPolicy(id: string, policyNumber: string, reason?: string): Promise<{
+  payment_id: string
+  matched_policy_id: string
+  matched_customer_id: string
+  customer_name: string
+}> {
+  return apiFetch(`/api/payments/${id}/attach-policy`, {
+    method: "POST",
+    body: JSON.stringify({ policy_number: policyNumber, reason: reason ?? null }),
+  })
+}
+
 export function returnPayment(id: string, notes?: string): Promise<unknown> {
   return apiFetch(`/api/payments/${id}/return`, {
     method: "POST",
@@ -246,7 +274,9 @@ export interface ChangeRequest {
   projected_impact: string | null
   status: string
   proposed_by: string
+  proposed_by_name?: string
   approved_by: string | null
+  approved_by_name?: string | null
   review_comment: string | null
   proposed_at: string
   reviewed_at: string | null
@@ -335,6 +365,7 @@ export interface OverrideRow {
   decision_attribution: string | null
   override_reason: string | null
   overridden_by: string | null
+  overridden_by_name?: string | null
   overridden_at: string | null
 }
 
@@ -363,6 +394,7 @@ export interface ThresholdHistory {
   old_value: number | null
   new_value: number
   changed_by: string
+  changed_by_name?: string
   effective_from: string
   effective_to: string | null
   change_id: number | null

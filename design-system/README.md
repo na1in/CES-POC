@@ -22,8 +22,8 @@ import { Button, RecBadge, StatCard, SignalBar } from '@/design-system'
 
 | Token | Value | Usage |
 |---|---|---|
-| `colors.primary` | `#7C4DFF` | Primary actions, active tabs, focus rings |
-| `colors.secondary` | `#00E5FF` | Gradient end, cyan accent |
+| `colors.primary` | `#0A66C2` | Primary actions, active tabs, focus rings |
+| `colors.secondary` | `#378FE9` | Gradient end, cyan accent |
 | `colors.apply` | `#10B981` | APPLY status, success, accept buttons |
 | `colors.hold` | `#F59E0B` | HOLD status, warnings |
 | `colors.escalate` | `#EF4444` | ESCALATE status, errors |

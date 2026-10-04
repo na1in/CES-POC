@@ -46,7 +46,9 @@ async def run_signal_engine(
 
     payment keys:
         amount, payment_method, payment_date, sender_name, sender_account,
-        reference_1, reference_2, extracted_policy_number
+        reference_field_1, reference_field_2  (DB column names, as the pipeline supplies them; also used for the
+        duplicate check and reference-text third-party detection), extracted_policy_number.
+        Legacy keys reference_1 / reference_2 are still accepted for reference-text detection.
 
     customer keys:
         customer_name, status, outstanding_balance_cents, next_due_date,
@@ -58,8 +60,13 @@ async def run_signal_engine(
     """
     premium_amount: int = (policy or {}).get("premium_amount") or 0
     policy_number: str | None = (policy or {}).get("policy_number")
+    # The pipeline supplies the DB column names (reference_field_1/2); reference_1/2 are the older keys. Reading only
+    # the older ones meant reference-text third-party detection saw nothing in production (finding F6).
     reference_text = " ".join(
-        part for part in [payment.get("reference_1"), payment.get("reference_2")] if part
+        part for part in [
+            payment.get("reference_field_1") or payment.get("reference_1"),
+            payment.get("reference_field_2") or payment.get("reference_2"),
+        ] if part
     ) or None
 
     # ── Wave 1: async I/O signals (run concurrently) ──────────────────────────
@@ -69,7 +76,7 @@ async def run_signal_engine(
             db=db,
             payment_id=payment_id,
             sender_name=payment["sender_name"],
-            sender_account=payment.get("sender_account"),
+            reference=payment.get("reference_field_1"),
             payment_method=payment["payment_method"],
             payment_date=payment["payment_date"],
             amount=payment["amount"],
@@ -110,6 +117,7 @@ async def run_signal_engine(
         historical_sender_accounts=customer.get("historical_sender_accounts") or [],
         amount_variance_pct=variance["amount_variance_pct"],
         historical_consistency_score=consistency_score,
+        historical_record_count=len(customer.get("historical_amounts") or []),
     )
     policy_confidence = compute_policy_match_confidence(
         name_similarity_score=name_sim["name_similarity_score"],

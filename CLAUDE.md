@@ -32,6 +32,7 @@ Always before making any changes, search the web for the newest chanes and only 
   - `docs/Step3_Feature_Signals.md` — 19 signal computation methods across 5 categories
   - `docs/Executive_Summary_Scenarios.md` — overview with routing flow and decision matrix
   - `docs/Database_Design.md` — proto-to-DB mapping and design notes
+  - `docs/Evaluation_Harness.md` — synthetic evaluation methodology, results and open findings (harness in `backend/scripts/eval/`)
 
 ## Conventions
 - Monetary amounts are stored as integers in cents (never floats)
@@ -42,7 +43,7 @@ Always before making any changes, search the web for the newest chanes and only 
 - When updating decision logic, update in this order: protos → schema → scenario docs → architecture docs → reference docs
 
 ## Architecture (5-Stage Pipeline)
-1. **Ingest** (code + Gemini 2.5 Flash via OpenRouter) — validate fields, parse free-text references to extract policy numbers/intent/period count, persist payment as RECEIVED
+1. **Ingest** (code) — validate fields, extract the policy number from the free-text references with a deterministic regex (normalised to `POL-XXXXX`; no LLM), persist payment as RECEIVED. The parse is done once and handed to the pipeline
 2. **Compute Signals** (code + Gemini 2.5 Flash for gray-zone names) — 19 signals in 3 dependency waves, snapshot to `payment_signals`
 3. **AI Agent** (deterministic router + Gemini 2.5 Flash reasoning) — Scenario 5 runs first (duplicate check), then route to 1-4. Produces structured recommendation JSON
 4. **Persist** (code) — single DB transaction: save recommendation + update status to HELD + fill matched IDs + audit log. Human approval is always required — no auto-apply. Retry wrapper: 3 attempts with backoff
@@ -50,10 +51,10 @@ Always before making any changes, search the web for the newest chanes and only 
 
 ## 5 Scenarios (Routing is deterministic if/else, reasoning uses Gemini 2.5 Flash via OpenRouter)
 1. **Strong Policy Match** — policy # provided, name ≥75%, variance ≤2%. All matches land HELD for Priya; AI recommends APPLY when name >90%, no risk flags, active policy, low-risk method
-2. **Customer Match, No Policy** — customer match ≥90% (or <90% with 2+ supporting signals), no policy ref. Always requires human approval
+2. **Customer Match, No Policy** — name similarity ≥90% is a strong match on its own (or <90% with 2+ supporting signals), no policy ref. Always requires human approval. Variance is computed from the customer's active policy (never assumed 0%); an APPLY for a customer with risk flags becomes HOLD
 3. **High Amount Variance** — match found but variance >2%. Tiers: 2-15% HOLD, 15-50% check special cases (multi-period, multi-method, third-party → HOLD), >100% ESCALATE. Name must be ≥90%
 4. **No Matching Customer** — all matching failed. Check for third-party payment first (employer, family, escrow → HOLD if amount ≤15%), otherwise ESCALATE
-5. **Duplicate Payment** — runs FIRST on every payment. Match: 3 exact fields (sender, method, reference) + amount within $2 tolerance, within 72hrs. Balance >0 → HOLD, balance =0 → ESCALATE
+5. **Duplicate Payment** — runs FIRST on every payment. Match: 3 exact fields (sender name, payment method, `reference_field_1`) + amount within $2 tolerance, within ±72hrs of the payment's date; the sender's account is NOT a criterion; `processing_failed` payments count, `returned` ones do not. Balance >0 → HOLD, balance =0 → ESCALATE
 
 ## 19 Signals (5 categories, 3 computation waves)
 ### Category 1: Matching & Identification (4)
@@ -87,7 +88,7 @@ Always before making any changes, search the web for the newest chanes and only 
 - Duplicate Amount Difference (cents, 0=exact, up to 200=$2)
 
 ## Hybrid Name Matching
-- Traditional: Jaro-Winkler + Levenshtein + Soundex → deterministic_score
+- Traditional: Jaro-Winkler + Levenshtein + Soundex → deterministic_score, after normalising: lower-case, drop punctuation, and ignore a middle initial that only one of the two names has ("Boris P. Ulker" = "Boris Ulker"). Nicknames are NOT expanded (business decision)
 - If score <70%: clear mismatch, no LLM call
 - If score >92%: clear match, no LLM call
 - If score 70-92% (gray zone): call Gemini 2.5 Flash → final = max(deterministic, llm)
@@ -214,7 +215,7 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 | `proto/payment.proto` | Payment, PaymentStatus (incl. pending_sender_response, returned) |
 | `proto/signals.proto` | PaymentSignals with full name matching breakdown |
 | `proto/recommendation.proto` | PaymentRecommendation with DecisionAttribution |
-| `proto/audit.proto` | AuditLogEntry (all 20 action types), ConfigurationThreshold |
+| `proto/audit.proto` | AuditLogEntry (all 21 action types), ConfigurationThreshold |
 | `proto/user.proto` | User, UserRole |
 | `proto/document.proto` | CaseDocument, DocumentType |
 | `proto/annotation.proto` | CaseAnnotation, AnnotationType |
@@ -226,18 +227,18 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 ## Testing
 
 ### Backend (`backend/tests/`)
-- ~378 pytest tests; run with `python -m pytest tests/ -v` from `backend/`
-- `conftest.py` has `--live-llm` flag: default mocks `parse_reference_fields` + `get_reasoning`; pass `--live-llm` for real OpenRouter calls
+- 452 pytest tests (as of 2026-09-26), all passing; run with `python -m pytest tests/ -v` from `backend/`. Run against a database built by `alembic upgrade head` + seed (`ces_test`); the dev DB works too because every test rolls back. `conftest.py` mocks the reasoning LLM (patched where the scenario modules use it) and disables the gray-zone name LLM, so the suite is offline (~4 s); `--live-llm` uses real calls. `tests/test_schema_parity.py` fails if an enum in `db/schema.sql` differs from the migrated database
+- `conftest.py` has the `--live-llm` flag: by default it mocks `get_reasoning` and disables the gray-zone name LLM (reference parsing is deterministic and needs no mock); pass `--live-llm` for real OpenRouter calls
 - E2E tests use `rollback_only` fixtures — all mutations are rolled back after each test
 
 ### Frontend (`frontend/e2e/`)
 - 38 Playwright tests across 6 spec files (01-login through 06-admin); chromium only, 1 worker
 - Run with `npx playwright test` from `frontend/` (backend on :8000 + Next.js on :3001 must be running)
 - All tests are read-only (navigation/visibility) — mutations stay in backend pytest suite
-- `helpers/auth.ts`: `loginAs()` clears localStorage before each login to prevent RouteGuard bounce
+- `helpers/auth.ts`: `loginAs()` clears sessionStorage before each login to prevent RouteGuard bounce
 - Key selector patterns: `getByText(/^PMT-/).first()` for row nav; `{ exact: true }` to avoid audit-log false matches; `page.locator('input[aria-label="..."]')` for `<input type="date">`
-- `PMT-ESC-001` is seeded as a pre-escalated payment to enable investigation workflow tests
-- `PMT-H-001`..`PMT-H-009` are seeded historical payments (applied/returned/escalated with correct `decision_attribution`) to populate the Governance Dashboard with meaningful data; protected from `demo_restore.py` cleanup via `SEED_PAYMENT_IDS`
+- `PMT-900` is seeded as a pre-escalated payment to enable investigation workflow tests
+- `PMT-901`..`PMT-909` are seeded historical payments (applied/returned/escalated with correct `decision_attribution`) to populate the Governance Dashboard with meaningful data; protected from `demo_restore.py` cleanup via `SEED_PAYMENT_IDS`
 
 ### Infrastructure (fixed 2026-05-16)
 - `backend/app/main.py`: `CORSMiddleware` for origins :3000/:3001/:3002 — required for browser API calls
@@ -251,10 +252,52 @@ RECEIVED → PROCESSING → APPLIED / HELD / ESCALATED / PROCESSING_FAILED / PEN
 - `frontend/src/app/governance/page.tsx`: Added "Exception Dashboard" button to header — Lorraine had no UI path to `/governance/exceptions`
 - `frontend/src/app/investigations/page.tsx`: Removed "Export Case List" button; wired "View SLA Report" to open a live-data modal
 
+### Bug fixes (2026-06-08)
+- `frontend/src/contexts/auth.tsx`, `frontend/src/lib/api.ts`, `frontend/e2e/helpers/auth.ts`: Switched auth token storage from `localStorage` to `sessionStorage` — app now always starts at `/login` on a fresh browser open or new tab; session persists across page refreshes within the same tab
+
+### Bug fixes (2026-09-18)
+- `backend/app/services/signals/duplicate.py`, `backend/app/services/signal_engine.py`: duplicate detection now matches sender name + payment method + `reference_field_1` (exact) + amount ±$2 within 72h, as the spec requires. It previously matched on `sender_account`, so duplicates from another account were missed (APPLY) and identical-premium policies paid from one account were escalated. Tests rewritten (+3 new) in `tests/test_signals_wave1.py`
+
+### Bug fixes (2026-09-26)
+- `backend/app/services/agent/scenarios/sc2.py`: strong match tests the name similarity score, not the blended `customer_match_confidence` (an exact name without an account/history match was ESCALATED); variance comes from the customer's active policy and a payment whose variance cannot be computed is HELD (was read as 0%); an APPLY for a risk-flagged customer becomes HOLD; `amount_match` is derived from policy premiums
+- `backend/app/services/ingest.py`: reference parsing is a deterministic regex (was an LLM call made twice); `pipeline.py` / `routers/payments.py` pass the ingest parse to the pipeline
+- `backend/app/services/signals/matching.py`: middle-initial normalisation; `_llm_score` sets `temperature=0`. `pipeline.py` `_find_best_customer` uses the same normalisation
+- `backend/app/services/signals/amount.py` / `risk.py` / `signal_engine.py`: historical consistency spread floored at 2% of the mean, `historical_match` needs ≥2 records; the engine reads `reference_field_1/2`
+- `backend/app/services/signals/duplicate.py`: window is ±72h (had no upper bound), amount tolerance applied inside the query, `processing_failed` payments count
+- `backend/app/services/agent/scenarios/sc1.py`: no crash on a `None` variance
+- `backend/app/routers/approvals.py`: the reprocess endpoint imports `_target_status` (was a `NameError` → 500 after the pipeline had run)
+- `backend/alembic/versions/0002_audit_action_policy_attached.py`: `policy_attached` audit action (was only in `schema.sql`/proto, so attach-policy failed on migrated databases)
+- Dev DB: `amount_tolerance_auto` restored from 40 to 2 via the change-request rollback (#64, the "Testing the POC with Rama" change)
+- Tests: 26 stale/failing tests fixed and new ones added (452 total); `conftest.py` LLM patches now take effect
+
+### Bug fixes / demo data (2026-09-27)
+- `backend/scripts/seed.py`: seed fixture payments renamed from `PMT-ESC-001`/`PMT-H-001..009` to a uniform `PMT-900`/`PMT-901..909` (real `PMT-NNN` shape, just a reserved high block, so `_next_payment_id()` no longer needs to special-case skip non-numeric IDs); every seed date (payment dates, `policies.next_due_date`, the 6-month `payment_history`) is now relative to `now()`/`CURRENT_DATE` instead of a fixed calendar date, so a fresh seed always looks current instead of drifting further into the past every time nobody re-seeds. `seed_policies` uses `ON CONFLICT DO UPDATE` for `next_due_date` so a re-seed actually refreshes it. `seed_payment_history` deletes and re-inserts (dedup by exact timestamp doesn't work once dates are relative)
+- `backend/scripts/demo_restore.py` / `demo_actions.py`: updated for the `PMT-900`/`PMT-901..909` rename; `delete_demo_payment_history`'s cutoff is now `now() - interval '15 days'` instead of a fixed date
+- `backend/scripts/demo_governance.py`: governance review / anomaly `period_start`/`period_end` are relative to today, not `2026-05-01..15` — that range was already outside the Governance Dashboard's default 5-day filter
+- `frontend/e2e/03-payment-detail.spec.ts`, `04-investigations.spec.ts`: only had comments mentioning `PMT-ESC-001`, not a hardcoded locator (both already match `/^PMT-/`) — comments updated, no test-behavior change
+
+### Evaluation harness (added 2026-09-18; extended 2026-09-26)
+- `backend/scripts/eval/`: `generate.py` (Gemini-generated synthetic world + scenario archetypes, independent checks, seeded noise) and `run_eval.py` (runs cases through the real ingest endpoint + pipeline against an isolated `ces_eval` database; refuses any database not ending in `_eval`)
+- Also: `ai_decider.py` (an LLM makes the final decision), `compare_runs.py` (paired comparison, McNemar) and `run_eval.py --llm regex|defaults|name-llm|ai-rules|ai-open|ai-tight --out FILE`; corpora `full.json`, `heldout.json`, `mock_5000.json` / `mock_500.json`
+- Corpus and results in `backend/scripts/eval/data/`; full methodology, results and findings in `docs/Evaluation_Harness.md`
+- Result (synthetic test set, one pass): 169/179 = 94.4% scenario-and-recommendation agreement on valid-label cases (95% CI 90.0–96.9), after the duplicate fix; 87.2% before. After the 2026-09-26 fixes the code-only arm agrees on 179/179, 180/180 (held-out) and 4,649/4,650 (5,000-case) valid-label cases, but the failures were found on those same synthetic sets. This is agreement with spec-derived labels, not accuracy on real payments
+- Measured 2026-09-25/26: the remaining LLM calls (gray-zone names, reasoning text) cost about $0.70 per 1,000 payments and add ~2.6 s per payment; an LLM as the final decider did worse than the code and was less consistent
+- Do not use `scripts/demo_restore.py` to clean up eval data — it wipes all non-seed payments, thresholds and governance records in the DB it targets
+
+### Known issues (open; details in `docs/Evaluation_Harness.md`)
+- Initial + surname names (`C. Gomez` vs `Carlos Gomez`) score 61–66, skip the LLM (below the 70 floor) and ESCALATE — spec-conformant, a coverage gap. Nicknames ("Bob"/"Robert" ≈ 63) never reach the gray-zone LLM for the same reason; expanding them is a business decision
+- Gray-zone name LLM answers in round numbers (90/95) against a ">90" apply threshold; `temperature=0` is set but stability was not re-measured
+- Scenario 2 with a computed variance >15% HOLDs in S2 instead of rerouting to Scenario 3's tiers (so >100% variance holds rather than escalates)
+- Reference parser is untested on genuinely messy real references (the eval noise is templated); when text has a 5-digit number but no pattern matched, an info line is logged
+- `docs/architecture/pipeline-diagram.md` (untracked) still describes an LLM reference parser
+
 ### Dev setup
 - PostgreSQL runs in Docker: `docker compose up -d db` (from repo root)
 - Backend: `python -m uvicorn app.main:app --port 8000 --reload` (from `backend/`, after DB is up)
 - Frontend: `npx next dev -p 3001` (from `frontend/`)
+- Full Docker stack (all three services): `docker compose up -d` — frontend on :3000, backend on :8000
+- External / mentor onboarding: see `SETUP.md` at repo root
+- Backend env template: `backend/.env.example` (copy to `backend/.env` and fill in `OPENROUTER_API_KEY`)
 
 ## Implementation plan
 See `docs/Implementation_Plan.md` for the full phased plan with ticket breakdowns, parallel tracks, estimates, and risk mitigation. Team: 2 engineers + 1 designer, ~7 weeks.

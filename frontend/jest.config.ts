@@ -10,6 +10,9 @@ const config: Config = {
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
   },
+  // e2e/ holds Playwright specs (test() from @playwright/test, run via `npx playwright test`) —
+  // they use an incompatible test API and crash under Jest if not excluded here.
+  testPathIgnorePatterns: ["<rootDir>/node_modules/", "<rootDir>/.next/", "<rootDir>/e2e/"],
 }
 
 export default createJestConfig(config)

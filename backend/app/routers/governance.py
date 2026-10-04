@@ -32,8 +32,14 @@ _EXPORT_SCOPES = {"decisions", "overrides", "config_changes", "all"}
 # ── Request bodies ────────────────────────────────────────────────────────────
 
 class ReviewBody(BaseModel):
-    period_start: str   # ISO date: YYYY-MM-DD
-    period_end: str
+    # date, not str: asyncpg binds these straight to DATE columns (period_start/period_end below), and
+    # its date codec requires an actual date object — a plain ISO string crashes with "'str' object
+    # has no attribute 'toordinal'" the moment Postgres infers the parameter's type as `date` from
+    # context (which it does even through an explicit CAST(:x AS DATE) in the query text). Typing the
+    # field as `date` here makes FastAPI/Pydantic parse the incoming "YYYY-MM-DD" string once, at the
+    # API boundary, instead of passing it through as text.
+    period_start: date
+    period_end: date
     notes: Optional[str] = None
     export_generated: bool = False
 
@@ -42,8 +48,8 @@ class AnomalyBody(BaseModel):
     metric_name: str
     description: str
     scenario_type: Optional[str] = None
-    period_start: Optional[str] = None
-    period_end: Optional[str] = None
+    period_start: Optional[date] = None
+    period_end: Optional[date] = None
     assigned_to: Optional[str] = None
 
     @field_validator("description")
@@ -84,7 +90,7 @@ async def create_review(
     result = await db.execute(text("""
         INSERT INTO governance_reviews
             (reviewed_by, period_start, period_end, export_generated, notes)
-        VALUES (:reviewer, :start, :end, :exported, :notes)
+        VALUES (:reviewer, CAST(:start AS DATE), CAST(:end AS DATE), :exported, :notes)
         RETURNING review_id, review_timestamp
     """), {
         "reviewer": current_user.user_id,
@@ -104,8 +110,8 @@ async def create_review(
         "actor_uid": current_user.user_id,
         "details": json.dumps({
             "review_id": row["review_id"],
-            "period_start": body.period_start,
-            "period_end": body.period_end,
+            "period_start": body.period_start.isoformat(),
+            "period_end": body.period_end.isoformat(),
         }),
     })
 
@@ -148,7 +154,7 @@ async def flag_anomaly(
         INSERT INTO anomaly_flags
             (metric_name, scenario_type, description, period_start, period_end,
              flagged_by, assigned_to, status)
-        VALUES (:metric, :scenario, :desc, :pstart, :pend, :flagged_by, :assigned_to, 'open')
+        VALUES (:metric, :scenario, :desc, CAST(:pstart AS DATE), CAST(:pend AS DATE), :flagged_by, :assigned_to, 'open')
         RETURNING flag_id, flagged_at
     """), {
         "metric": body.metric_name,

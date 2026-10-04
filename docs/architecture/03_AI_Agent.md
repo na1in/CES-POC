@@ -106,9 +106,17 @@ Once the router picks a scenario, Claude API receives the signals and applies th
 | Single Policy | 1 active policy + variance <= 15% | **APPLY** | 80-90% | Yes (always) |
 | Amount Disambiguates | Multiple policies, amount matches exactly 1 (within 2%) | **APPLY** | 75-85% | Yes |
 | Ambiguous | Multiple policies, cannot disambiguate by amount | **HOLD** | 70-80% | Yes |
-| High Variance | Variance > 15% | Reroute → Scenario 3 | — | — |
+| High Variance | Variance > 15% | **HOLD** (`scenario_2_hold_high_variance`) | 65-75% | Yes |
+| Amount Unverifiable | Variance cannot be computed (policy premium unknown) | **HOLD** (`scenario_2_hold_amount_unverified`) | 60-70% | Yes |
+| Risk Flags | Any of the above would be APPLY, but the customer has risk flags | **HOLD** (`scenario_2_hold_risk_flag`) | 60% | Yes |
 
 Note: Scenario 2 **always** requires human approval, even when recommending APPLY. The system couldn't match a policy reference directly, so a human confirms.
+
+Implementation notes (2026-09-26):
+- **Strong match = name similarity ≥ 90%**, tested on the name similarity score itself. The blended `customer_match_confidence` (name 60% + account 20% + history 20%) is display-only here: it caps an exact name at 60 when the account or history is missing, which used to send 100%-name payments to ESCALATE. Account, amount and history matches are supporting signals for the <90% path only (2 of 3 needed).
+- **Variance** comes from the signal engine when a policy was identified; otherwise it is computed from the customer's active policy. It is never assumed to be 0%.
+- **`amount_match`** is derived from the active policies' premiums (within `amount_tolerance_auto`), since no policy is identified for the signal engine to compare against.
+- **Risk flags** turn an APPLY into HOLD, as in Scenario 1. HOLD and ESCALATE outcomes are unchanged.
 
 ---
 

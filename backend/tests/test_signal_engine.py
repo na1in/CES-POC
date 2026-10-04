@@ -24,8 +24,8 @@ def _base_payment(payment_id: str, amount: int = 150000) -> dict:
         "payment_date": datetime(2026, 4, 24, 10, 0, 0, tzinfo=timezone.utc),
         "sender_name": "Robert Johnson",
         "sender_account": "ACC-001",
-        "reference_1": "Policy POL-00001",
-        "reference_2": None,
+        "reference_field_1": "Policy POL-00001",   # the pipeline supplies DB column names
+        "reference_field_2": None,
         "extracted_policy_number": "POL-00001",
     }
 
@@ -212,10 +212,10 @@ async def test_signal_engine_outstanding_balance_justifies_duplicate(db: AsyncSe
     await db.execute(text("""
         INSERT INTO payments (
             payment_id, amount, sender_name, sender_account, beneficiary_name,
-            payment_method, payment_date, status, created_timestamp
+            payment_method, payment_date, reference_field_1, status, created_timestamp
         ) VALUES (
             'PMT-SE-008-PRIOR', 150000, 'Robert Johnson', 'ACC-001', 'Robert Johnson',
-            'ACH', '2026-04-23 10:00:00+00', 'received', '2026-04-23 10:00:00+00'
+            'ACH', '2026-04-23 10:00:00+00', 'Policy POL-00001', 'received', '2026-04-23 10:00:00+00'
         )
     """))
 
@@ -274,3 +274,52 @@ async def test_signal_engine_multi_period_detected(db: AsyncSession):
 
     assert signals["is_multi_period"] is True
     assert signals["estimated_periods"] == 2
+
+
+async def test_signal_engine_reads_reference_text_from_the_pipeline_column_names(db: AsyncSession):
+    """Finding F6: the engine read reference_1/2 while the pipeline supplies reference_field_1/2, so keyword-based
+    third-party detection saw no text in production."""
+    await _insert_payment(db, "PMT-SE-F6A")
+    payment = _base_payment("PMT-SE-F6A")
+    payment.update(sender_name="Acme Payroll Services", reference_field_1="payroll deduction POL-00001")
+
+    await run_signal_engine(payment_id="PMT-SE-F6A", payment=payment, customer=_base_customer(), policy=_base_policy(), db=db)
+
+    row = (await db.execute(text("""
+        SELECT is_third_party_payment, third_party_relationship FROM payment_signals WHERE payment_id = 'PMT-SE-F6A'
+    """))).fetchone()
+    assert row.is_third_party_payment is True
+    assert row.third_party_relationship == "payroll"
+
+
+async def test_signal_engine_still_accepts_the_legacy_reference_keys(db: AsyncSession):
+    await _insert_payment(db, "PMT-SE-F6B")
+    payment = _base_payment("PMT-SE-F6B")
+    payment.pop("reference_field_1"); payment.pop("reference_field_2")
+    payment.update(sender_name="Acme Escrow Services", reference_1="escrow release POL-00001", reference_2=None)
+
+    await run_signal_engine(payment_id="PMT-SE-F6B", payment=payment, customer=_base_customer(), policy=_base_policy(), db=db)
+
+    row = (await db.execute(text("SELECT third_party_relationship FROM payment_signals WHERE payment_id = 'PMT-SE-F6B'"))).fetchone()
+    assert row.third_party_relationship == "escrow"
+
+
+async def test_signal_engine_history_needs_two_records_to_count_as_a_match(db: AsyncSession):
+    await _insert_payment(db, "PMT-SE-HM1")
+    customer = _base_customer()
+    customer["historical_amounts"] = []   # a new customer: consistency score is 100 ("no data"), but that is no support
+
+    await run_signal_engine(payment_id="PMT-SE-HM1", payment=_base_payment("PMT-SE-HM1"), customer=customer, policy=_base_policy(), db=db)
+
+    row = (await db.execute(text("SELECT historical_match FROM payment_signals WHERE payment_id = 'PMT-SE-HM1'"))).fetchone()
+    assert row.historical_match is False
+
+
+async def test_signal_engine_constant_history_flags_an_off_amount_payment(db: AsyncSession):
+    await _insert_payment(db, "PMT-SE-HM2", amount=300000)
+    payment = _base_payment("PMT-SE-HM2", amount=300000)   # customer has always paid 150000
+
+    await run_signal_engine(payment_id="PMT-SE-HM2", payment=payment, customer=_base_customer(), policy=_base_policy(), db=db)
+
+    row = (await db.execute(text("SELECT historical_match FROM payment_signals WHERE payment_id = 'PMT-SE-HM2'"))).fetchone()
+    assert row.historical_match is False

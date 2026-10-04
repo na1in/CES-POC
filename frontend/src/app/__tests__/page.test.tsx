@@ -91,7 +91,7 @@ describe("Queue Dashboard — rendering", () => {
     expect(screen.queryByText("245000")).not.toBeInTheDocument()
   })
 
-  it("shows AI recommendation pills (APPLY, HOLD, ESCALATE)", () => {
+  it("shows recommendation pills (APPLY, HOLD, ESCALATE)", () => {
     render(<QueueDashboard />)
     expect(screen.getByText("APPLY")).toBeInTheDocument()
     expect(screen.getAllByText("HOLD").length).toBeGreaterThan(0)
@@ -155,27 +155,33 @@ describe("Queue Dashboard — error state", () => {
 
 // ── Sort order ────────────────────────────────────────────────────────────────
 
+const RANK: Record<string, number> = { apply: 0, hold: 1, escalate: 2 }
+const recOf = (id: string) => mockRecommendations[id]?.recommendation as string | undefined
+const rankOf = (id: string) => (recOf(id) != null ? RANK[recOf(id)!] : 3)
+
 describe("Queue Dashboard — default sort", () => {
-  it("sorts rows by confidence score descending (highest first) by default", () => {
+  it("sorts rows by recommendation (Apply → Hold → Escalate) by default", () => {
     render(<QueueDashboard />)
     const rows = screen.getAllByRole("row").slice(1)
-    expect(within(rows[0]).getByText("PMT-001")).toBeInTheDocument()
-    const lastRow = rows[rows.length - 1]
-    expect(within(lastRow).getByText("Unknown Remitter")).toBeInTheDocument()
+    const labels = rows.map(r => within(r).queryByText(/^(APPLY|HOLD|ESCALATE)$/)?.textContent?.toLowerCase())
+    const ranks = labels.map(l => (l != null ? RANK[l] : 3))
+    expect(ranks).toEqual([...ranks].sort((a, b) => a - b))
   })
 
-  it("shows the sort dropdown with Confidence: High → Low selected by default", () => {
+  it("shows the sort dropdown with Recommendation: Apply → Escalate selected by default", () => {
     render(<QueueDashboard />)
     const select = screen.getByRole("combobox", { name: /sort by/i })
-    expect((select as HTMLSelectElement).value).toBe("confidence_desc")
+    expect((select as HTMLSelectElement).value).toBe("rec_apply_first")
   })
 
-  it("switching sort to Confidence: Low → High puts PMT-005 first", () => {
+  it("switching sort to Recommendation: Escalate → Apply lists escalations first", () => {
     render(<QueueDashboard />)
     const select = screen.getByRole("combobox", { name: /sort by/i })
-    fireEvent.change(select, { target: { value: "confidence_asc" } })
+    fireEvent.change(select, { target: { value: "rec_escalate_first" } })
     const rows = screen.getAllByRole("row").slice(1)
-    expect(within(rows[0]).getByText("Unknown Remitter")).toBeInTheDocument()
+    const labels = rows.map(r => within(r).queryByText(/^(APPLY|HOLD|ESCALATE)$/)?.textContent?.toLowerCase())
+    const ranks = labels.map(l => (l != null ? RANK[l] : 3))
+    expect(ranks).toEqual([...ranks].sort((a, b) => b - a))
   })
 
   it("switching sort to Amount High→Low puts $12,000.00 first", () => {
@@ -224,36 +230,22 @@ describe("Queue Dashboard — scenario filter", () => {
   })
 })
 
-describe("Queue Dashboard — confidence band filter", () => {
-  it("clicking Low shows only payments with confidence < 40", () => {
+describe("Queue Dashboard — recommendation filter", () => {
+  it.each([["Escalate", "escalate"], ["Hold", "hold"], ["Apply", "apply"]])(
+    "clicking the %s chip shows only %s recommendations",
+    (chip, rec) => {
+      render(<QueueDashboard />)
+      fireEvent.click(screen.getByRole("button", { name: chip }))
+      const expected = mockPayments.filter(p => recOf(p.payment_id) === rec).length
+      const rows = screen.getAllByRole("row").slice(1)
+      expect(rows.length).toBe(expected)
+    },
+  )
+
+  it("has no payment method filter", () => {
     render(<QueueDashboard />)
-    const lowChips = screen.getAllByText("Low")
-    fireEvent.click(lowChips[0])
-
-    const lowConfidenceIds = Object.entries(mockRecommendations)
-      .filter(([, r]) => r.confidence_score < 40)
-      .map(([id]) => id)
-
-    const rows = screen.getAllByRole("row").slice(1)
-    expect(rows.length).toBe(lowConfidenceIds.length)
-  })
-})
-
-describe("Queue Dashboard — payment method filter", () => {
-  it("clicking ACH shows only ACH payments", () => {
-    render(<QueueDashboard />)
-    fireEvent.click(screen.getByRole("button", { name: "ACH" }))
-    const achPayments = mockPayments.filter(p => p.payment_method === "ACH")
-    const rows = screen.getAllByRole("row").slice(1)
-    expect(rows.length).toBe(achPayments.length)
-  })
-
-  it("clicking Wire shows only Wire payments", () => {
-    render(<QueueDashboard />)
-    fireEvent.click(screen.getByRole("button", { name: "Wire" }))
-    const wirePayments = mockPayments.filter(p => p.payment_method === "Wire")
-    const rows = screen.getAllByRole("row").slice(1)
-    expect(rows.length).toBe(wirePayments.length)
+    expect(screen.queryByRole("button", { name: "ACH" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Wire" })).not.toBeInTheDocument()
   })
 })
 
@@ -295,11 +287,7 @@ describe("Queue Dashboard — navigation", () => {
     render(<QueueDashboard />)
     const rows = screen.getAllByRole("row").slice(1)
 
-    const sorted = [...mockPayments].sort((a, b) => {
-      const aScore = mockRecommendations[a.payment_id]?.confidence_score ?? 0
-      const bScore = mockRecommendations[b.payment_id]?.confidence_score ?? 0
-      return bScore - aScore
-    })
+    const sorted = [...mockPayments].sort((a, b) => rankOf(a.payment_id) - rankOf(b.payment_id))
 
     rows.forEach((row, i) => {
       fireEvent.click(row)

@@ -1,100 +1,70 @@
-from unittest.mock import AsyncMock, MagicMock, patch
-
 import pytest
 
 from app.services.ingest import parse_reference_fields
 
-
-def _mock_openai_response(json_text: str):
-    """Build a fake OpenAI-format response object returning the given text."""
-    message = MagicMock()
-    message.content = json_text
-    choice = MagicMock()
-    choice.message = message
-    response = MagicMock()
-    response.choices = [choice]
-    return response
+DEFAULTS = {"extracted_policy_number": None, "payment_intent": "unknown", "period_count": 1}
 
 
-# ── LLM returns clean structured data ────────────────────────────────────────
+@pytest.mark.parametrize("ref1, ref2, expected", [
+    # well-formed
+    ("for policy POL-00001 April payment", None, "POL-00001"),
+    ("POL-90001", None, "POL-90001"),
+    # missing hyphen / spacing / punctuation variants are normalised to POL-XXXXX (the LLM parser returned "POL90001")
+    ("POL90001", None, "POL-90001"),
+    ("ref POL90001", "monthly auto", "POL-90001"),
+    ("pol 90003 - ins.", None, "POL-90003"),
+    ("Pol.93010 - prem", None, "POL-93010"),
+    ("pol-91006", "home premium", "POL-91006"),
+    ("Policy #90014", None, "POL-90014"),
+    # "policy no." phrasings
+    ("policy no. 90014", "LIFE POLICY PAYMENT", "POL-90014"),
+    ("pmt for policy no. 90004", "annual premium", "POL-90004"),
+    ("ins. policy no. 10169", "MEDICAL PLAN", "POL-10169"),
+    ("policy number: 90014", None, "POL-90014"),
+    ("P0L-90001", None, "POL-90001"),
+    # the number may be in either field; the same policy repeated is still one policy
+    ("premium", "policy POL-00003", "POL-00003"),
+    ("POL-90001 / pol 90001", None, "POL-90001"),
+])
+async def test_parse_extracts_and_normalises_policy_number(ref1, ref2, expected):
+    result = await parse_reference_fields(ref1, ref2)
+    assert result["extracted_policy_number"] == expected
 
-async def test_parse_extracts_policy_number():
-    mock_response = _mock_openai_response(
-        '{"extracted_policy_number": "POL-00001", "payment_intent": "premium", "period_count": 1}'
-    )
-    with patch("app.services.ingest._get_client") as mock_get_client:
-        mock_get_client.return_value.chat.completions.create = AsyncMock(return_value=mock_response)
-        result = await parse_reference_fields("for policy POL-00001 April payment", None)
 
-    assert result["extracted_policy_number"] == "POL-00001"
-    assert result["payment_intent"] == "premium"
-    assert result["period_count"] == 1
+@pytest.mark.parametrize("ref1, ref2", [
+    ("policyholder 90014", None),      # keyword must not run into letters
+    ("police report 12345", None),
+    ("invoice 12345", None),          # a bare 5-digit number is not a policy number
+    ("POL-9000", None),               # too short
+    ("POL-900011", None),             # too long
+    ("thanks", "payment"),
+    ("catching up on missed payments", None),
+    ("some reference text", None),
+])
+async def test_parse_does_not_invent_a_policy_number(ref1, ref2):
+    assert (await parse_reference_fields(ref1, ref2))["extracted_policy_number"] is None
 
 
-async def test_parse_detects_arrears_intent():
-    mock_response = _mock_openai_response(
-        '{"extracted_policy_number": null, "payment_intent": "arrears", "period_count": 1}'
-    )
-    with patch("app.services.ingest._get_client") as mock_get_client:
-        mock_get_client.return_value.chat.completions.create = AsyncMock(return_value=mock_response)
-        result = await parse_reference_fields("catching up on missed payments", None)
-
-    assert result["payment_intent"] == "arrears"
+async def test_parse_two_different_policies_is_left_unmatched():
+    """Ambiguous: an analyst chooses, rather than silently taking the first."""
+    result = await parse_reference_fields("POL-90001 and POL-90002", None)
     assert result["extracted_policy_number"] is None
 
 
-async def test_parse_detects_multi_period():
-    mock_response = _mock_openai_response(
-        '{"extracted_policy_number": "POL-00002", "payment_intent": "premium", "period_count": 3}'
-    )
-    with patch("app.services.ingest._get_client") as mock_get_client:
-        mock_get_client.return_value.chat.completions.create = AsyncMock(return_value=mock_response)
-        result = await parse_reference_fields("3 months premium POL-00002", None)
-
-    assert result["period_count"] == 3
-
-
 async def test_parse_combines_both_reference_fields():
-    """Both ref fields should be joined and sent to the LLM together."""
-    mock_response = _mock_openai_response(
-        '{"extracted_policy_number": "POL-00003", "payment_intent": "partial", "period_count": 1}'
-    )
-    with patch("app.services.ingest._get_client") as mock_get_client:
-        mock_create = AsyncMock(return_value=mock_response)
-        mock_get_client.return_value.chat.completions.create = mock_create
-        await parse_reference_fields("policy POL-00003", "partial payment")
-
-    call_args = mock_create.call_args
-    prompt = call_args.kwargs["messages"][0]["content"]
-    assert "POL-00003" in prompt
-    assert "partial payment" in prompt
+    result = await parse_reference_fields("policy", "no. 90014")
+    assert result["extracted_policy_number"] == "POL-90014"
 
 
-# ── Fallback behaviour ────────────────────────────────────────────────────────
-
-async def test_parse_returns_defaults_on_timeout():
-    with patch("app.services.ingest._get_client") as mock_get_client:
-        mock_get_client.return_value.chat.completions.create = AsyncMock(
-            side_effect=TimeoutError("LLM timed out")
-        )
-        result = await parse_reference_fields("some reference text", None)
-
-    assert result == {"extracted_policy_number": None, "payment_intent": "unknown", "period_count": 1}
+async def test_parse_returns_defaults_when_both_fields_empty():
+    assert await parse_reference_fields(None, None) == DEFAULTS
+    assert await parse_reference_fields("", "   ") == DEFAULTS
 
 
-async def test_parse_returns_defaults_on_invalid_json():
-    mock_response = _mock_openai_response("Sorry, I cannot process this request.")
-    with patch("app.services.ingest._get_client") as mock_get_client:
-        mock_get_client.return_value.chat.completions.create = AsyncMock(return_value=mock_response)
-        result = await parse_reference_fields("some reference text", None)
-
-    assert result == {"extracted_policy_number": None, "payment_intent": "unknown", "period_count": 1}
-
-
-async def test_parse_skips_claude_when_both_fields_empty():
-    """No API call should be made if both reference fields are None."""
-    with patch("app.services.ingest._get_client") as mock_get_client:
-        result = await parse_reference_fields(None, None)
-        mock_get_client.assert_not_called()
-
-    assert result == {"extracted_policy_number": None, "payment_intent": "unknown", "period_count": 1}
+async def test_parse_is_deterministic_and_makes_no_network_call():
+    """The ingest-time parse and the pipeline's parse must agree (finding F2), and parsing costs nothing."""
+    first = await parse_reference_fields("ins. policy no. 10169", "MEDICAL PLAN")
+    for _ in range(20):
+        assert await parse_reference_fields("ins. policy no. 10169", "MEDICAL PLAN") == first
+    import app.services.ingest as ingest
+    assert not hasattr(ingest, "_get_client")  # no LLM client left in the module

@@ -50,19 +50,26 @@ PAYMENTS = [
         "reference_field_1": "Monthly insurance premium",
     },
     {
-        "_label": "SC3 — Robert Johnson, 20% overpayment",
-        "sender_name": "Robert Johnson",
-        "sender_account": "ACC-10001",
-        "amount": 180000,
+        # David Chen (CUST-0005/POL-00006, $4,500/quarter), not Robert Johnson again — SC1 already
+        # uses Robert Johnson, and Scenario 3's variance test has no dependency on which customer it
+        # is, so there's no reason for the two cases to show the same name.
+        "_label": "SC3 — David Chen, 20% overpayment",
+        "sender_name": "David Chen",
+        "sender_account": "ACC-10005",
+        "amount": 540000,
         "payment_method": "ACH",
         "payment_date": NOW,
-        "reference_field_1": "POL-00001 — paid extra this month",
+        "reference_field_1": "POL-00006 — paid extra this month",
     },
     {
-        "_label": "SC4 — Unknown Corp LLC, no customer match",
-        "sender_name": "Unknown Corp LLC",
+        # Deliberately distinct from PMT-900 (seed.py's ESCALATED_CASE_ID: "Unknown Corp LLC", $750,
+        # Wire, no reference) — with seed dates now relative to now() instead of a fixed past date,
+        # PMT-900 is always inside the 72h duplicate window, so an identical payload here would route
+        # to Scenario 5 (duplicate) instead of the Scenario 4 this case is meant to demonstrate.
+        "_label": "SC4 — Global Freight Partners, no customer match",
+        "sender_name": "Global Freight Partners",
         "sender_account": None,
-        "amount": 75000,
+        "amount": 82500,
         "payment_method": "Wire",
         "payment_date": NOW,
         "reference_field_1": None,

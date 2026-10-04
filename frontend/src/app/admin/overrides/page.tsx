@@ -7,16 +7,13 @@ import {
 } from "lucide-react"
 import { getOverrides, type OverrideRow } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { SCENARIO_LABEL, ALL_SCENARIOS, scenarioLabel } from "@/lib/scenarioLabels"
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SCENARIO_OPTIONS = [
-  { value: "",           label: "All" },
-  { value: "scenario_1", label: "Scenario 1" },
-  { value: "scenario_2", label: "Scenario 2" },
-  { value: "scenario_3", label: "Scenario 3" },
-  { value: "scenario_4", label: "Scenario 4" },
-  { value: "scenario_5", label: "Scenario 5" },
+  { value: "", label: "All" },
+  ...ALL_SCENARIOS.map(value => ({ value, label: SCENARIO_LABEL[value] })),
 ]
 
 const BAND_OPTIONS = [
@@ -141,8 +138,12 @@ export default function OverrideAnalysisPage() {
           <span style={{ fontSize: 12, color: "var(--pw-text-muted)", flex: 1 }}>Search…</span>
           <span style={{ fontSize: 10, color: "var(--pw-text-muted)", background: "var(--pw-border)", padding: "1px 4px", borderRadius: 3 }}>⌘K</span>
         </div>
-        <Bell size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
-        <SettingsIcon size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} onClick={() => router.push("/settings")} />
+        <button type="button" aria-label="Notifications" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+          <Bell size={16} color="var(--pw-text-secondary)" />
+        </button>
+        <button type="button" aria-label="Settings" onClick={() => router.push("/settings")} style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+          <SettingsIcon size={16} color="var(--pw-text-secondary)" />
+        </button>
         <div style={{ position: "relative" }}>
           <button
             aria-label="User menu"
@@ -238,7 +239,7 @@ export default function OverrideAnalysisPage() {
                   <tr>
                     <th style={TH}>Payment ID</th>
                     <th style={TH}>Scenario</th>
-                    <th style={TH}>AI Rec</th>
+                    <th style={TH}>Recommended</th>
                     <th style={TH}>Confidence</th>
                     <th style={{ ...TH, width: "28%" }}>Override Reason</th>
                     <th style={TH}>Date</th>
@@ -257,7 +258,7 @@ export default function OverrideAnalysisPage() {
                         </button>
                       </td>
                       <td style={{ ...TD, color: "var(--pw-text-secondary)", whiteSpace: "nowrap", fontSize: 12 }}>
-                        {o.scenario_route?.replace("scenario_", "Scenario ") ?? "—"}
+                        {scenarioLabel(o.scenario_route)}
                       </td>
                       <td style={TD}><RecBadge rec={o.original_recommendation} /></td>
                       <td style={TD}>
@@ -274,7 +275,7 @@ export default function OverrideAnalysisPage() {
                         }
                       </td>
                       <td style={{ ...TD, color: "var(--pw-text-secondary)", whiteSpace: "nowrap", fontSize: 12 }}>
-                        {o.overridden_by ?? "—"}
+                        {o.overridden_by_name ?? o.overridden_by ?? "—"}
                       </td>
                     </tr>
                   ))}

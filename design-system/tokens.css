@@ -11,31 +11,31 @@
   --bg-surface-elevated: #F1F3F5;   /* inputs, hover, tags */
 
   /* ── Brand ───────────────────────────────────────────── */
-  --color-primary:        #7C4DFF;
-  --color-primary-hover:  #6A3FE8;
-  --color-secondary:      #00E5FF;  /* gradient end / cyan accent */
-  --gradient-brand: linear-gradient(135deg, #7C4DFF, #00E5FF);
+  --color-primary:        #0A66C2;  /* LinkedIn Blue */
+  --color-primary-hover:  #004182;
+  --color-secondary:      #378FE9;  /* gradient end / light-blue accent */
+  --gradient-brand: linear-gradient(135deg, #0A66C2, #378FE9);
 
   /* ── Status ──────────────────────────────────────────── */
-  --color-apply:          #10B981;
-  --color-apply-hover:    #059669;
+  --color-apply:          #047857;
+  --color-apply-hover:    #065F46;
   --color-apply-tint:     rgba(16, 185, 129, 0.10);
 
-  --color-hold:           #F59E0B;
-  --color-hold-hover:     #D97706;
+  --color-hold:           #B45309;
+  --color-hold-hover:     #92400E;
   --color-hold-tint:      rgba(245, 158, 11, 0.10);
 
-  --color-escalate:       #EF4444;
-  --color-escalate-hover: #DC2626;
+  --color-escalate:       #B91C1C;
+  --color-escalate-hover: #991B1B;
   --color-escalate-tint:  rgba(239, 68, 68, 0.10);
 
-  --color-info:           #3B82F6;
+  --color-info:           #1D4ED8;
   --color-info-tint:      rgba(59, 130, 246, 0.10);
 
   /* ── Text ────────────────────────────────────────────── */
   --text-primary:   #1E293B;
   --text-secondary: #64748B;
-  --text-muted:     #94A3B8;
+  --text-muted:     #5B6B82;
 
   /* ── Borders ─────────────────────────────────────────── */
   --border-color: #E2E8F0;

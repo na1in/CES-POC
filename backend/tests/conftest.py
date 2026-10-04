@@ -1,9 +1,12 @@
-import re
+from contextlib import ExitStack
+
 import pytest
 from unittest.mock import patch, AsyncMock
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from app.config import settings
 
 from app.database import get_db
 from app.main import app
@@ -21,40 +24,43 @@ def pytest_addoption(parser):
 @pytest.fixture(autouse=True)
 def maybe_mock_llm(request):
     """
-    By default, patch both LLM callsites so tests run fast and offline.
+    By default, keep every test offline and deterministic. The pipeline has two LLM call sites left (reference parsing
+    is now a deterministic regex and needs no mock):
+
+      - get_reasoning: analyst-facing prose. Patched to a fixed fallback; the narrative does not affect routing,
+        recommendation, status, or any signal we assert on.
+      - the gray-zone name scorer's client: made to fail, so compute_name_similarity falls back to the deterministic
+        score (its documented behaviour). Tests that exercise the LLM path patch _get_client themselves.
+
+    Patches are applied where each name is USED. The scenario handlers import get_reasoning by name, so patching only
+    app.services.agent.reasoning.get_reasoning never reached them and real LLM calls slipped through.
+
     Pass --live-llm to skip patching and exercise real OpenRouter calls.
-
-    parse_reference_fields mock: regex-extracts POL-XXXXX from the reference
-    text — no LLM needed, produces the same result for well-formed references.
-
-    get_reasoning mock: returns a fixed fallback — the narrative it produces
-    does not affect routing decisions, recommendation, status, or any signal
-    we assert on in E2E tests.
     """
     if request.config.getoption("--live-llm"):
         yield  # no patching — real LLM
         return
 
-    async def _fake_parse(ref1: str | None, ref2: str | None) -> dict:
-        text = f"{ref1 or ''} {ref2 or ''}"
-        m = re.search(r"POL-\d+", text)
-        return {
-            "extracted_policy_number": m.group(0) if m else None,
-            "payment_intent": "payment",
-            "period_count": 1,
-        }
-
     _fake_reasoning = AsyncMock(
         return_value=(["Mocked reasoning — run with --live-llm to use real LLM"], "Mocked suggested action")
     )
+    reasoning_targets = ["app.services.agent.reasoning.get_reasoning"] + [
+        f"app.services.agent.scenarios.sc{n}.get_reasoning" for n in range(1, 6)
+    ]
 
-    with (
-        patch("app.services.ingest.parse_reference_fields", side_effect=_fake_parse),
-        patch("app.services.agent.reasoning.get_reasoning", _fake_reasoning),
-    ):
+    with ExitStack() as stack:
+        for target in reasoning_targets:
+            stack.enter_context(patch(target, _fake_reasoning))
+        stack.enter_context(
+            patch("app.services.signals.matching._get_client", side_effect=RuntimeError("LLM disabled in tests (use --live-llm)"))
+        )
         yield
 
-TEST_DATABASE_URL = "postgresql+asyncpg://ces_user:ces_password@localhost:5432/ces"
+
+# Follow the app's own configuration (backend/.env) rather than hardcoding a
+# port — a local docker-compose override can move Postgres off 5432, and a
+# hardcoded URL silently makes the whole suite unrunnable on that machine.
+TEST_DATABASE_URL = settings.DATABASE_URL
 
 # NullPool ensures every test gets a brand-new connection — no recycled state
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)

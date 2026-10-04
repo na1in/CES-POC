@@ -65,9 +65,9 @@ describe("Governance — metric cards", () => {
     expect(screen.getByText(String(summary.held_pending_review))).toBeInTheDocument()
   })
 
-  it("shows Escalated by AI label and count", () => {
+  it("shows Auto-Escalated label and count", () => {
     render(<GovernancePage />)
-    expect(screen.getByText("Escalated by AI")).toBeInTheDocument()
+    expect(screen.getByText("Auto-Escalated")).toBeInTheDocument()
     expect(screen.getByText(String(summary.escalated_by_ai))).toBeInTheDocument()
   })
 

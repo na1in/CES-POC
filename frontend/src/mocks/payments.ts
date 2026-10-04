@@ -591,7 +591,7 @@ export const mockRecommendations: Record<string, PaymentRecommendation> = {
     requires_human_approval: false,
     approval_reason: null,
     reasoning: [
-      "Name similarity 97 exceeds auto-apply threshold (90)",
+      "Name similarity 97 exceeds the Apply-recommendation threshold (90)",
       "Policy reference POL-88341 matched exactly",
       "Account on file matches sender account",
       "Amount matches expected premium to the cent",
@@ -609,10 +609,10 @@ export const mockRecommendations: Record<string, PaymentRecommendation> = {
     scenario_route: "scenario_1",
     decision_path: "scenario_1_hold_name_mismatch",
     requires_human_approval: true,
-    approval_reason: "Name similarity 71 is below auto-apply threshold (90); LLM gray-zone call did not raise it above threshold",
+    approval_reason: "Name similarity 71 is below the Apply-recommendation threshold (90); LLM gray-zone call did not raise it above threshold",
     reasoning: [
       "Jaro-Winkler 74, Levenshtein 67 — gray zone (70–92); LLM called",
-      "LLM raised score to 71 — still below auto-apply threshold of 90",
+      "LLM raised score to 71 — still below the Apply-recommendation threshold of 90",
       "Policy reference matched; account on file matched",
       "Likely same entity under a shortened name — analyst should confirm",
     ],

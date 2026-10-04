@@ -59,7 +59,7 @@ import AdminDashboardPage from "@/app/admin/page"
 describe("Admin Dashboard — zero-volume scenario", () => {
   function renderOnScenario4() {
     render(<AdminDashboardPage />)
-    fireEvent.click(screen.getByRole("button", { name: "Scenario 4" }))
+    fireEvent.click(screen.getByRole("button", { name: "No Match" }))
   }
 
   it("renders without crashing on a 0-volume scenario", () => {
@@ -89,7 +89,7 @@ describe("Admin Dashboard — zero-volume scenario", () => {
   it("still shows all tabs", () => {
     renderOnScenario4()
     expect(screen.getByRole("button", { name: "All" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Scenario 4" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "No Match" })).toBeInTheDocument()
   })
 
   it("switching back to All removes the empty-state messages", () => {

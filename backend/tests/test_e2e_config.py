@@ -290,11 +290,20 @@ async def test_rollback_conflicts_on_non_deployed(client: AsyncClient, db: Async
     assert resp.status_code == 409
 
 
-async def test_rollback_rejects_non_director(client: AsyncClient, db: AsyncSession):
+async def test_rollback_rejects_roles_other_than_director_or_admin(client: AsyncClient, db: AsyncSession):
+    cid = await _propose_approve_deploy(client)
+    resp = await client.post(f"/api/settings/change-requests/{cid}/rollback",
+                             headers=_analyst_headers())
+    assert resp.status_code == 403
+
+
+async def test_rollback_allowed_for_admin(client: AsyncClient, db: AsyncSession):
+    """Rollback is director OR admin (fixed 2026-05-22; the spec says either may roll back)."""
     cid = await _propose_approve_deploy(client)
     resp = await client.post(f"/api/settings/change-requests/{cid}/rollback",
                              headers=_admin_headers())
-    assert resp.status_code == 403
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "rolled_back"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -336,7 +345,7 @@ async def test_retryable_error_exhausts_all_attempts(client: AsyncClient, db: As
 
     call_count = 0
 
-    async def _always_timeout(payment_id, db):
+    async def _always_timeout(payment_id, db, parsed_refs=None):
         nonlocal call_count
         call_count += 1
         raise openai.APITimeoutError("simulated timeout")
@@ -373,12 +382,12 @@ async def test_retryable_error_succeeds_on_second_attempt(client: AsyncClient, d
         "app.services.pipeline", fromlist=["_process_payment"]
     )._process_payment
 
-    async def _fail_once(payment_id, db):
+    async def _fail_once(payment_id, db, parsed_refs=None):
         nonlocal attempt
         attempt += 1
         if attempt == 1:
             raise openai.APITimeoutError("simulated timeout on first attempt")
-        return await original_process(payment_id, db)
+        return await original_process(payment_id, db, parsed_refs)
 
     with patch("app.services.pipeline._process_payment", side_effect=_fail_once):
         with patch("asyncio.sleep"):

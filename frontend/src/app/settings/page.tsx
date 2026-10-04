@@ -67,8 +67,12 @@ export default function SettingsPage() {
           <span style={{ fontSize: 12, color: "var(--pw-text-muted)", flex: 1 }}>Search…</span>
           <span style={{ fontSize: 10, color: "var(--pw-text-muted)", background: "var(--pw-border)", padding: "1px 4px", borderRadius: 3 }}>⌘K</span>
         </div>
-        <Bell size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
-        <SettingsIcon size={16} color="var(--pw-primary)" style={{ cursor: "pointer" }} />
+        <button type="button" aria-label="Notifications" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+          <Bell size={16} color="var(--pw-text-secondary)" />
+        </button>
+        <button type="button" aria-label="Settings" aria-current="page" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+          <SettingsIcon size={16} color="var(--pw-primary)" />
+        </button>
         {/* Role switcher (demo) */}
         <div style={{ position: "relative" }}>
           <button

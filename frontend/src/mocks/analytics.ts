@@ -64,7 +64,7 @@ function makeScenarioData(
       { week: "Apr 27", count: Math.round(volume * 0.22) },
     ],
     decision_distribution: [
-      { label: "AI Autonomous",   value: aiAuto },
+      { label: "Auto-Applied",   value: aiAuto },
       { label: "Human Confirmed", value: humanConfirmed },
       { label: "Human Override",  value: humanOverride },
     ],

@@ -140,22 +140,22 @@ describe("Payment Detail — page header", () => {
   })
 })
 
-// ── AI Recommendation banner ──────────────────────────────────────────────────
+// ── Recommendation banner ──────────────────────────────────────────────────
 
 describe("Payment Detail — recommendation banner", () => {
   it("shows APPLY recommendation for PMT-001", () => {
     renderWith("PMT-001")
-    expect(screen.getByText(/AI Recommendation: APPLY/i)).toBeInTheDocument()
+    expect(screen.getByText(/System Recommendation: APPLY/i)).toBeInTheDocument()
   })
 
   it("shows HOLD recommendation for PMT-002", () => {
     renderWith("PMT-002")
-    expect(screen.getByText(/AI Recommendation: HOLD/i)).toBeInTheDocument()
+    expect(screen.getByText(/System Recommendation: HOLD/i)).toBeInTheDocument()
   })
 
   it("shows ESCALATE recommendation for PMT-005", () => {
     renderWith("PMT-005")
-    expect(screen.getByText(/AI Recommendation: ESCALATE/i)).toBeInTheDocument()
+    expect(screen.getByText(/System Recommendation: ESCALATE/i)).toBeInTheDocument()
   })
 
   it("shows confidence score", () => {
@@ -165,7 +165,7 @@ describe("Payment Detail — recommendation banner", () => {
 
   it("shows first reasoning line", () => {
     renderWith("PMT-001")
-    expect(screen.getByText(/Name similarity 97 exceeds auto-apply threshold/i)).toBeInTheDocument()
+    expect(screen.getByText(/Name similarity 97 exceeds the Apply-recommendation threshold/i)).toBeInTheDocument()
   })
 })
 

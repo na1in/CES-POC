@@ -9,7 +9,7 @@ export const mockChangeRequests: ConfigChangeRequest[] = [
     current_value: "90%",
     proposed_value: "93%",
     rationale: "Override rate in 90–92% band has dropped from 3% to 11% over 4 weeks. Raising threshold reduces false auto-applies.",
-    projected_impact: "Est. 8% reduction in auto-apply volume, 2% increase in HOLD queue.",
+    projected_impact: "Est. 8% reduction in Apply recommendations, 2% increase in HOLD queue.",
     proposed_by: "Marcus Webb",
     proposed_at: "2026-04-28T09:00:00.000Z",
     status: "pending",

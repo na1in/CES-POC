@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PayWise Audit Report</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--primary:#0A66C2;--ink:#1E293B;--sec:#64748B;--border:#E2E8F0;--row:#F1F5F9;--bg:#F8F9FA;
+  --apply:#047857;--hold:#B45309;--esc:#B91C1C}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,sans-serif;background:var(--bg);color:var(--ink);font-size:13.5px;line-height:1.5;padding:32px 16px;-webkit-font-smoothing:antialiased}
+.mono{font-family:"JetBrains Mono",monospace;font-size:12.5px}
+.doc{max-width:900px;margin:0 auto;background:#fff;border:1px solid var(--border);border-radius:12px;padding:36px 40px}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:18px;border-bottom:2px solid var(--ink)}
+.brand{font-weight:700;color:var(--primary);font-size:13px;letter-spacing:.02em}
+h1{font-size:22px;font-weight:700;margin-top:4px}
+.id{text-align:right;color:var(--sec);font-size:12.5px}
+.id b{display:block;color:var(--ink);font-size:14px}
+
+h2{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:28px 0 10px;display:flex;gap:10px;align-items:baseline}
+h2 span{color:var(--sec);font-weight:500}
+
+.fields{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.f{padding:10px 12px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}
+.f:nth-child(4n){border-right:0}
+.f:nth-last-child(-n+4){border-bottom:0}
+.f .l{font-size:11px;color:var(--sec);margin-bottom:2px}
+.f .v{font-weight:600}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:11px;font-weight:600;color:var(--sec);padding:7px 10px;border-bottom:1px solid var(--border);background:var(--row)}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr.cat td{background:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--sec);padding-top:14px}
+td.n{color:var(--sec);width:38px}
+td.r{width:92px;text-align:right}
+.tbl{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.tbl tr:last-child td{border-bottom:0}
+
+.tag{font-size:11px;font-weight:600;letter-spacing:.04em}
+.pass{color:var(--apply)}.flag{color:var(--hold)}.na{color:var(--sec);font-weight:500}
+.rec-apply{color:var(--apply)}.rec-hold{color:var(--hold)}.rec-esc{color:var(--esc)}
+
+.expl{border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-top:10px}
+.expl .l{font-size:11px;color:var(--sec);margin-bottom:4px}
+
+footer{margin-top:26px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--sec)}
+
+@media (max-width:720px){.doc{padding:22px 16px}.fields{grid-template-columns:repeat(2,1fr)}.f:nth-child(4n){border-right:1px solid var(--border)}.f:nth-child(2n){border-right:0}.f:nth-last-child(-n+4){border-bottom:1px solid var(--border)}.f:nth-last-child(-n+2){border-bottom:0}header{flex-direction:column}.id{text-align:left}}
+</style>
+</head>
+<body>
+<article class="doc">
+
+<header>
+  <div><div class="brand">PAYWISE</div><h1>Payment audit report</h1></div>
+  <div class="id"><b class="mono">PMT-2026-04187</b>Generated Apr 14, 2026 · 10:42 AM<br>Visible to: Analyst, Investigator</div>
+</header>
+
+<h2>1 · Payment <span>as received</span></h2>
+<div class="fields">
+  <div class="f"><div class="l">Amount</div><div class="v">$1,842.60</div></div>
+  <div class="f"><div class="l">Received</div><div class="v">Apr 14, 2026</div></div>
+  <div class="f"><div class="l">Method</div><div class="v">ACH</div></div>
+  <div class="f"><div class="l">Status</div><div class="v rec-esc">Escalated</div></div>
+  <div class="f"><div class="l">Sender</div><div class="v">J. Okafor-Reyes</div></div>
+  <div class="f"><div class="l">Policy reference</div><div class="v mono">POL-48213</div></div>
+  <div class="f"><div class="l">Policyholder</div><div class="v">Joanna Reyes</div></div>
+  <div class="f"><div class="l">Assigned to</div><div class="v">Investigations</div></div>
+</div>
+
+<h2>2 · Outcome <span>decided by rules</span></h2>
+<div class="fields">
+  <div class="f"><div class="l">Scenario</div><div class="v">1 · Name mismatch</div></div>
+  <div class="f"><div class="l">Recommendation</div><div class="v rec-hold">Hold</div></div>
+  <div class="f"><div class="l">Confidence</div><div class="v">72%</div></div>
+  <div class="f"><div class="l">Deciding rule</div><div class="v">Name score 75–90</div></div>
+</div>
+<div class="expl"><div class="l">Explanation · written by AI after the decision</div>
+The policy reference and amount match policy POL-48213, but the sender name only partly matches the policyholder (82 out of 100). Names between 75 and 90 need a person to confirm the payer before money is applied.</div>
+
+<h2>3 · Signal checks <span>same checks, same order, every payment</span></h2>
+<div class="tbl"><table>
+  <thead><tr><th>#</th><th>Check</th><th>Value</th><th>Rule</th><th style="text-align:right">Result</th></tr></thead>
+  <tbody>
+    <tr class="cat"><td colspan="5">Matching</td></tr>
+    <tr><td class="n">1.1</td><td>Name similarity</td><td>82 / 100</td><td>Apply ≥ 90 · Hold 75–90</td><td class="r"><span class="tag flag">HOLD</span></td></tr>
+    <tr><td class="n">1.2</td><td>Policy match confidence</td><td>93</td><td>Name, policy #, amount</td><td class="r"><span class="tag pass">PASS</span></td></tr>
+    <tr><td class="n">1.3</td><td>Customer match confidence</td><td>89</td><td>Name, account, history</td><td class="r"><span class="tag pass">PASS</span></td></tr>
+    <tr><td class="n">1.4</td><td>Supporting signals</td><td>Account ✓ · Amount ✓ · History ✓</td><td>—</td><td class="r"><span class="tag pass">3 / 3</span></td></tr>
+
+    <tr class="cat"><td colspan="5">Amount</td></tr>
+    <tr><td class="n">2.1</td><td>Variance from premium</td><td>1.2% ($1,842.60 vs $1,820.00)</td><td>Apply ≤ 2%</td><td class="r"><span class="tag pass">PASS</span></td></tr>
+    <tr><td class="n">2.2</td><td>Over / underpayment</td><td>Over by $22.60</td><td>—</td><td class="r"><span class="tag na">INFO</span></td></tr>
+    <tr><td class="n">2.3</td><td>Multiple periods</td><td>No</td><td>N × premium, ±5%</td><td class="r"><span class="tag na">NO</span></td></tr>
+    <tr><td class="n">2.4</td><td>Split payment</td><td>No</td><td>Premium ÷ N, ±5%</td><td class="r"><span class="tag na">NO</span></td></tr>
+    <tr><td class="n">2.5</td><td>Third-party payer</td><td>Not checked</td><td>Only when name &lt; 50</td><td class="r"><span class="tag na">N/A</span></td></tr>
+    <tr><td class="n">2.6</td><td>Historical consistency</td><td>94 / 100</td><td>vs past payments</td><td class="r"><span class="tag pass">PASS</span></td></tr>
+
+    <tr class="cat"><td colspan="5">Timing</td></tr>
+    <tr><td class="n">3.1</td><td>Payment timing</td><td>2 days after due date</td><td>Bands: excellent / good / acceptable / poor</td><td class="r"><span class="tag pass">GOOD</span></td></tr>
+    <tr><td class="n">3.2</td><td>Days since last payment</td><td>31</td><td>—</td><td class="r"><span class="tag na">INFO</span></td></tr>
+
+    <tr class="cat"><td colspan="5">Risk</td></tr>
+    <tr><td class="n">4.1</td><td>Risk flags</td><td>None</td><td>Any flag forces Hold</td><td class="r"><span class="tag pass">PASS</span></td></tr>
+    <tr><td class="n">4.2</td><td>Account status</td><td>Active</td><td>Inactive / closed escalate</td><td class="r"><span class="tag pass">PASS</span></td></tr>
+    <tr><td class="n">4.3</td><td>Payment method risk</td><td>ACH</td><td>Low · Medium · High</td><td class="r"><span class="tag pass">LOW</span></td></tr>
+    <tr><td class="n">4.4</td><td>Outstanding balance</td><td>$0.00 · Current</td><td>—</td><td class="r"><span class="tag na">INFO</span></td></tr>
+
+    <tr class="cat"><td colspan="5">Duplicates</td></tr>
+    <tr><td class="n">5.1</td><td>Duplicate match</td><td>None found</td><td>Sender, method, reference + amount ±$2, ±72 h</td><td class="r"><span class="tag pass">PASS</span></td></tr>
+    <tr><td class="n">5.2–5.4</td><td>Duplicate details</td><td>—</td><td>Only when 5.1 matches</td><td class="r"><span class="tag na">N/A</span></td></tr>
+  </tbody>
+</table></div>
+
+<h2>4 · Activity log <span>entries are only added, never edited</span></h2>
+<div class="tbl"><table>
+  <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Detail</th></tr></thead>
+  <tbody>
+    <tr><td class="mono">09:01</td><td>System</td><td>Payment received</td><td>Reference read: POL-48213</td></tr>
+    <tr><td class="mono">09:02</td><td>Rules engine</td><td>Signals computed</td><td>20 checks, section 3</td></tr>
+    <tr><td class="mono">09:02</td><td>Rules engine</td><td>Recommendation made</td><td>Hold · 72% · Scenario 1</td></tr>
+    <tr><td class="mono">09:02</td><td>AI</td><td>Explanation written</td><td>Section 2</td></tr>
+    <tr><td class="mono">10:39</td><td>M. Chen · Analyst</td><td>Note added</td><td>"Name is close but I couldn't confirm the payer is the policyholder. Possible third party. Please contact the sending bank."</td></tr>
+    <tr><td class="mono">10:42</td><td>M. Chen · Analyst</td><td>Escalated</td><td>Assigned to Investigations</td></tr>
+  </tbody>
+</table></div>
+
+<footer><span>PayWise MVP · Illustrative data</span><span>Page 1 of 1</span></footer>
+</article>
+</body>
+</html>

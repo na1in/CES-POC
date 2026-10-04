@@ -2,12 +2,189 @@
 
 import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { ArrowLeft, Bell, Settings, AlertTriangle, CheckCircle2, Clock, ChevronDown } from "lucide-react"
+import { ArrowLeft, ArrowRight, Bell, Settings, AlertTriangle, CheckCircle2, Clock, ChevronDown, Search, Link2 } from "lucide-react"
 import {
   getPayment, approvePayment, rejectPayment, overridePayment, returnPayment, reprocessPayment,
-  type PaymentDetail,
+  searchPolicies, attachPolicy, BASE,
+  type PaymentDetail, type PolicySearchResult,
 } from "@/lib/api"
 import { useAuth } from "@/contexts/auth"
+import { scenarioLabel } from "@/lib/scenarioLabels"
+
+// ── Manual policy attach ──────────────────────────────────────────────────────
+
+/**
+ * Shown in the Matched Policy card when nothing is linked. Without it the only
+ * routes out of a no-match case are Escalate or Override & Apply -- neither of
+ * which actually resolves the match.
+ */
+function AttachPolicyPanel({ onAttach }: {
+  onAttach: (policyNumber: string, reason: string) => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  const [results, setResults] = useState<PolicySearchResult[] | null>(null)
+  const [selected, setSelected] = useState<PolicySearchResult | null>(null)
+  const [reason, setReason] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState("")
+
+  async function runSearch() {
+    const q = query.trim()
+    if (q.length < 2) { setError("Enter at least 2 characters"); return }
+    setBusy(true); setError(""); setSelected(null)
+    try {
+      const r = await searchPolicies(q)
+      setResults(r.policies)
+      if (r.policies.length === 0) setError("No policies match that search")
+    } catch {
+      setError("Search failed — try again")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirm() {
+    if (!selected) return
+    setBusy(true); setError("")
+    try {
+      await onAttach(selected.policy_number, reason)
+      setOpen(false); setQuery(""); setResults(null); setSelected(null); setReason("")
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not attach policy")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <div>
+        <p style={{ fontSize: 13, color: "var(--pw-text-muted)", margin: "0 0 12px" }}>No matched policy</p>
+        <button
+          onClick={() => setOpen(true)}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, width: "100%",
+            justifyContent: "center", background: "var(--pw-primary)", color: "#fff",
+            border: "none", borderRadius: 6, padding: "9px 12px",
+            fontSize: 13, fontWeight: 600, cursor: "pointer",
+          }}
+        >
+          <Search size={14} /> Search policies
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", gap: 6 }}>
+        <input
+          autoFocus
+          value={query}
+          onChange={e => { setQuery(e.target.value); setError("") }}
+          onKeyDown={e => { if (e.key === "Enter") runSearch() }}
+          placeholder="Policy no. or name"
+          aria-label="Search policies by number or customer name"
+          style={{
+            flex: 1, minWidth: 0, fontSize: 12, padding: "7px 9px", borderRadius: 6,
+            border: "1px solid var(--pw-border)", color: "var(--pw-text-primary)",
+            background: "var(--pw-surface)",
+          }}
+        />
+        <button
+          onClick={runSearch}
+          disabled={busy}
+          aria-label="Run policy search"
+          style={{
+            background: "var(--pw-primary)", color: "#fff", border: "none", borderRadius: 6,
+            padding: "7px 10px", fontSize: 12, fontWeight: 600,
+            cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1,
+          }}
+        >
+          <Search size={13} />
+        </button>
+      </div>
+
+      {error && (
+        <p style={{ fontSize: 11, color: "var(--pw-escalate)", margin: 0 }}>{error}</p>
+      )}
+
+      {results && results.length > 0 && (
+        <div style={{ maxHeight: 190, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+          {results.map(r => {
+            const isSel = selected?.policy_number === r.policy_number
+            const inactive = r.status !== "active"
+            return (
+              <button
+                key={r.policy_number}
+                onClick={() => !inactive && setSelected(r)}
+                disabled={inactive}
+                aria-pressed={isSel}
+                style={{
+                  textAlign: "left", padding: "7px 9px", borderRadius: 6, fontSize: 12,
+                  border: isSel ? "1px solid var(--pw-primary)" : "1px solid var(--pw-border)",
+                  background: isSel ? "rgba(10,102,194,0.06)" : "var(--pw-surface)",
+                  cursor: inactive ? "not-allowed" : "pointer",
+                  opacity: inactive ? 0.5 : 1,
+                }}
+              >
+                <span style={{ fontFamily: "var(--pw-font-mono)", fontWeight: 600, color: "var(--pw-text-primary)" }}>
+                  {r.policy_number}
+                </span>
+                <span style={{ display: "block", color: "var(--pw-text-secondary)" }}>
+                  {r.customer_name} · {r.policy_type}
+                </span>
+                <span style={{ display: "block", color: "var(--pw-text-muted)", fontSize: 11 }}>
+                  {formatUSD(r.premium_amount)} {r.premium_frequency}{inactive ? ` · ${r.status}` : ""}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {selected && (
+        <input
+          value={reason}
+          onChange={e => setReason(e.target.value)}
+          placeholder="Reason (optional)"
+          aria-label="Reason for attaching this policy"
+          style={{
+            fontSize: 12, padding: "7px 9px", borderRadius: 6,
+            border: "1px solid var(--pw-border)", color: "var(--pw-text-primary)",
+            background: "var(--pw-surface)",
+          }}
+        />
+      )}
+
+      <div style={{ display: "flex", gap: 6 }}>
+        <button
+          onClick={confirm}
+          disabled={!selected || busy}
+          style={{
+            flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+            background: selected ? "var(--pw-primary)" : "var(--pw-surface-elevated)",
+            color: selected ? "#fff" : "var(--pw-text-muted)",
+            border: "none", borderRadius: 6, padding: "8px 10px", fontSize: 12, fontWeight: 600,
+            cursor: selected && !busy ? "pointer" : "default",
+          }}
+        >
+          <Link2 size={13} /> {busy ? "Attaching…" : "Attach"}
+        </button>
+        <button
+          onClick={() => { setOpen(false); setError(""); setSelected(null); setResults(null) }}
+          style={{
+            background: "none", border: "1px solid var(--pw-border)", borderRadius: 6,
+            padding: "8px 10px", fontSize: 12, color: "var(--pw-text-secondary)", cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // ── Mock policy data (keyed by policy ID) ─────────────────────────────────────
 
@@ -112,14 +289,89 @@ const ACTION_LABELS: Record<string, string> = {
   contact_logged: "Contact Logged",
   annotated: "Note Added",
   approved: "Approved",
+  overridden: "System Recommendation Overridden",
+  returned: "Returned to Sender",
+  policy_attached: "Policy Attached",
+  document_uploaded: "Document Uploaded",
 }
 
 function auditActor(actor: string, actionType: string): string {
   if (actor === "system") {
-    if (actionType === "signals_computed" || actionType === "recommendation_made") return "AI Agent"
+    if (actionType === "signals_computed" || actionType === "recommendation_made") return "System"
     return "System"
   }
   return actor
+}
+
+/** "scenario_1_auto_apply" → "apply recommended" (the scenario itself is already shown separately). Nothing auto-applies. */
+function humanizeDecisionPath(path: unknown): string {
+  if (typeof path !== "string") return ""
+  return path.replace(/^scenario_\d+_/, "").replace(/_/g, " ").replace(/^auto apply$/, "apply recommended")
+}
+
+/**
+ * Turns a raw audit_log.details JSON blob into a sentence a human can act on, instead of a
+ * mechanical "key: value, key: value" dump of the underlying signal/decision fields. Falls back
+ * to the raw dump for any action type not covered here, so nothing is ever silently dropped.
+ */
+function formatAuditDetail(actionType: string, details: unknown, systemRec?: string | null): string | null {
+  if (!details || typeof details !== "object") return null
+  const d = details as Record<string, unknown>
+  const pct = (v: unknown) => (typeof v === "number" ? `${Math.round(v)}%` : "—")
+
+  switch (actionType) {
+    case "received": {
+      const method = typeof d.payment_method === "string" ? d.payment_method.toUpperCase() : d.payment_method
+      const policy = d.extracted_policy_number
+      return `${formatUSD(d.amount as number)} via ${method} from ${d.sender_name}. ` +
+        (policy ? `Reference matched to policy ${policy}.` : "No policy number found in the payment reference.")
+    }
+    case "signals_computed":
+      return `Name match ${pct(d.name_similarity_score)} · policy match ${pct(d.policy_match_confidence)} · ` +
+        `customer match ${pct(d.customer_match_confidence)}. ` +
+        `${d.has_risk_flags ? "Risk flags present." : "No risk flags."} ` +
+        `${d.is_duplicate_match ? "Flagged as a possible duplicate." : "Not a duplicate."}`
+    case "recommendation_made": {
+      const rec = typeof d.recommendation === "string" ? d.recommendation.toUpperCase() : d.recommendation
+      const scenario = scenarioLabel(d.scenario_route as string)
+      const path = humanizeDecisionPath(d.decision_path)
+      const confidence = typeof d.confidence_score === "number" ? ` at ${pct(d.confidence_score)} confidence` : ""
+      return `Recommended ${rec}${confidence} — ${scenario}` +
+        (path ? ` (${path}).` : ".") +
+        (d.auto_applied ? " Auto-applied, no human review required." : " Held for human review.")
+    }
+    case "approved":
+      return d.policy_id ? `Approved against policy ${d.policy_id}.` : "Approved."
+    case "applied":
+      return d.via === "human_override" ? "Applied after an analyst override." : "Applied after analyst approval — ledger updated."
+    case "escalated":
+      if (d.action === "marked_pending_outreach") return "Marked as awaiting a response from the sender."
+      if (d.via === "human_override") return "Escalated after an analyst override."
+      if (d.via === "analyst_rejection") {
+        // "rejected" only when the analyst's action differs from what the system recommended
+        const recommended = String(d.system_recommendation ?? systemRec ?? "").toLowerCase()
+        return recommended === "escalate"
+          ? "Escalated to investigator — analyst confirmed the system recommendation."
+          : "Escalated — analyst rejected the system recommendation."
+      }
+      return "Escalated to the investigation queue."
+    case "overridden":
+      return `Overrode the system recommendation → ${String(d.override_action).toUpperCase()}. Reason: "${d.reason_preview}"`
+    case "returned":
+      return d.notes_provided ? "Returned to sender, with an investigation note." : "Returned to sender."
+    case "policy_attached":
+      return `Manually attached policy ${d.policy_number}` +
+        (d.previous_policy_number ? ` (previously ${d.previous_policy_number})` : "") +
+        (d.reason ? `. Reason: "${d.reason}"` : ".")
+    case "document_uploaded":
+      return `Uploaded "${d.file_name}"${d.document_type ? ` (${d.document_type})` : ""}.`
+    case "annotated":
+      return typeof d.annotation_type === "string"
+        ? `Added a ${d.annotation_type.replace(/_/g, " ")}.`
+        : "Added a note."
+    default:
+      return Object.entries(d).map(([k, v]) => `${k}: ${v}`).join(", ")
+  }
 }
 
 function statusLabel(status: string): string {
@@ -153,6 +405,10 @@ export default function PaymentDetail() {
   const [contactedNote, setContactedNote] = useState("")
   const [toast, setToast] = useState<string | null>(null)
   const [roleMenuOpen, setRoleMenuOpen] = useState(false)
+  // Real policy record for whatever is currently attached. POLICY_INFO below
+  // only covers the demo policy IDs, so a seeded or newly attached policy
+  // would otherwise render as "No matched policy" even once linked.
+  const [livePolicy, setLivePolicy] = useState<PolicySearchResult | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -162,9 +418,30 @@ export default function PaymentDetail() {
       .finally(() => setLoading(false))
   }, [id])
 
+  const attachedPolicyId = (detail?.payment as { matched_policy_id?: string } | undefined)?.matched_policy_id ?? null
+
+  useEffect(() => {
+    if (!attachedPolicyId) { setLivePolicy(null); return }
+    let cancelled = false
+    searchPolicies(attachedPolicyId)
+      .then(r => {
+        if (cancelled) return
+        setLivePolicy(r.policies.find(p => p.policy_number === attachedPolicyId) ?? null)
+      })
+      .catch(console.error)
+    return () => { cancelled = true }
+  }, [attachedPolicyId])
+
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(null), 3000)
+  }
+
+  async function handleAttachPolicy(policyNumber: string, reason: string) {
+    if (!id) return
+    const result = await attachPolicy(id, policyNumber, reason || undefined)
+    showToast(`Attached ${result.matched_policy_id} — ${result.customer_name}`)
+    getPayment(id).then(setDetail).catch(console.error)
   }
 
   async function handleApprove() {
@@ -261,7 +538,15 @@ export default function PaymentDetail() {
   const annotations = detail.annotations
 
   const policyId = payment.matched_policy_id as string | null
-  const policy = policyId ? POLICY_INFO[policyId] : null
+  const policy = livePolicy
+    ? {
+        holder: livePolicy.customer_name,
+        type: livePolicy.policy_type,
+        premium: `${formatUSD(livePolicy.premium_amount)} ${livePolicy.premium_frequency}`,
+        next_due: livePolicy.next_due_date ?? "—",
+        balance_cents: livePolicy.outstanding_balance,
+      }
+    : policyId ? POLICY_INFO[policyId] : null
   const paymentHistory = policyId ? (PAYMENT_HISTORY[policyId] ?? []) : []
 
   const recColor =
@@ -319,8 +604,12 @@ export default function PaymentDetail() {
           <span style={{ fontSize: 12, color: "var(--pw-text-muted)", flex: 1 }}>Search…</span>
           <span style={{ fontSize: 10, color: "var(--pw-text-muted)", background: "var(--pw-border)", padding: "1px 4px", borderRadius: 3 }}>⌘K</span>
         </div>
-        <Bell size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
-        <Settings size={16} color="var(--pw-text-secondary)" style={{ cursor: "pointer" }} />
+        <button type="button" aria-label="Notifications" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+          <Bell size={16} color="var(--pw-text-secondary)" />
+        </button>
+        <button type="button" aria-label="Settings" style={{ background: "none", border: "none", padding: 0, display: "inline-flex", cursor: "pointer" }}>
+          <Settings size={16} color="var(--pw-text-secondary)" />
+        </button>
         <div style={{ position: "relative" }}>
           <button
             aria-label="Switch role"
@@ -408,7 +697,7 @@ export default function PaymentDetail() {
         {/* Left column */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
 
-          {/* AI Recommendation banner */}
+          {/* Recommendation banner */}
           {rec && (
             <div style={{
               background: recTint,
@@ -428,11 +717,11 @@ export default function PaymentDetail() {
                     : <AlertTriangle size={13} color="#fff" />}
                 </div>
                 <span style={{ fontWeight: 700, fontSize: 15, color: recColor, fontFamily: "var(--pw-font-display)" }}>
-                  AI Recommendation: {rec.recommendation.toUpperCase()}
+                  System Recommendation: {rec.recommendation.toUpperCase()}
                 </span>
               </div>
               <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: "2px 0 12px 32px" }}>
-                Confidence Score: {rec.confidence_score}%
+                Confidence Score: {Math.round(rec.confidence_score)}%
               </p>
 
               {/* First reasoning line */}
@@ -469,7 +758,7 @@ export default function PaymentDetail() {
                     AMOUNT CORRELATION
                   </p>
                   <p style={{ fontSize: 13, fontWeight: 600, color: "var(--pw-text-primary)", margin: 0 }}>
-                    {variance === 0 ? "On target" : `${variance > 0 ? "+" : ""}${variance}% variance`}
+                    {variance === 0 ? "On target" : `${variance > 0 ? "+" : ""}${Number(variance).toFixed(1)}% variance`}
                   </p>
                 </div>
                 <div style={{ background: "rgba(255,255,255,0.65)", borderRadius: 8, padding: "10px 12px" }}>
@@ -680,12 +969,25 @@ export default function PaymentDetail() {
           {/* Audit Trail */}
           {logs.length > 0 && (
             <div className="pw-card" style={{ padding: 20 }}>
-              <h2 style={{
-                fontSize: 15, fontWeight: 700, margin: "0 0 16px",
-                color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)",
-              }}>
-                Audit Trail
-              </h2>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <h2 style={{
+                  fontSize: 15, fontWeight: 700, margin: 0,
+                  color: "var(--pw-text-primary)", fontFamily: "var(--pw-font-display)",
+                }}>
+                  Audit Trail
+                </h2>
+                <a
+                  href={`${BASE}/api/payments/${id}/audit-report`}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    fontSize: 12.5, fontWeight: 600, color: "var(--pw-info)",
+                    background: "var(--pw-info-tint)", borderRadius: 8, padding: "6px 12px",
+                    textDecoration: "none",
+                  }}
+                >
+                  View audit report <ArrowRight size={13} />
+                </a>
+              </div>
               <div>
                 {logs.map((log, i) => (
                   <div key={log.log_id} style={{ display: "flex", gap: 12, paddingBottom: i < logs.length - 1 ? 16 : 0 }}>
@@ -705,11 +1007,9 @@ export default function PaymentDetail() {
                       <p style={{ fontSize: 13, fontWeight: 600, color: "var(--pw-text-primary)", margin: "0 0 2px" }}>
                         {ACTION_LABELS[log.action_type] ?? log.action_type}
                       </p>
-                      {log.details && (
+                      {formatAuditDetail(log.action_type, log.details, rec?.recommendation) && (
                         <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>
-                          {Object.entries(log.details as unknown as Record<string, unknown>)
-                            .map(([k, v]) => `${k}: ${v}`)
-                            .join(", ")}
+                          {formatAuditDetail(log.action_type, log.details, rec?.recommendation)}
                         </p>
                       )}
                     </div>
@@ -790,7 +1090,7 @@ export default function PaymentDetail() {
                 </div>
               </div>
             ) : (
-              <p style={{ fontSize: 13, color: "var(--pw-text-muted)", margin: 0 }}>No matched policy</p>
+              <AttachPolicyPanel onAttach={handleAttachPolicy} />
             )}
           </div>
 
@@ -813,7 +1113,7 @@ export default function PaymentDetail() {
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 600, color: "var(--pw-text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 2px" }}>SCENARIO</p>
                   <p style={{ fontSize: 12, color: "var(--pw-text-secondary)", margin: 0 }}>
-                    {rec.scenario_route.replace("_", " ")}
+                    {scenarioLabel(rec.scenario_route)}
                   </p>
                 </div>
               )}
@@ -844,7 +1144,7 @@ export default function PaymentDetail() {
               Override Recommendation
             </h2>
             <p style={{ fontSize: 13, color: "var(--pw-text-secondary)", margin: "0 0 16px" }}>
-              Provide a reason for overriding the AI recommendation. This will be logged in the audit trail.
+              Provide a reason for overriding the system recommendation. This will be logged in the audit trail.
             </p>
             <textarea
               aria-label="Override reason"
@@ -1046,7 +1346,7 @@ export default function PaymentDetail() {
         color: "var(--pw-text-muted)", position: "sticky", bottom: 0, zIndex: 40,
       }}>
         <span style={{ color: "var(--pw-apply)", fontWeight: 600 }}>● Audit Active</span>
-        <span>User: Priya Venkataraman</span>
+        <span>User: {user?.name ?? "—"}</span>
         <span>Last sync: 2 minutes ago</span>
         <span style={{ marginLeft: "auto" }}>
           Press{" "}

@@ -20,9 +20,18 @@ Simulates:
 Run with: python scripts/demo_governance.py
 Requires: backend running on :8000
 """
+from datetime import date, timedelta
+
 from demo_helpers import (
     USR_DIRECTOR, USR_ADMIN, get_token, api, section, ok, info
 )
+
+# Relative to today, not a fixed calendar date — the Governance Dashboard defaults to the last 5 days,
+# so a hardcoded period from whenever this script was first written would age out of view and the
+# review/anomaly this script creates would look like it never happened.
+TODAY = date.today()
+PERIOD_START = (TODAY - timedelta(days=14)).isoformat()
+PERIOD_END = TODAY.isoformat()
 
 
 def run() -> None:
@@ -35,8 +44,8 @@ def run() -> None:
 
     review = api("POST", "/api/governance/reviews", director_token,
         json={
-            "period_start": "2026-05-01",
-            "period_end":   "2026-05-15",
+            "period_start": PERIOD_START,
+            "period_end":   PERIOD_END,
             "notes": "Override rate elevated at 12% vs 8% baseline. Flagging for admin follow-up.",
             "export_generated": True,
         },
@@ -51,8 +60,8 @@ def run() -> None:
             "description": "Override rate spiked to 12% in the last 14 days against 8% 90-day baseline. "
                            "Concentrated in Scenario 3 (high variance) payments.",
             "scenario_type": "scenario_3",
-            "period_start": "2026-05-01",
-            "period_end":   "2026-05-15",
+            "period_start": PERIOD_START,
+            "period_end":   PERIOD_END,
             "assigned_to":  "USR-0004",
         },
         expected=201)

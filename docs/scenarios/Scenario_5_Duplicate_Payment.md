@@ -10,7 +10,7 @@ Payment closely matches a recent transaction within 72-hour window on all critic
 
 ## When Does This Scenario Apply?
 
-- Payment received within **72 hours** of a previous payment
+- Payment received within **72 hours** of a previous payment (before or after: the window is ±72 hours around the payment's date, so a duplicate processed ahead of the original is still caught; `processing_failed` payments count, `returned` ones do not)
 - **Match** on all critical fields:
   - Amount (within **$2 tolerance** — covers fees, charges, rounding)
   - Sender name (exact)

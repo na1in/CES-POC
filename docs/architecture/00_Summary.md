@@ -43,7 +43,7 @@ The system is a 5-stage pipeline. Each stage has a single responsibility:
 
 | Stage | What It Does | Who Does the Work |
 |-------|-------------|-------------------|
-| 1. Ingest | Validate payment, parse free-text references | Code + Claude API |
+| 1. Ingest | Validate payment, parse free-text references | Code (regex) |
 | 2. Compute Signals | Calculate 19 analytical signals (name match, amount variance, third-party, etc.) | Deterministic code + Haiku for gray-zone names |
 | 3. AI Agent | Route to scenario, reason about decision | Deterministic routing + Claude API reasoning |
 | 4. Persist | Save recommendation, update status, write audit trail | Code (single DB transaction) |
@@ -71,7 +71,6 @@ Scenario 5 runs **first** on every payment. Then the system routes to 1, 2, 3, o
 
 | Location | Model | Purpose |
 |----------|-------|---------|
-| Ingest — reference parsing | Claude (Sonnet/Opus) | Extract policy numbers, intent, period count from free-text |
 | Signals — name matching | Claude Haiku | Gray-zone fallback (70-92%) for nicknames, format variations |
 | Agent — scenario reasoning | Claude (Sonnet/Opus) | Weigh signals, produce recommendation + explanations |
 

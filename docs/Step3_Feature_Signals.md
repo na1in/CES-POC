@@ -36,6 +36,10 @@ The feature signals are organized into 5 main categories:
 - Handle common variations: middle initials, nicknames, spelling
 - Normalize: lowercase, remove special characters, handle prefixes/suffixes
 
+**Implementation notes** (2026-09-26):
+- Middle initials are handled deterministically: a single-letter initial that only one of the two names has is ignored ("Boris P. Ulker" vs "Boris Ulker" scores 100). An initial is kept when it is evidence (same initial on both sides, an initial standing for a name the other side spells out, or two different initials). Without this, such names scored 76-90 and went to HOLD.
+- Nicknames are **not** expanded ("Bob" vs "Robert" scores about 63, below the 70 gray-zone floor, so the LLM is never asked). Whether nicknames are the same person is a business decision.
+
 **Output**: Numeric score (0-100)
 
 **Decision Thresholds** (Scenario 1):
@@ -63,6 +67,8 @@ The feature signals are organized into 5 main categories:
 - Fuzzy name match using Levenshtein distance or similar algorithm
 - Can be boosted by supporting signals (see 1.4)
 
+**Implementation note** (2026-09-26): the stored `customer_match_confidence` is a blended display value (name 60% + account match 20% + history match 20%), so an exact name without an account or history match shows 60. It is **not** used for the "name match ≥ 90%" decision: Scenario 2 tests the name similarity score (1.2) directly.
+
 **Output**: Numeric score (0-100)
 
 **Used In**: Scenarios 2, 4
@@ -77,7 +83,11 @@ The feature signals are organized into 5 main categories:
 - **Amount Match**: Payment amount matches expected premium for a policy
 - **Historical Pattern Match**: Amount and timing match historical payment pattern
 
-**Rule**: If name match < 90%, requires ≥2 supporting signals to proceed with Scenario 2. Otherwise escalates to Scenario 4.
+**Rule**: If name match < 90%, requires ≥2 supporting signals to proceed with Scenario 2. Otherwise escalates to Scenario 4. A name match ≥ 90% is a strong match on its own; these signals never gate it.
+
+**Implementation notes** (2026-09-26):
+- *Amount Match* cannot be computed by the signal engine when no policy is identified (no premium to compare), which is always the case in Scenario 2, so Scenario 2 derives it from the customer's active policies' premiums.
+- *Historical Pattern Match* requires at least 2 history records. The consistency score returns 100 for a customer with too little history, which is "not enough data", not support for the payment.
 
 **Used In**: Scenario 2
 
@@ -174,6 +184,8 @@ is_multi_method = (fraction ≈ 1/N for N in [2,3,4]) within 5% tolerance
 - Calculate mean and std deviation of last 6-12 payments
 - Compare current payment to historical pattern
 - Z-score calculation for statistical outlier detection
+- The spread is floored at 2% of the mean, so a customer who always pays the same premium (standard deviation 0) is still flagged when an amount is off. Without the floor every amount scored 100 for such customers.
+- Fewer than 2 records: score 100 ("not enough data to flag")
 
 **Output**: Consistency score (0-100) + outlier flag
 
@@ -296,6 +308,8 @@ ELSE: Duplicate = FALSE (0%)
 ```
 
 This is a binary check — either all criteria are met or it's not a duplicate. The $2 amount tolerance accounts for bank processing fees (e.g., $7,500 → $7,499), rounding differences, and small surcharges.
+
+**Implementation note**: `Policy_Reference` is compared as the exact text of `reference_field_1`, not through the reference parser, so the check does not depend on parsing. The time window is symmetric (±72 hours around the payment's date), the amount tolerance is applied inside the search, and only `returned` payments are ignored (a `processing_failed` payment is money that arrived and still counts). The sender's account is deliberately **not** a criterion — a duplicate can arrive from another bank account or card, and the account says nothing about which policy is paid.
 
 **Output**: Boolean (duplicate detected / not detected)
 

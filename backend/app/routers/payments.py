@@ -4,11 +4,13 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, StrictInt, field_validator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal, get_db
+from app.services.audit_report import render_audit_report_html
 from app.services.ingest import parse_reference_fields
 from app.services.pipeline import run_pipeline
 
@@ -55,7 +57,9 @@ class IngestResponse(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 async def _next_payment_id(db: AsyncSession) -> str:
-    # Only consider numeric IDs (e.g. PMT-001) — skips seeded non-numeric ones like PMT-ESC-001
+    # Only consider numeric IDs (e.g. PMT-001) — defensive: every payment_id is this shape today
+    # (seed fixtures use a reserved PMT-9xx block, not a separate format), but this guards against a
+    # manually-inserted non-numeric ID ever breaking MAX() here.
     result = await db.execute(text("""
         SELECT MAX(CAST(split_part(payment_id, '-', 2) AS INTEGER))
         FROM payments
@@ -68,10 +72,10 @@ async def _next_payment_id(db: AsyncSession) -> str:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
-async def _run_pipeline_bg(payment_id: str) -> None:
+async def _run_pipeline_bg(payment_id: str, parsed_refs: dict | None = None) -> None:
     async with AsyncSessionLocal() as db:
         try:
-            await run_pipeline(payment_id, db)
+            await run_pipeline(payment_id, db, parsed_refs)
         except Exception:
             logger.exception("Background pipeline failed for %s", payment_id)
 
@@ -82,7 +86,8 @@ async def ingest_payment(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    # Parse free-text references with Claude Haiku (never raises)
+    # Extract the policy number from the free-text references (deterministic, never raises). Parsed once here and
+    # handed to the pipeline.
     parsed = await parse_reference_fields(body.reference_field_1, body.reference_field_2)
 
     payment_id = await _next_payment_id(db)
@@ -129,7 +134,7 @@ async def ingest_payment(
     await db.commit()
     logger.info("Ingested %s — %s %s", payment_id, body.sender_name, body.amount)
 
-    background_tasks.add_task(_run_pipeline_bg, payment_id)
+    background_tasks.add_task(_run_pipeline_bg, payment_id, parsed)
 
     return IngestResponse(payment_id=payment_id, status="received", created_timestamp=now)
 
@@ -279,12 +284,12 @@ async def list_payments(
 
 # ── GET /api/payments/{id} ────────────────────────────────────────────────────
 
-@router.get("/{payment_id}")
-async def get_payment(
-    payment_id: str,
-    db: AsyncSession = Depends(get_db),
-):
-    """Full payment detail: payment + signals (by category) + recommendation + audit + annotations + documents."""
+async def _load_payment_detail(payment_id: str, db: AsyncSession) -> dict:
+    """
+    Shared loader for the full payment detail: payment + signals (by category) + recommendation +
+    audit + annotations + documents. Used by both the JSON detail endpoint and the audit-report HTML
+    endpoint so the two never drift apart.
+    """
     payment_row = await db.execute(
         text("SELECT * FROM payments WHERE payment_id = :id"),
         {"id": payment_id},
@@ -361,7 +366,10 @@ async def get_payment(
     recommendation = dict(rec) if rec else None
 
     audit_rows = await db.execute(
-        text("SELECT * FROM audit_log WHERE payment_id = :id ORDER BY timestamp ASC"),
+        # log_id tiebreaker: two entries in the same request (e.g. approve's "approved" then "applied")
+        # can share the exact same timestamp, and ORDER BY timestamp alone doesn't guarantee insertion
+        # order on a tie — this pinned it to log_id, matching how the rows were actually written.
+        text("SELECT * FROM audit_log WHERE payment_id = :id ORDER BY timestamp ASC, log_id ASC"),
         {"id": payment_id},
     )
     audit_trail = [dict(r) for r in audit_rows.mappings()]
@@ -395,3 +403,40 @@ async def get_payment(
         "annotations": annotations,
         "documents": documents,
     }
+
+
+@router.get("/{payment_id}")
+async def get_payment(
+    payment_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Full payment detail: payment + signals (by category) + recommendation + audit + annotations + documents."""
+    return await _load_payment_detail(payment_id, db)
+
+
+@router.get("/{payment_id}/audit-report", response_class=HTMLResponse)
+async def get_payment_audit_report(
+    payment_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Renders the same data as GET /{payment_id} as a printable HTML report, styled to match the
+    PayWise frontend (frontend/src/app/globals.css tokens), for the "View audit report" button on the
+    Payment Detail page. Includes case notes / investigation notes so an investigator opening the
+    report sees everything an analyst has added — not just the system's own audit trail.
+
+    No auth dependency, matching GET /{payment_id} above (PoC has no per-endpoint read restriction on
+    payment detail; see CLAUDE.md "PoC auth" note).
+    """
+    detail = await _load_payment_detail(payment_id, db)
+
+    customer_name = None
+    if detail["payment"].get("matched_customer_id"):
+        row = await db.execute(
+            text("SELECT name FROM customers WHERE customer_id = :id"),
+            {"id": detail["payment"]["matched_customer_id"]},
+        )
+        found = row.one_or_none()
+        customer_name = found[0] if found else None
+
+    return HTMLResponse(render_audit_report_html(detail, customer_name))
